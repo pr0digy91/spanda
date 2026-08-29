@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
+import tempfile
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 from spanda.extract import extract_codebase, plan_scan, stream_records
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
+from spanda.drift import compare
 from spanda.store import Index, IndexError_, db_path, prepare_db_path
 
 
@@ -308,6 +312,163 @@ def cmd_find(args: argparse.Namespace) -> int:
     return 0
 
 
+def _bullet(change) -> str:
+    warning = "  [callers not statically knowable]" if change.callers_unknowable else ""
+    return f"    {change.file_path}:{change.line_start}  {change.qualname}{warning}"
+
+
+def cmd_drift(args: argparse.Namespace) -> int:
+    target = resolve_db(args)
+    if target is None:
+        print(f"no index yet at {db_path(Path(args.path).resolve())} — "
+              f"run `spanda index` first")
+        return 1
+
+    with Index(target) as index:
+        scans = index.scans(complete_only=True)
+        if len(scans) < 2:
+            print(f"only {len(scans)} completed scan(s) in this index; "
+                  f"drift needs two.\nRun `spanda index` again after a change, "
+                  f"or `spanda backfill` to index past commits.")
+            return 1
+        first = args.scan_a if args.scan_a is not None else scans[-2]["scan_id"]
+        second = args.scan_b if args.scan_b is not None else scans[-1]["scan_id"]
+        report = compare(index, first, second)
+
+    a, b = report.scan_a, report.scan_b
+
+    def label(scan) -> str:
+        if scan["git_commit_hash"]:
+            return f"scan {scan['scan_id']} ({scan['git_commit_hash'][:8]})"
+        if scan["git_base_commit"]:
+            return f"scan {scan['scan_id']} ({scan['git_base_commit'][:8]}+dirty)"
+        return f"scan {scan['scan_id']}"
+
+    print(f"{label(a)}  →  {label(b)}")
+    print(f"{a['timestamp']}  →  {b['timestamp']}\n")
+
+    if report.identical:
+        print("Nothing changed.")
+    else:
+        headline = []
+        if report.shape:
+            headline.append(f"{len(report.shape)} changed shape")
+        if report.removed:
+            headline.append(f"{len(report.removed)} removed")
+        if report.added:
+            headline.append(f"{len(report.added)} added")
+        if report.internal:
+            headline.append(f"{len(report.internal)} changed internally")
+        print(", ".join(headline).capitalize() + ".")
+        print(f"{report.unchanged_count} symbols untouched.\n")
+
+    if report.shape:
+        print("SHAPE CHANGED — callers of these may break\n")
+        for change in report.shape:
+            print(_bullet(change))
+            print(f"        was  {change.before}")
+            print(f"        now  {change.after}")
+        print()
+
+    if report.removed:
+        print("REMOVED\n")
+        for change in report.removed:
+            print(_bullet(change))
+        print()
+
+    if report.added:
+        print("ADDED\n")
+        for change in report.added:
+            print(_bullet(change))
+        print()
+
+    if report.internal and not args.brief:
+        print("CHANGED INTERNALLY — callers unaffected\n")
+        for change in report.internal:
+            print(_bullet(change))
+        print()
+    elif report.internal:
+        print(f"({len(report.internal)} internal-only changes hidden; "
+              f"drop --brief to list them)\n")
+
+    if report.caveats:
+        print("Caveats\n")
+        for note in report.caveats:
+            print(f"  · {note}")
+        print()
+
+    unknowable = [c for c in report.shape if c.callers_unknowable]
+    if unknowable:
+        print(f"{len(unknowable)} of the shape changes are on symbols whose "
+              f"callers cannot be\ndetermined by reading the code. Reading the "
+              f"call sites will not find them.")
+    return 0
+
+
+def _git(root: Path, *args: str) -> str | None:
+    result = subprocess.run(("git", "-C", str(root)) + args,
+                            capture_output=True, text=True)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def cmd_backfill(args: argparse.Namespace) -> int:
+    """Index past commits, so drift can be tested against real history today
+    rather than after weeks of accumulating scans."""
+    root = Path(args.path).resolve()
+    if _git(root, "rev-parse", "HEAD") is None:
+        print(f"{root} is not a git repository; backfill has no history to read",
+              file=sys.stderr)
+        return 2
+
+    target = Path(args.db) if args.db else prepare_db_path(root)
+    with Index(target, codebase_root=root) as index:
+        if index.scans():
+            print(f"{target} already holds scans. Backfill writes history in "
+                  f"chronological order,\nso it needs an empty index — later "
+                  f"scans would otherwise carry earlier commits.\nDelete it and "
+                  f"re-run, or pass --db to a new file.", file=sys.stderr)
+            return 2
+
+    log = _git(root, "log", "-n", str(args.last), "--format=%H %ct %s")
+    commits = [line.split(" ", 2) for line in (log or "").splitlines()]
+    commits.reverse()  # oldest first, so scan_id order matches time order
+    if not commits:
+        print("no commits found", file=sys.stderr)
+        return 2
+
+    patterns = load_patterns(Path(args.patterns) if args.patterns else None)
+    print(f"backfilling {len(commits)} commits into {target}\n")
+
+    with Index(target, codebase_root=root) as index:
+        for number, (commit, when, subject) in enumerate(commits, start=1):
+            committed = datetime.fromtimestamp(
+                int(when), timezone.utc).isoformat(timespec="seconds")
+            with tempfile.TemporaryDirectory() as tmp:
+                worktree = Path(tmp) / "tree"
+                if _git(root, "worktree", "add", "--detach",
+                        str(worktree), commit) is None:
+                    print(f"  ! could not check out {commit[:8]}, skipping",
+                          file=sys.stderr)
+                    continue
+                try:
+                    plan = plan_scan(worktree)
+                    scan_id = index.begin_scan(
+                        worktree, plan.skipped_count, record_root=root,
+                        commit_override=commit, dirty_override=False,
+                        timestamp_override=committed)
+                    symbols = 0
+                    for record in stream_records(plan):
+                        symbols += index.write_record(scan_id, record, patterns)
+                    index.finish_scan(scan_id)
+                    print(f"  {number:>3}/{len(commits)}  scan {scan_id}  "
+                          f"{commit[:8]}  {symbols:>6} symbols  {subject[:44]}")
+                finally:
+                    _git(root, "worktree", "remove", "--force", str(worktree))
+
+    print(f"\nDone. Compare any two with:  spanda drift {args.path} A B")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="spanda",
@@ -348,6 +509,27 @@ def main(argv: list[str] | None = None) -> int:
     find_cmd.add_argument("pattern", help="name or qualname, * allowed as a wildcard")
     find_cmd.add_argument("--db", default=None, help="pin a specific index file")
     find_cmd.set_defaults(func=cmd_find)
+
+    drift_cmd = subparsers.add_parser(
+        "drift", help="what changed between two scans")
+    drift_cmd.add_argument("path", help="root of the indexed codebase")
+    drift_cmd.add_argument("scan_a", nargs="?", type=int, default=None,
+                           help="older scan (default: second-newest)")
+    drift_cmd.add_argument("scan_b", nargs="?", type=int, default=None,
+                           help="newer scan (default: newest)")
+    drift_cmd.add_argument("--brief", action="store_true",
+                           help="hide the internal-only changes")
+    drift_cmd.add_argument("--db", default=None, help="pin a specific index file")
+    drift_cmd.set_defaults(func=cmd_drift)
+
+    backfill_cmd = subparsers.add_parser(
+        "backfill", help="index past git commits into a fresh index")
+    backfill_cmd.add_argument("path", help="root of the codebase (a git repository)")
+    backfill_cmd.add_argument("--last", type=int, default=10,
+                              help="how many commits back to index (default: 10)")
+    backfill_cmd.add_argument("--patterns", help="override the dynamic-dispatch pattern file")
+    backfill_cmd.add_argument("--db", default=None, help="pin a specific index file")
+    backfill_cmd.set_defaults(func=cmd_backfill)
 
     args = parser.parse_args(argv)
     try:

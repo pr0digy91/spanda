@@ -14,7 +14,8 @@ milestone plan.
 
 M1 complete: per-file extraction (Stage 1) and gap reporting.
 M2 complete: SQLite storage with stable symbol identity across scans.
-Next: M3, drift reporting — the go/no-go milestone.
+M3 complete: drift reporting and backfill of past commits.
+Next: evaluate whether the drift reports change a decision worth making.
 
 ## Use
 
@@ -37,6 +38,13 @@ python -m spanda.cli gaps <path> --unreferenced
 python -m spanda.cli index <path>
 python -m spanda.cli scans <path>
 python -m spanda.cli find <path> "Order*"
+
+# Replay past commits, so drift has real history to read today
+python -m spanda.cli backfill <path> --last 10
+
+# What changed between two scans (defaults to the last two)
+python -m spanda.cli drift <path>
+python -m spanda.cli drift <path> 3 7 --brief
 ```
 
 The index lives at `<path>/.spanda/index.db` — one authoritative index per

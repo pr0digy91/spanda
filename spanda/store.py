@@ -20,7 +20,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -105,6 +105,19 @@ CREATE TABLE IF NOT EXISTS symbols (
     last_seen_scan_id    INTEGER NOT NULL
 );
 
+-- Contiguous runs of scans in which a symbol was present. `first_seen` and
+-- `last_seen` cannot answer "was it there at scan 4?" on their own: a symbol
+-- deleted at scan 3 and restored at scan 5 has first_seen 1 and last_seen 5,
+-- which wrongly implies it existed throughout. One row per unbroken run, so a
+-- symbol that never disappears costs exactly one row for its whole life.
+CREATE TABLE IF NOT EXISTS symbol_spans (
+    symbol_uuid TEXT    NOT NULL,
+    from_scan   INTEGER NOT NULL,
+    to_scan     INTEGER NOT NULL,
+    PRIMARY KEY (symbol_uuid, from_scan)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spans_range ON symbol_spans (from_scan, to_scan);
 CREATE INDEX IF NOT EXISTS idx_versions_scan ON symbol_versions (scan_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols (file_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols (name);
@@ -342,8 +355,26 @@ class Index:
         self.close()
 
     # -- scans ------------------------------------------------------------
-    def begin_scan(self, root: Path, skipped_files: int = 0) -> int:
-        commit, dirty = git_state(root)
+    def previous_scan_id(self, scan_id: int) -> int | None:
+        row = self.connection.execute(
+            "SELECT MAX(scan_id) AS previous FROM scans WHERE scan_id < ?",
+            (scan_id,)).fetchone()
+        return row["previous"]
+
+    def begin_scan(self, root: Path, skipped_files: int = 0,
+                   record_root: Path | None = None,
+                   commit_override: str | None = None,
+                   dirty_override: bool | None = None,
+                   timestamp_override: str | None = None) -> int:
+        """Open a scan. `record_root` and the overrides exist for backfill,
+        which extracts from a throwaway git worktree but must record the scan
+        against the real repository, the commit it checked out, and — since
+        the scan describes code as it was — that commit's own date rather than
+        the moment the backfill happened to run."""
+        if commit_override is not None:
+            commit, dirty = commit_override, bool(dirty_override)
+        else:
+            commit, dirty = git_state(root)
         try:
             self.connection.execute("BEGIN IMMEDIATE")
         except sqlite3.OperationalError as error:
@@ -358,8 +389,9 @@ class Index:
             "INSERT INTO scans (timestamp, root_path, git_commit_hash,"
             " git_base_commit, git_dirty, skipped_files)"
             " VALUES (?, ?, ?, ?, ?, ?)",
-            (datetime.now(timezone.utc).isoformat(timespec="seconds"),
-             str(Path(root).resolve()),
+            (timestamp_override
+             or datetime.now(timezone.utc).isoformat(timespec="seconds"),
+             str(Path(record_root or root).resolve()),
              # A dirty tree is not the commit it sits on.
              None if dirty else commit,
              commit,
@@ -483,6 +515,8 @@ class Index:
                     f" VALUES (?, ?, {placeholders}, ?, ?)",
                     (symbol_uuid, key) + values + (scan_id, scan_id))
 
+            self._record_presence(symbol_uuid, scan_id)
+
             if changed:
                 self.connection.execute(
                     "INSERT OR REPLACE INTO symbol_versions (symbol_uuid, scan_id,"
@@ -494,7 +528,34 @@ class Index:
 
         return len(definitions)
 
+    def _record_presence(self, symbol_uuid: str, scan_id: int) -> None:
+        """Extend this symbol's current run of scans, or start a new one."""
+        latest = self.connection.execute(
+            "SELECT from_scan, to_scan FROM symbol_spans WHERE symbol_uuid = ?"
+            " ORDER BY from_scan DESC LIMIT 1", (symbol_uuid,)).fetchone()
+        if latest and latest["to_scan"] == scan_id:
+            return
+        if latest and latest["to_scan"] == self._previous_scan(scan_id):
+            self.connection.execute(
+                "UPDATE symbol_spans SET to_scan = ? WHERE symbol_uuid = ?"
+                " AND from_scan = ?", (scan_id, symbol_uuid, latest["from_scan"]))
+            return
+        self.connection.execute(
+            "INSERT OR REPLACE INTO symbol_spans (symbol_uuid, from_scan, to_scan)"
+            " VALUES (?, ?, ?)", (symbol_uuid, scan_id, scan_id))
+
+    def _previous_scan(self, scan_id: int) -> int | None:
+        if getattr(self, "_prev_cache", (None, None))[0] != scan_id:
+            self._prev_cache = (scan_id, self.previous_scan_id(scan_id))
+        return self._prev_cache[1]
+
     # -- queries ----------------------------------------------------------
+    def present_at(self, scan_id: int) -> set[str]:
+        """UUIDs of every symbol that existed at a given scan."""
+        return {r["symbol_uuid"] for r in self.connection.execute(
+            "SELECT symbol_uuid FROM symbol_spans"
+            " WHERE from_scan <= ? AND to_scan >= ?", (scan_id, scan_id))}
+
     def symbol_by_key(self, key: str) -> sqlite3.Row | None:
         return self.connection.execute(
             "SELECT * FROM symbols WHERE symbol_key = ?", (key,)).fetchone()
