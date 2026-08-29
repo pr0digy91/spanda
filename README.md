@@ -34,10 +34,16 @@ python -m spanda.cli gaps <path>
 python -m spanda.cli gaps <path> --unreferenced
 
 # Store it. Re-running is safe: symbols keep their identity across scans.
-python -m spanda.cli index <path> --db spanda.db
-python -m spanda.cli scans --db spanda.db
-python -m spanda.cli find "Order*" --db spanda.db
+python -m spanda.cli index <path>
+python -m spanda.cli scans <path>
+python -m spanda.cli find <path> "Order*"
 ```
+
+The index lives at `<path>/.spanda/YYYY-MM-DD-HHMMSS.db`, inside the codebase
+it describes. Names sort chronologically, so the newest is the last one listed.
+`.spanda/` ignores itself via a `.gitignore` of `*`: indexes are derived data
+and never belong in a commit. Each run starts from the most recent existing
+index so symbols keep their identity; pass `--db` to pin one file instead.
 
 Indexing streams one file at a time, so peak memory depends on the largest
 single file rather than the size of the codebase — 680 files index in 52 MB

@@ -1,39 +1,55 @@
 """Stage 4 — SQLite storage.
 
 Written one file at a time, never accumulating the codebase in memory. The
-whole point of this layer is that a symbol keeps its identity across scans:
-if a re-index mints fresh UUIDs, every symbol reads as removed-and-added and
-the drift report — the only thing this project is ultimately for — becomes
-noise. That identity lives in `symbol_key`, and everything else follows.
+point of this layer is that a symbol keeps its identity across scans: if a
+re-index mints fresh UUIDs, every symbol reads as removed-and-added and the
+drift report — the only thing this project is ultimately for — becomes noise.
+That identity lives in `symbol_key`, and everything else follows.
+
+The index lives inside the codebase it describes, at `.spanda/YYYY-MM-DD.db`,
+so a database and the code it indexes cannot drift apart or be mixed up.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import sqlite3
 import subprocess
 import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS scans (
     scan_id             INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp           TEXT    NOT NULL,
     root_path           TEXT    NOT NULL,
+    -- Set only when the working tree is clean. A dirty tree is NOT the commit
+    -- it sits on: recording the hash anyway would let a scan of uncommitted
+    -- work masquerade as a scan of that commit, and any later comparison
+    -- across the two would be nonsense.
     git_commit_hash     TEXT,
+    git_base_commit     TEXT,
     git_dirty           INTEGER,
+    -- Fingerprint of every file hash in the scan. Two scans with the same
+    -- value indexed byte-identical code, whatever git thinks.
+    content_fingerprint TEXT,
     total_files         INTEGER DEFAULT 0,
     parsed_files        INTEGER DEFAULT 0,
     unparseable_files   INTEGER DEFAULT 0,
     skipped_files       INTEGER DEFAULT 0,
     total_symbols       INTEGER DEFAULT 0,
     ambiguous_symbols   INTEGER DEFAULT 0,
-    -- 0 until the run finishes. An interrupted scan must be visibly partial
-    -- rather than quietly indistinguishable from a complete one.
     completed           INTEGER NOT NULL DEFAULT 0
 );
 
@@ -47,6 +63,21 @@ CREATE TABLE IF NOT EXISTS files (
     parse_error_message TEXT,
     symbol_count        INTEGER DEFAULT 0,
     PRIMARY KEY (scan_id, file_path)
+);
+
+-- One row per scan in which a symbol's shape or content actually changed.
+-- The symbols table holds only current values, so without this a second scan
+-- overwrites the first and "did this signature change between scan 3 and scan
+-- 7" — the question Stage 6 exists to answer — becomes unanswerable. Rows are
+-- written only on an actual change, so an unchanged codebase adds nothing.
+CREATE TABLE IF NOT EXISTS symbol_versions (
+    symbol_uuid         TEXT    NOT NULL,
+    scan_id             INTEGER NOT NULL,
+    content_hash        TEXT,
+    signature_hash      TEXT,
+    canonical_signature TEXT,
+    line_start          INTEGER,
+    PRIMARY KEY (symbol_uuid, scan_id)
 );
 
 CREATE TABLE IF NOT EXISTS symbols (
@@ -72,23 +103,7 @@ CREATE TABLE IF NOT EXISTS symbols (
     content_hash         TEXT,
     signature_hash       TEXT,
     first_seen_scan_id   INTEGER NOT NULL,
-    last_seen_scan_id    INTEGER NOT NULL,
-    is_deleted           INTEGER NOT NULL DEFAULT 0
-);
-
--- One row per scan in which a symbol's shape or content actually changed.
--- The symbols table holds only current values, so without this a second scan
--- overwrites the first and "did this signature change between scan 3 and scan
--- 7" — the question Stage 6 exists to answer — becomes unanswerable. Rows are
--- written only on an actual change, so an unchanged codebase adds nothing.
-CREATE TABLE IF NOT EXISTS symbol_versions (
-    symbol_uuid         TEXT    NOT NULL,
-    scan_id             INTEGER NOT NULL,
-    content_hash        TEXT,
-    signature_hash      TEXT,
-    canonical_signature TEXT,
-    line_start          INTEGER,
-    PRIMARY KEY (symbol_uuid, scan_id)
+    last_seen_scan_id    INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_versions_scan ON symbol_versions (scan_id);
@@ -104,6 +119,88 @@ SYMBOL_FIELDS = [
     "has_dynamic_dispatch", "definition_count", "signature_varies",
     "content_hash", "signature_hash",
 ]
+
+
+class IndexError_(Exception):
+    """Refusal to operate on an index that cannot be trusted."""
+
+
+# --------------------------------------------------------------------------
+# where the index lives
+# --------------------------------------------------------------------------
+
+def index_dir(root: Path) -> Path:
+    """`.spanda/` inside the codebase being indexed.
+
+    Co-locating the index with its code is the structural fix for indexing two
+    different projects into one database: there is no shared default path to
+    collide on.
+    """
+    return Path(root).resolve() / INDEX_DIRNAME
+
+
+#: `2026-08-29-134502.db`. Date first so the directory sorts chronologically
+#: by name; time appended so several runs in one day stay distinguishable and
+#: the newest is simply the last one listed.
+DB_NAME_FORMAT = "%Y-%m-%d-%H%M%S"
+
+GITIGNORE_BODY = """# Spanda index files.
+#
+# Derived data: everything here is rebuildable from the source it describes,
+# and the files are large and binary. Ignoring the whole directory, including
+# this file, keeps generated indexes out of the repository's history.
+*
+"""
+
+
+def timestamped_db_path(root: Path, when: datetime | None = None) -> Path:
+    stamp = (when or datetime.now()).strftime(DB_NAME_FORMAT)
+    return index_dir(root) / f"{stamp}.db"
+
+
+def existing_dbs(root: Path) -> list[Path]:
+    """Every index for this codebase, oldest first.
+
+    Names sort chronologically, so the last entry is the most recent.
+    """
+    directory = index_dir(root)
+    if not directory.is_dir():
+        return []
+    return sorted(p for p in directory.glob("*.db") if p.is_file())
+
+
+def latest_db(root: Path) -> Path | None:
+    dbs = existing_dbs(root)
+    return dbs[-1] if dbs else None
+
+
+def ensure_index_dir(root: Path) -> Path:
+    """Create `.spanda/`, self-ignoring so indexes never reach a commit."""
+    directory = index_dir(root)
+    directory.mkdir(parents=True, exist_ok=True)
+    gitignore = directory / ".gitignore"
+    if not gitignore.exists():
+        gitignore.write_text(GITIGNORE_BODY)
+    return directory
+
+
+def prepare_db_path(root: Path, when: datetime | None = None) -> tuple[Path, Path | None]:
+    """A new index path for this run, seeded from the most recent earlier one.
+
+    Carrying the previous database forward is what keeps symbol identity
+    continuous. Starting each run from an empty file would mint fresh UUIDs
+    for everything and report the whole codebase as new every time — the exact
+    failure `symbol_key` exists to prevent. The cost is that each file holds
+    the full history to date, so they accumulate; `--db` pins one file when
+    that matters.
+    """
+    ensure_index_dir(root)
+    target = timestamped_db_path(root, when)
+    source = latest_db(root)
+    if source is not None and source != target and not target.exists():
+        shutil.copy2(source, target)
+        return target, source
+    return target, None
 
 
 # --------------------------------------------------------------------------
@@ -192,35 +289,107 @@ def git_state(root: Path) -> tuple[str | None, bool | None]:
 # --------------------------------------------------------------------------
 
 class Index:
-    """A SQLite-backed symbol index, written incrementally as files stream in."""
+    """A SQLite-backed symbol index, written incrementally as files stream in.
 
-    def __init__(self, path: Path) -> None:
+    A scan is one transaction. An interrupted run leaves the index exactly as
+    it was, rather than half-written — a half-written scan looks identical to
+    a mass deletion, and would make a drift report confidently wrong.
+    """
+
+    def __init__(self, path: Path, codebase_root: Path | None = None) -> None:
         self.path = Path(path)
-        self.connection = sqlite3.connect(self.path)
+        fresh = not self.path.exists()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.connection = sqlite3.connect(self.path, isolation_level=None)
         self.connection.row_factory = sqlite3.Row
-        self.connection.executescript(SCHEMA)
-        self.connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-        self.connection.commit()
+        self._open_scan: int | None = None
 
+        if fresh:
+            self.connection.executescript(SCHEMA)
+            self._set_meta("schema_version", str(SCHEMA_VERSION))
+            if codebase_root is not None:
+                self._set_meta("codebase_root", str(Path(codebase_root).resolve()))
+        else:
+            self._check_schema_version()
+            self.connection.executescript(SCHEMA)  # additive only
+            if codebase_root is not None:
+                self._check_codebase(codebase_root)
+
+    # -- guards -----------------------------------------------------------
+    def _set_meta(self, key: str, value: str) -> None:
+        self.connection.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, value))
+
+    def meta(self, key: str) -> str | None:
+        try:
+            row = self.connection.execute(
+                "SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+        except sqlite3.OperationalError:
+            return None
+        return row["value"] if row else None
+
+    def _check_schema_version(self) -> None:
+        stored = self.meta("schema_version")
+        if stored is None:
+            raise IndexError_(
+                f"{self.path} predates schema versioning and cannot be read "
+                f"safely. Delete it and re-index.")
+        if int(stored) != SCHEMA_VERSION:
+            direction = "newer than" if int(stored) > SCHEMA_VERSION else "older than"
+            raise IndexError_(
+                f"{self.path} has schema version {stored}, {direction} this "
+                f"build's version {SCHEMA_VERSION}. There are no migrations "
+                f"yet: delete the file and re-index.")
+
+    def _check_codebase(self, root: Path) -> None:
+        stored = self.meta("codebase_root")
+        resolved = str(Path(root).resolve())
+        if stored is None:
+            self._set_meta("codebase_root", resolved)
+            return
+        if stored != resolved:
+            raise IndexError_(
+                f"{self.path} indexes {stored}, not {resolved}. Indexing a "
+                f"second codebase into it would report the first one's symbols "
+                f"as deleted. Use a separate index.")
+
+    # -- lifecycle --------------------------------------------------------
     def close(self) -> None:
+        if self._open_scan is not None:
+            self.abort_scan()
         self.connection.close()
 
     def __enter__(self) -> "Index":
         return self
 
-    def __exit__(self, *exc) -> None:
+    def __exit__(self, exc_type, *_) -> None:
+        if exc_type is not None and self._open_scan is not None:
+            self.abort_scan()
         self.close()
 
     # -- scans ------------------------------------------------------------
     def begin_scan(self, root: Path, skipped_files: int = 0) -> int:
         commit, dirty = git_state(root)
+        self.connection.execute("BEGIN IMMEDIATE")
+        self._open_scan = None
         cursor = self.connection.execute(
-            "INSERT INTO scans (timestamp, root_path, git_commit_hash, git_dirty,"
-            " skipped_files) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO scans (timestamp, root_path, git_commit_hash,"
+            " git_base_commit, git_dirty, skipped_files)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
             (datetime.now(timezone.utc).isoformat(timespec="seconds"),
-             str(root), commit, None if dirty is None else int(dirty), skipped_files))
-        self.connection.commit()
-        return cursor.lastrowid
+             str(Path(root).resolve()),
+             # A dirty tree is not the commit it sits on.
+             None if dirty else commit,
+             commit,
+             None if dirty is None else int(dirty),
+             skipped_files))
+        self._open_scan = cursor.lastrowid
+        return self._open_scan
+
+    def abort_scan(self) -> None:
+        """Discard an in-progress scan entirely."""
+        self.connection.execute("ROLLBACK")
+        self._open_scan = None
 
     def finish_scan(self, scan_id: int) -> dict:
         totals = self.connection.execute(
@@ -233,22 +402,49 @@ class Index:
             "SELECT COUNT(*) FROM symbols"
             " WHERE last_seen_scan_id = ? AND definition_count > 1",
             (scan_id,)).fetchone()[0]
+
+        digest = hashlib.sha256()
+        for row in self.connection.execute(
+                "SELECT file_path, file_hash FROM files WHERE scan_id = ?"
+                " ORDER BY file_path", (scan_id,)):
+            digest.update(f"{row['file_path']}:{row['file_hash']}\n".encode())
+
         self.connection.execute(
             "UPDATE scans SET total_files = ?, parsed_files = ?,"
             " unparseable_files = ?, total_symbols = ?, ambiguous_symbols = ?,"
-            " completed = 1 WHERE scan_id = ?",
+            " content_fingerprint = ?, completed = 1 WHERE scan_id = ?",
             (totals["files"], totals["parsed"] or 0, totals["unparseable"] or 0,
-             totals["symbols"], ambiguous, scan_id))
-        self.connection.commit()
+             totals["symbols"], ambiguous, "sha256:" + digest.hexdigest()[:32],
+             scan_id))
+        self.connection.execute("COMMIT")
+        self._open_scan = None
         return dict(self.scan(scan_id))
 
     def scan(self, scan_id: int) -> sqlite3.Row:
         return self.connection.execute(
             "SELECT * FROM scans WHERE scan_id = ?", (scan_id,)).fetchone()
 
-    def scans(self) -> list[sqlite3.Row]:
+    def scans(self, complete_only: bool = False) -> list[sqlite3.Row]:
+        clause = " WHERE completed = 1" if complete_only else ""
         return self.connection.execute(
-            "SELECT * FROM scans ORDER BY scan_id").fetchall()
+            f"SELECT * FROM scans{clause} ORDER BY scan_id").fetchall()
+
+    def require_complete(self, scan_id: int) -> sqlite3.Row:
+        """Fetch a scan, refusing one that never finished.
+
+        An interrupted scan saw only part of the codebase, so everything it
+        did not reach looks deleted. Comparing against one would produce a
+        confidently wrong answer, which is worse than no answer.
+        """
+        row = self.scan(scan_id)
+        if row is None:
+            raise IndexError_(f"no scan {scan_id} in {self.path}")
+        if not row["completed"]:
+            raise IndexError_(
+                f"scan {scan_id} never completed — it saw only part of the "
+                f"codebase, so everything it did not reach would read as "
+                f"deleted. Re-run the index instead of comparing against it.")
+        return row
 
     # -- writing ----------------------------------------------------------
     def write_record(self, scan_id: int, record: dict, patterns: list[str]) -> int:
@@ -292,9 +488,8 @@ class Index:
                            or existing["signature_hash"] != definition["signature_hash"])
                 assignments = ", ".join(f"{f} = ?" for f in SYMBOL_FIELDS)
                 self.connection.execute(
-                    f"UPDATE symbols SET {assignments}, last_seen_scan_id = ?,"
-                    " is_deleted = 0 WHERE uuid = ?",
-                    values + (scan_id, symbol_uuid))
+                    f"UPDATE symbols SET {assignments}, last_seen_scan_id = ?"
+                    " WHERE uuid = ?", values + (scan_id, symbol_uuid))
             else:
                 symbol_uuid = uuid_module.uuid4().hex
                 changed = True
@@ -317,9 +512,6 @@ class Index:
 
         return len(definitions)
 
-    def commit(self) -> None:
-        self.connection.commit()
-
     # -- queries ----------------------------------------------------------
     def symbol_by_key(self, key: str) -> sqlite3.Row | None:
         return self.connection.execute(
@@ -336,6 +528,18 @@ class Index:
             " ORDER BY file_path, line_start LIMIT ?",
             (pattern, pattern, limit)).fetchall()
 
+    def missing_at(self, scan_id: int) -> list[sqlite3.Row]:
+        """Symbols the index knows about that a given scan did not see.
+
+        Derived rather than stored. An `is_deleted` column would have to be
+        maintained by every write path, and once Stage 5 stops re-reading
+        unchanged files it would be maintained wrongly — a column that is
+        always false is worse than no column, because queries come to trust it.
+        """
+        return self.connection.execute(
+            "SELECT * FROM symbols WHERE last_seen_scan_id < ?"
+            " ORDER BY file_path, line_start", (scan_id,)).fetchall()
+
     def version_at(self, symbol_uuid: str, scan_id: int) -> sqlite3.Row | None:
         """What a symbol looked like as of a given scan.
 
@@ -346,9 +550,3 @@ class Index:
         return self.connection.execute(
             "SELECT * FROM symbol_versions WHERE symbol_uuid = ? AND scan_id <= ?"
             " ORDER BY scan_id DESC LIMIT 1", (symbol_uuid, scan_id)).fetchone()
-
-    def missing_since(self, scan_id: int) -> list[sqlite3.Row]:
-        """Symbols the index knows about that this scan did not see."""
-        return self.connection.execute(
-            "SELECT * FROM symbols WHERE last_seen_scan_id < ? ORDER BY file_path",
-            (scan_id,)).fetchall()

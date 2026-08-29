@@ -15,8 +15,9 @@ import pytest
 
 from spanda.extract import plan_scan, stream_records
 from spanda.gaps import load_patterns
-from spanda.store import (Index, merge_duplicate_definitions, path_module,
-                          symbol_key)
+from spanda.store import (Index, IndexError_, ensure_index_dir, existing_dbs,
+                          latest_db, merge_duplicate_definitions, path_module,
+                          prepare_db_path, symbol_key, timestamped_db_path)
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "fixtures"
@@ -25,21 +26,29 @@ FIXTURES = ROOT / "fixtures"
 def index_once(db: Path, source: Path) -> int:
     plan = plan_scan(source)
     patterns = load_patterns()
-    with Index(db) as index:
+    with Index(db, codebase_root=source) as index:
         scan_id = index.begin_scan(plan.root, plan.skipped_count)
         for record in stream_records(plan):
             index.write_record(scan_id, record, patterns)
-        index.commit()
+        # finish_scan commits: a scan is one transaction, all or nothing.
         index.finish_scan(scan_id)
     return scan_id
+
+
+#: Never copy an existing index into a test workspace; the copy would claim
+#: to describe the original directory.
+IGNORE_INDEXES = shutil.ignore_patterns(".spanda")
+
+
+def fresh_copy(destination: Path) -> Path:
+    shutil.copytree(FIXTURES, destination, ignore=IGNORE_INDEXES)
+    return destination
 
 
 @pytest.fixture
 def workspace(tmp_path):
     """A throwaway copy of the fixture codebase, safe to edit."""
-    source = tmp_path / "code"
-    shutil.copytree(FIXTURES, source)
-    return source, tmp_path / "index.db"
+    return fresh_copy(tmp_path / "code"), tmp_path / "index.db"
 
 
 # -- identity --------------------------------------------------------------
@@ -130,7 +139,7 @@ def test_addition_and_removal_are_detected(workspace):
     with Index(db) as index:
         added = {r["qualname"] for r in index.connection.execute(
             "SELECT qualname FROM symbols WHERE first_seen_scan_id = 2")}
-        missing = {r["qualname"] for r in index.missing_since(2)}
+        missing = {r["qualname"] for r in index.missing_at(2)}
 
     assert "brand_new" in added
     assert {"format_currency", "slugify", "_internal_only"} <= missing
@@ -212,3 +221,164 @@ def test_unparseable_file_is_recorded_in_the_index(workspace):
     assert row["parse_error_line"] == 10
     assert scan["unparseable_files"] == 1
     assert scan["completed"] == 1
+
+
+# -- where the index lives -------------------------------------------------
+
+def test_index_lives_beside_the_code_it_describes(tmp_path):
+    (tmp_path / "app.py").write_text("def f(): pass\n")
+    db, seeded = prepare_db_path(tmp_path)
+    assert db.parent == tmp_path / ".spanda"
+    assert seeded is None
+
+
+def test_db_name_is_date_then_time_so_newest_sorts_last(tmp_path):
+    from datetime import datetime
+    early = timestamped_db_path(tmp_path, datetime(2026, 8, 29, 9, 5, 1))
+    later = timestamped_db_path(tmp_path, datetime(2026, 8, 29, 17, 30, 12))
+    next_day = timestamped_db_path(tmp_path, datetime(2026, 8, 30, 1, 0, 0))
+    assert early.name == "2026-08-29-090501.db"
+    assert sorted([next_day.name, later.name, early.name]) == [
+        early.name, later.name, next_day.name]
+
+
+def test_index_dir_ignores_itself(tmp_path):
+    """Indexes are derived data and must never reach a commit."""
+    directory = ensure_index_dir(tmp_path)
+    gitignore = directory / ".gitignore"
+    assert gitignore.exists()
+    assert "*" in gitignore.read_text().splitlines()
+
+
+def test_a_new_index_carries_the_previous_one_forward(tmp_path):
+    """Otherwise every run mints new UUIDs and reports the codebase as new."""
+    from datetime import datetime
+    (tmp_path / "app.py").write_text("def kept(): pass\n")
+
+    first, _ = prepare_db_path(tmp_path, datetime(2026, 8, 29, 10, 0, 0))
+    index_once(first, tmp_path)
+    with Index(first) as index:
+        before = {r["symbol_key"]: r["uuid"] for r in
+                  index.connection.execute("SELECT symbol_key, uuid FROM symbols")}
+
+    second, seeded = prepare_db_path(tmp_path, datetime(2026, 8, 30, 10, 0, 0))
+    assert seeded == first
+    index_once(second, tmp_path)
+    with Index(second) as index:
+        after = {r["symbol_key"]: r["uuid"] for r in
+                 index.connection.execute("SELECT symbol_key, uuid FROM symbols")}
+        scans = index.scans()
+
+    assert before == after, "identity must survive a new day's index file"
+    assert len(scans) == 2, "history must carry forward, not restart"
+    assert latest_db(tmp_path) == second
+    assert len(existing_dbs(tmp_path)) == 2
+
+
+# -- the five robustness failures ------------------------------------------
+
+def test_refuses_to_index_a_second_codebase_into_one_file(tmp_path):
+    """Otherwise the first project's symbols all report as deleted."""
+    a, b = tmp_path / "a", tmp_path / "b"
+    for directory, name in ((a, "alpha"), (b, "beta")):
+        directory.mkdir()
+        (directory / f"{name}.py").write_text(f"def {name}_fn(): pass\n")
+
+    db, _ = prepare_db_path(a)
+    index_once(db, a)
+    with pytest.raises(IndexError_, match="indexes"):
+        Index(db, codebase_root=b)
+
+
+def test_an_interrupted_scan_leaves_no_trace(tmp_path):
+    """A half-written scan is indistinguishable from a mass deletion."""
+    source = tmp_path / "code"
+    fresh_copy(source)
+    db, _ = prepare_db_path(source)
+    index_once(db, source)
+
+    plan, patterns = plan_scan(source), load_patterns()
+    with pytest.raises(RuntimeError):
+        with Index(db, codebase_root=source) as index:
+            scan_id = index.begin_scan(plan.root, plan.skipped_count)
+            for number, record in enumerate(stream_records(plan)):
+                if number == 3:
+                    raise RuntimeError("simulated crash")
+                index.write_record(scan_id, record, patterns)
+
+    with Index(db) as index:
+        assert len(index.scans()) == 1, "the dead scan must not survive"
+        assert index.missing_at(1) == [], "nothing may look deleted"
+
+
+def test_refuses_to_compare_against_an_incomplete_scan(tmp_path):
+    source = tmp_path / "code"
+    fresh_copy(source)
+    db, _ = prepare_db_path(source)
+    index_once(db, source)
+    with Index(db) as index:
+        index.connection.execute("UPDATE scans SET completed = 0 WHERE scan_id = 1")
+        with pytest.raises(IndexError_, match="never completed"):
+            index.require_complete(1)
+
+
+def test_deletion_is_derived_not_stored(tmp_path):
+    """An is_deleted column would be maintained wrongly once Stage 5 stops
+    re-reading unchanged files, and a column that is always false is worse
+    than no column because queries come to trust it."""
+    source = tmp_path / "code"
+    fresh_copy(source)
+    db, _ = prepare_db_path(source)
+    index_once(db, source)
+    with Index(db) as index:
+        columns = [r["name"] for r in
+                   index.connection.execute("PRAGMA table_info(symbols)")]
+    assert "is_deleted" not in columns
+
+
+def test_a_dirty_tree_is_not_recorded_as_its_commit(tmp_path, monkeypatch):
+    """Otherwise a scan of uncommitted work masquerades as a scan of that
+    commit, and any later comparison across the two is nonsense."""
+    import spanda.store as store
+    source = tmp_path / "code"
+    fresh_copy(source)
+    db, _ = prepare_db_path(source)
+
+    monkeypatch.setattr(store, "git_state", lambda root: ("abc123", True))
+    index_once(db, source)
+    monkeypatch.setattr(store, "git_state", lambda root: ("abc123", False))
+    index_once(db, source)
+
+    with Index(db) as index:
+        dirty, clean = index.scans()
+    assert dirty["git_commit_hash"] is None
+    assert dirty["git_base_commit"] == "abc123"
+    assert clean["git_commit_hash"] == "abc123"
+
+
+def test_refuses_an_index_from_a_different_schema_version(tmp_path):
+    (tmp_path / "app.py").write_text("def f(): pass\n")
+    db, _ = prepare_db_path(tmp_path)
+    index_once(db, tmp_path)
+    with Index(db) as index:
+        index.connection.execute("UPDATE meta SET value = '99' WHERE key = 'schema_version'")
+    with pytest.raises(IndexError_, match="schema version 99"):
+        Index(db)
+
+
+def test_identical_content_produces_an_identical_fingerprint(tmp_path):
+    """A cheap, git-independent answer to 'did anything change at all?'"""
+    source = tmp_path / "code"
+    fresh_copy(source)
+    db, _ = prepare_db_path(source)
+    index_once(db, source)
+    index_once(db, source)
+    with Index(db) as index:
+        one, two = index.scans()
+    assert one["content_fingerprint"] == two["content_fingerprint"]
+
+    (source / "sample_pkg" / "extra.py").write_text("def added(): pass\n")
+    index_once(db, source)
+    with Index(db) as index:
+        three = index.scans()[2]
+    assert three["content_fingerprint"] != one["content_fingerprint"]

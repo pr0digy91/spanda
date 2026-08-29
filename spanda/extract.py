@@ -20,6 +20,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 SKIP_DIRS = {
+    # `.spanda` holds this tool's own index files. Reading them back would
+    # make the tool part of what it measures.
+    ".spanda",
     "__pycache__", ".git", ".hg", ".svn", ".venv", "venv", "env",
     "node_modules", "build", "dist", ".tox", ".mypy_cache",
     ".pytest_cache", ".ruff_cache", "site-packages", ".eggs",
