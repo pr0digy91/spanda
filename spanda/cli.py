@@ -8,8 +8,9 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from spanda.extract import extract_codebase
+from spanda.extract import extract_codebase, plan_scan, stream_records
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
+from spanda.store import Index
 
 
 COLUMNS = [("defs", 6), ("fn", 5), ("cls", 5), ("meth", 6),
@@ -182,6 +183,101 @@ def cmd_gaps(args: argparse.Namespace) -> int:
     return 0
 
 
+COMMIT_EVERY = 200
+
+
+def cmd_index(args: argparse.Namespace) -> int:
+    root = Path(args.path).resolve()
+    if not root.is_dir():
+        print(f"not a directory: {root}", file=sys.stderr)
+        return 2
+
+    plan = plan_scan(root)
+    patterns = load_patterns(Path(args.patterns) if args.patterns else None)
+
+    with Index(Path(args.db)) as index:
+        scan_id = index.begin_scan(plan.root, plan.skipped_count)
+        print(f"scan {scan_id}: {len(plan.files)} files under {plan.root}")
+
+        symbols = 0
+        # One file in memory at a time. Peak memory is a function of the
+        # largest file, not of the codebase size.
+        for number, record in enumerate(stream_records(plan), start=1):
+            symbols += index.write_record(scan_id, record, patterns)
+            if number % COMMIT_EVERY == 0:
+                index.commit()
+                print(f"  {number}/{len(plan.files)} files, {symbols} symbols")
+        index.commit()
+
+        totals = index.finish_scan(scan_id)
+        missing = index.missing_since(scan_id)
+
+    print(f"\nscan {scan_id} complete")
+    print(f"  {totals['parsed_files']} files parsed, "
+          f"{totals['unparseable_files']} unparseable, "
+          f"{totals['skipped_files']} not looked at")
+    print(f"  {totals['total_symbols']} symbols "
+          f"({totals['ambiguous_symbols']} defined more than once in their file)")
+    if totals["git_commit_hash"]:
+        dirty = " (working tree dirty)" if totals["git_dirty"] else ""
+        print(f"  at commit {totals['git_commit_hash'][:12]}{dirty}")
+    else:
+        print("  not a git repository — incremental re-index will not be available")
+
+    if missing:
+        print(f"\n  {len(missing)} symbols known to the index were not seen "
+              f"in this scan:")
+        for row in missing[:10]:
+            print(f"    {row['file_path']}:{row['line_start']}  {row['qualname']}"
+                  f"  (last seen in scan {row['last_seen_scan_id']})")
+        if len(missing) > 10:
+            print(f"    ... and {len(missing) - 10} more")
+    return 0
+
+
+def cmd_scans(args: argparse.Namespace) -> int:
+    with Index(Path(args.db)) as index:
+        rows = index.scans()
+    if not rows:
+        print("no scans in this index yet")
+        return 0
+    header = (f"{'id':>4}  {'when':<20} {'commit':<10} {'files':>7} "
+              f"{'symbols':>8}  status")
+    print(header)
+    print("-" * len(header))
+    for row in rows:
+        commit = (row["git_commit_hash"] or "-")[:8]
+        if row["git_dirty"]:
+            commit += "*"
+        status = "complete" if row["completed"] else "INTERRUPTED — partial"
+        print(f"{row['scan_id']:>4}  {row['timestamp']:<20} {commit:<10} "
+              f"{row['total_files']:>7} {row['total_symbols']:>8}  {status}")
+    return 0
+
+
+def cmd_find(args: argparse.Namespace) -> int:
+    with Index(Path(args.db)) as index:
+        rows = index.find(args.pattern.replace("*", "%"))
+        scans = index.scans()
+    latest = max((s["scan_id"] for s in scans), default=0)
+    if not rows:
+        print(f"nothing matching {args.pattern!r}")
+        return 0
+    for row in rows:
+        flags = []
+        if row["has_dynamic_dispatch"]:
+            flags.append("dynamic-dispatch")
+        if row["definition_count"] > 1:
+            flags.append(f"defined x{row['definition_count']}")
+        if row["last_seen_scan_id"] < latest:
+            flags.append(f"NOT SEEN since scan {row['last_seen_scan_id']}")
+        suffix = ("  [" + ", ".join(flags) + "]") if flags else ""
+        print(f"{row['file_path']}:{row['line_start']}  {row['kind']:<9} "
+              f"{row['qualname']}{suffix}")
+        print(f"    {row['symbol_key']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="spanda",
@@ -202,6 +298,22 @@ def main(argv: list[str] | None = None) -> int:
     gaps.add_argument("--unreferenced", action="store_true",
                       help="also list symbols whose name appears in no reference")
     gaps.set_defaults(func=cmd_gaps)
+
+    index_cmd = subparsers.add_parser(
+        "index", help="Stage 4: parse a codebase and store it in SQLite")
+    index_cmd.add_argument("path", help="root of the codebase to index")
+    index_cmd.add_argument("--db", default="spanda.db", help="index file (default: spanda.db)")
+    index_cmd.add_argument("--patterns", help="override the dynamic-dispatch pattern file")
+    index_cmd.set_defaults(func=cmd_index)
+
+    scans_cmd = subparsers.add_parser("scans", help="list the scans in an index")
+    scans_cmd.add_argument("--db", default="spanda.db")
+    scans_cmd.set_defaults(func=cmd_scans)
+
+    find_cmd = subparsers.add_parser("find", help="look up symbols by name")
+    find_cmd.add_argument("pattern", help="name or qualname, * allowed as a wildcard")
+    find_cmd.add_argument("--db", default="spanda.db")
+    find_cmd.set_defaults(func=cmd_find)
 
     args = parser.parse_args(argv)
     return args.func(args)

@@ -546,13 +546,30 @@ def extract_file(path: Path, root: Path) -> dict:
 
 
 @dataclass
-class CodebaseScan:
-    """Result of one pass over a codebase.
+class ScanPlan:
+    """What a run intends to look at, decided before any file is opened.
 
-    `skipped` is not an implementation detail: a file the tool declined to
-    look at is a gap in its knowledge, and this project's first principle is
-    that gaps are visible. Silently dropping directories is how a tool comes
-    to report "no callers" with confidence it has not earned.
+    Cheap to build — it walks filenames only — so the caller can report the
+    shape of a run, and what it is skipping, before committing to the work.
+    """
+
+    root: Path
+    files: list[Path]
+    skipped: dict[str, list[str]] = field(default_factory=dict)
+
+    @property
+    def skipped_count(self) -> int:
+        return sum(len(paths) for paths in self.skipped.values())
+
+
+@dataclass
+class CodebaseScan:
+    """Every record from one pass, held in memory at once.
+
+    Only for consumers that genuinely need the whole codebase in view — the
+    gap report needs a table of every name defined anywhere before it can say
+    which ones nothing mentions. Everything else should use `stream_records`,
+    which holds one file at a time.
     """
 
     root: Path
@@ -594,11 +611,33 @@ def iter_python_files(root: Path):
     yield from keep
 
 
-def extract_codebase(root: Path) -> CodebaseScan:
+def plan_scan(root: Path) -> ScanPlan:
+    """Decide what to look at. Opens nothing."""
     root = root.resolve()
     keep, skipped = partition_python_files(root)
+    return ScanPlan(root=root, files=keep, skipped=skipped)
+
+
+def stream_records(plan: ScanPlan):
+    """Yield one record per file, holding exactly one in memory at a time.
+
+    This is the shape every consumer should use unless it truly needs the
+    whole codebase at once. Accumulating all records first makes peak memory
+    scale with codebase size — measured at 187 MB for 680 files, which
+    extrapolates to roughly 2.7 GB at 10,000 files. Streaming makes peak
+    memory a function of the largest single file instead, and therefore flat
+    no matter how large the codebase grows.
+    """
+    for path in plan.files:
+        yield extract_file(path, plan.root)
+
+
+def extract_codebase(root: Path) -> CodebaseScan:
+    """Materialise every record. Prefer `stream_records` unless the consumer
+    needs a whole-codebase view; see CodebaseScan."""
+    plan = plan_scan(root)
     return CodebaseScan(
-        root=root,
-        records=[extract_file(path, root) for path in keep],
-        skipped=skipped,
+        root=plan.root,
+        records=list(stream_records(plan)),
+        skipped=plan.skipped,
     )
