@@ -241,7 +241,7 @@ def cmd_scans(args: argparse.Namespace) -> int:
     if not rows:
         print("no scans in this index yet")
         return 0
-    header = (f"{'id':>4}  {'when':<20} {'commit':<10} {'files':>7} "
+    header = (f"{'id':>4}  {'when':<26} {'commit':<10} {'files':>7} "
               f"{'symbols':>8}  status")
     print(header)
     print("-" * len(header))
@@ -250,7 +250,7 @@ def cmd_scans(args: argparse.Namespace) -> int:
         if row["git_dirty"]:
             commit += "*"
         status = "complete" if row["completed"] else "INTERRUPTED — partial"
-        print(f"{row['scan_id']:>4}  {row['timestamp']:<20} {commit:<10} "
+        print(f"{row['scan_id']:>4}  {row['timestamp']:<26} {commit:<10} "
               f"{row['total_files']:>7} {row['total_symbols']:>8}  {status}")
     return 0
 
