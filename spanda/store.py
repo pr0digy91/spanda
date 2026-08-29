@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 import sqlite3
 import subprocess
 import uuid as uuid_module
@@ -139,10 +138,13 @@ def index_dir(root: Path) -> Path:
     return Path(root).resolve() / INDEX_DIRNAME
 
 
-#: `2026-08-29-134502.db`. Date first so the directory sorts chronologically
-#: by name; time appended so several runs in one day stay distinguishable and
-#: the newest is simply the last one listed.
-DB_NAME_FORMAT = "%Y-%m-%d-%H%M%S"
+#: One authoritative index per codebase. Not one file per run: the `scans`
+#: table already records when each run happened, against which commit, with
+#: what content fingerprint — a richer history than filenames could carry, and
+#: a queryable one. Several files would instead give several things each
+#: claiming to describe the repository, with UUIDs and version history trapped
+#: inside whichever one you happened to open.
+DB_FILENAME = "index.db"
 
 GITIGNORE_BODY = """# Spanda index files.
 #
@@ -153,25 +155,9 @@ GITIGNORE_BODY = """# Spanda index files.
 """
 
 
-def timestamped_db_path(root: Path, when: datetime | None = None) -> Path:
-    stamp = (when or datetime.now()).strftime(DB_NAME_FORMAT)
-    return index_dir(root) / f"{stamp}.db"
-
-
-def existing_dbs(root: Path) -> list[Path]:
-    """Every index for this codebase, oldest first.
-
-    Names sort chronologically, so the last entry is the most recent.
-    """
-    directory = index_dir(root)
-    if not directory.is_dir():
-        return []
-    return sorted(p for p in directory.glob("*.db") if p.is_file())
-
-
-def latest_db(root: Path) -> Path | None:
-    dbs = existing_dbs(root)
-    return dbs[-1] if dbs else None
+def db_path(root: Path) -> Path:
+    """The one index for this codebase."""
+    return index_dir(root) / DB_FILENAME
 
 
 def ensure_index_dir(root: Path) -> Path:
@@ -184,23 +170,10 @@ def ensure_index_dir(root: Path) -> Path:
     return directory
 
 
-def prepare_db_path(root: Path, when: datetime | None = None) -> tuple[Path, Path | None]:
-    """A new index path for this run, seeded from the most recent earlier one.
-
-    Carrying the previous database forward is what keeps symbol identity
-    continuous. Starting each run from an empty file would mint fresh UUIDs
-    for everything and report the whole codebase as new every time — the exact
-    failure `symbol_key` exists to prevent. The cost is that each file holds
-    the full history to date, so they accumulate; `--db` pins one file when
-    that matters.
-    """
+def prepare_db_path(root: Path) -> Path:
+    """The index path for this codebase, with `.spanda/` created if needed."""
     ensure_index_dir(root)
-    target = timestamped_db_path(root, when)
-    source = latest_db(root)
-    if source is not None and source != target and not target.exists():
-        shutil.copy2(source, target)
-        return target, source
-    return target, None
+    return db_path(root)
 
 
 # --------------------------------------------------------------------------
@@ -300,7 +273,8 @@ class Index:
         self.path = Path(path)
         fresh = not self.path.exists()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.connection = sqlite3.connect(self.path, isolation_level=None)
+        # Wait rather than fail instantly if another run holds the write lock.
+        self.connection = sqlite3.connect(self.path, isolation_level=None, timeout=15)
         self.connection.row_factory = sqlite3.Row
         self._open_scan: int | None = None
 
@@ -370,7 +344,15 @@ class Index:
     # -- scans ------------------------------------------------------------
     def begin_scan(self, root: Path, skipped_files: int = 0) -> int:
         commit, dirty = git_state(root)
-        self.connection.execute("BEGIN IMMEDIATE")
+        try:
+            self.connection.execute("BEGIN IMMEDIATE")
+        except sqlite3.OperationalError as error:
+            if "locked" in str(error).lower():
+                raise IndexError_(
+                    f"another index run is writing to {self.path}. "
+                    f"Wait for it to finish rather than running two at once — "
+                    f"there is one index per codebase by design.") from error
+            raise
         self._open_scan = None
         cursor = self.connection.execute(
             "INSERT INTO scans (timestamp, root_path, git_commit_hash,"

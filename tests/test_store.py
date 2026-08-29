@@ -15,9 +15,9 @@ import pytest
 
 from spanda.extract import plan_scan, stream_records
 from spanda.gaps import load_patterns
-from spanda.store import (Index, IndexError_, ensure_index_dir, existing_dbs,
-                          latest_db, merge_duplicate_definitions, path_module,
-                          prepare_db_path, symbol_key, timestamped_db_path)
+from spanda.store import (Index, IndexError_, db_path, ensure_index_dir,
+                          merge_duplicate_definitions, path_module,
+                          prepare_db_path, symbol_key)
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "fixtures"
@@ -227,19 +227,22 @@ def test_unparseable_file_is_recorded_in_the_index(workspace):
 
 def test_index_lives_beside_the_code_it_describes(tmp_path):
     (tmp_path / "app.py").write_text("def f(): pass\n")
-    db, seeded = prepare_db_path(tmp_path)
-    assert db.parent == tmp_path / ".spanda"
-    assert seeded is None
+    db = prepare_db_path(tmp_path)
+    assert db == tmp_path / ".spanda" / "index.db"
 
 
-def test_db_name_is_date_then_time_so_newest_sorts_last(tmp_path):
-    from datetime import datetime
-    early = timestamped_db_path(tmp_path, datetime(2026, 8, 29, 9, 5, 1))
-    later = timestamped_db_path(tmp_path, datetime(2026, 8, 29, 17, 30, 12))
-    next_day = timestamped_db_path(tmp_path, datetime(2026, 8, 30, 1, 0, 0))
-    assert early.name == "2026-08-29-090501.db"
-    assert sorted([next_day.name, later.name, early.name]) == [
-        early.name, later.name, next_day.name]
+def test_one_index_per_codebase(tmp_path):
+    """Several files would each claim to describe the repository, with UUIDs
+    and version history trapped inside whichever one you happened to open."""
+    (tmp_path / "app.py").write_text("def f(): pass\n")
+    first = prepare_db_path(tmp_path)
+    index_once(first, tmp_path)
+    second = prepare_db_path(tmp_path)
+    index_once(second, tmp_path)
+    assert first == second == db_path(tmp_path)
+    assert [p.name for p in (tmp_path / ".spanda").glob("*.db")] == ["index.db"]
+    with Index(first) as index:
+        assert len(index.scans()) == 2, "both runs land in one history"
 
 
 def test_index_dir_ignores_itself(tmp_path):
@@ -250,29 +253,24 @@ def test_index_dir_ignores_itself(tmp_path):
     assert "*" in gitignore.read_text().splitlines()
 
 
-def test_a_new_index_carries_the_previous_one_forward(tmp_path):
-    """Otherwise every run mints new UUIDs and reports the codebase as new."""
-    from datetime import datetime
+def test_history_accumulates_in_one_place(tmp_path):
+    """Identity and history stay in one file, so neither can be stranded."""
     (tmp_path / "app.py").write_text("def kept(): pass\n")
+    db = prepare_db_path(tmp_path)
 
-    first, _ = prepare_db_path(tmp_path, datetime(2026, 8, 29, 10, 0, 0))
-    index_once(first, tmp_path)
-    with Index(first) as index:
+    index_once(db, tmp_path)
+    with Index(db) as index:
         before = {r["symbol_key"]: r["uuid"] for r in
                   index.connection.execute("SELECT symbol_key, uuid FROM symbols")}
 
-    second, seeded = prepare_db_path(tmp_path, datetime(2026, 8, 30, 10, 0, 0))
-    assert seeded == first
-    index_once(second, tmp_path)
-    with Index(second) as index:
+    index_once(db, tmp_path)
+    with Index(db) as index:
         after = {r["symbol_key"]: r["uuid"] for r in
                  index.connection.execute("SELECT symbol_key, uuid FROM symbols")}
         scans = index.scans()
 
-    assert before == after, "identity must survive a new day's index file"
-    assert len(scans) == 2, "history must carry forward, not restart"
-    assert latest_db(tmp_path) == second
-    assert len(existing_dbs(tmp_path)) == 2
+    assert before == after
+    assert [s["scan_id"] for s in scans] == [1, 2]
 
 
 # -- the five robustness failures ------------------------------------------
@@ -284,7 +282,7 @@ def test_refuses_to_index_a_second_codebase_into_one_file(tmp_path):
         directory.mkdir()
         (directory / f"{name}.py").write_text(f"def {name}_fn(): pass\n")
 
-    db, _ = prepare_db_path(a)
+    db = prepare_db_path(a)
     index_once(db, a)
     with pytest.raises(IndexError_, match="indexes"):
         Index(db, codebase_root=b)
@@ -294,7 +292,7 @@ def test_an_interrupted_scan_leaves_no_trace(tmp_path):
     """A half-written scan is indistinguishable from a mass deletion."""
     source = tmp_path / "code"
     fresh_copy(source)
-    db, _ = prepare_db_path(source)
+    db = prepare_db_path(source)
     index_once(db, source)
 
     plan, patterns = plan_scan(source), load_patterns()
@@ -314,7 +312,7 @@ def test_an_interrupted_scan_leaves_no_trace(tmp_path):
 def test_refuses_to_compare_against_an_incomplete_scan(tmp_path):
     source = tmp_path / "code"
     fresh_copy(source)
-    db, _ = prepare_db_path(source)
+    db = prepare_db_path(source)
     index_once(db, source)
     with Index(db) as index:
         index.connection.execute("UPDATE scans SET completed = 0 WHERE scan_id = 1")
@@ -328,7 +326,7 @@ def test_deletion_is_derived_not_stored(tmp_path):
     than no column because queries come to trust it."""
     source = tmp_path / "code"
     fresh_copy(source)
-    db, _ = prepare_db_path(source)
+    db = prepare_db_path(source)
     index_once(db, source)
     with Index(db) as index:
         columns = [r["name"] for r in
@@ -342,7 +340,7 @@ def test_a_dirty_tree_is_not_recorded_as_its_commit(tmp_path, monkeypatch):
     import spanda.store as store
     source = tmp_path / "code"
     fresh_copy(source)
-    db, _ = prepare_db_path(source)
+    db = prepare_db_path(source)
 
     monkeypatch.setattr(store, "git_state", lambda root: ("abc123", True))
     index_once(db, source)
@@ -358,7 +356,7 @@ def test_a_dirty_tree_is_not_recorded_as_its_commit(tmp_path, monkeypatch):
 
 def test_refuses_an_index_from_a_different_schema_version(tmp_path):
     (tmp_path / "app.py").write_text("def f(): pass\n")
-    db, _ = prepare_db_path(tmp_path)
+    db = prepare_db_path(tmp_path)
     index_once(db, tmp_path)
     with Index(db) as index:
         index.connection.execute("UPDATE meta SET value = '99' WHERE key = 'schema_version'")
@@ -370,7 +368,7 @@ def test_identical_content_produces_an_identical_fingerprint(tmp_path):
     """A cheap, git-independent answer to 'did anything change at all?'"""
     source = tmp_path / "code"
     fresh_copy(source)
-    db, _ = prepare_db_path(source)
+    db = prepare_db_path(source)
     index_once(db, source)
     index_once(db, source)
     with Index(db) as index:

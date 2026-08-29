@@ -10,8 +10,7 @@ from pathlib import Path
 
 from spanda.extract import extract_codebase, plan_scan, stream_records
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
-from spanda.store import (Index, IndexError_, existing_dbs, latest_db,
-                          prepare_db_path)
+from spanda.store import Index, IndexError_, db_path, prepare_db_path
 
 
 COLUMNS = [("defs", 6), ("fn", 5), ("cls", 5), ("meth", 6),
@@ -218,29 +217,10 @@ def cmd_index(args: argparse.Namespace) -> int:
     plan = plan_scan(root)
     patterns = load_patterns(Path(args.patterns) if args.patterns else None)
 
-    if args.db:
-        db_path, seeded_from = Path(args.db), None
-    else:
-        db_path, seeded_from = prepare_db_path(root)
+    target = Path(args.db) if args.db else prepare_db_path(root)
+    print(f"index: {target}")
 
-    print(f"index: {db_path}")
-    if seeded_from:
-        print(f"  carried forward from {seeded_from.name}, so symbols keep "
-              f"their identity")
-
-    try:
-        totals, missing, scan_id = _run_scan(db_path, root, plan, patterns)
-    except BaseException:
-        # A run that never produced a scan leaves behind only the copy of the
-        # previous index it was seeded from. Remove it rather than littering
-        # .spanda/ with files that duplicate an existing state.
-        if seeded_from is not None and db_path.exists():
-            with Index(db_path) as probe:
-                empty = not probe.scans()
-            if empty:
-                db_path.unlink()
-                print(f"  discarded empty {db_path.name}", file=sys.stderr)
-        raise
+    totals, missing, scan_id = _run_scan(target, root, plan, patterns)
 
     print(f"\nscan {scan_id} complete")
     print(f"  {totals['parsed_files']} files parsed, "
@@ -269,22 +249,19 @@ def cmd_index(args: argparse.Namespace) -> int:
 
 
 def resolve_db(args: argparse.Namespace) -> Path | None:
-    """Explicit --db wins; otherwise the newest index for this codebase."""
-    if args.db:
-        return Path(args.db)
-    return latest_db(Path(args.path).resolve())
+    """Explicit --db wins; otherwise this codebase's one index."""
+    target = Path(args.db) if args.db else db_path(Path(args.path).resolve())
+    return target if target.exists() else None
 
 
 def cmd_scans(args: argparse.Namespace) -> int:
-    db_path = resolve_db(args)
-    if db_path is None:
-        print(f"no index yet under {Path(args.path).resolve()}/.spanda/ — "
+    target = resolve_db(args)
+    if target is None:
+        print(f"no index yet at {db_path(Path(args.path).resolve())} — "
               f"run `spanda index` first")
         return 1
-    others = existing_dbs(Path(args.path).resolve())
-    print(f"index: {db_path}"
-          + (f"   ({len(others)} indexes present, newest shown)" if len(others) > 1 else ""))
-    with Index(db_path) as index:
+    print(f"index: {target}")
+    with Index(target) as index:
         rows = index.scans()
     if not rows:
         print("no scans in this index yet")
@@ -304,12 +281,12 @@ def cmd_scans(args: argparse.Namespace) -> int:
 
 
 def cmd_find(args: argparse.Namespace) -> int:
-    db_path = resolve_db(args)
-    if db_path is None:
-        print(f"no index yet under {Path(args.path).resolve()}/.spanda/ — "
+    target = resolve_db(args)
+    if target is None:
+        print(f"no index yet at {db_path(Path(args.path).resolve())} — "
               f"run `spanda index` first")
         return 1
-    with Index(db_path) as index:
+    with Index(target) as index:
         rows = index.find(args.pattern.replace("*", "%"))
         scans = index.scans()
     latest = max((s["scan_id"] for s in scans), default=0)
@@ -356,8 +333,8 @@ def main(argv: list[str] | None = None) -> int:
         "index", help="Stage 4: parse a codebase and store it in SQLite")
     index_cmd.add_argument("path", help="root of the codebase to index")
     index_cmd.add_argument("--db", default=None,
-                           help="pin a specific index file (default: "
-                                "<codebase>/.spanda/YYYY-MM-DD-HHMMSS.db)")
+                           help="override the index location "
+                                "(default: <codebase>/.spanda/index.db)")
     index_cmd.add_argument("--patterns", help="override the dynamic-dispatch pattern file")
     index_cmd.set_defaults(func=cmd_index)
 
