@@ -1,0 +1,434 @@
+{
+  "file": "sample_pkg/dynamic.py",
+  "module": "sample_pkg.dynamic",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:7b9893d54276b69391200733d08f1e65",
+  "module_docstring": "Dynamic dispatch: none of the call targets here are statically knowable.\n\nAlso carries a conditional import, which is resolvable only at runtime and\nmust be recorded as conditional rather than silently treated as certain.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from . import handlers",
+      "module": ".",
+      "names": [
+        {
+          "name": "handlers",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 7,
+      "conditional": false
+    },
+    {
+      "raw": "import ujson as json",
+      "module": null,
+      "names": [
+        {
+          "name": "ujson",
+          "alias": "json"
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 10,
+      "conditional": true
+    },
+    {
+      "raw": "import json",
+      "module": null,
+      "names": [
+        {
+          "name": "json",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 12,
+      "conditional": true
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "variable",
+      "name": "HANDLER_NAMES",
+      "qualname": "HANDLER_NAMES",
+      "parent": null,
+      "lines": [
+        14,
+        14
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:6ec2b6f86275adf11d8797d31216196a"
+    },
+    {
+      "local_id": "d2",
+      "kind": "function",
+      "name": "dispatch",
+      "qualname": "dispatch",
+      "parent": null,
+      "lines": [
+        17,
+        22
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "event_name",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          },
+          {
+            "name": "payload",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Look up a handler by a name assembled at runtime, then call it.",
+      "canonical_signature": "(positional:event_name:str,positional:payload)->",
+      "signature_hash": "sha256:cd5e2c64ece98839abc6b1206c2542b7",
+      "content_hash": "sha256:3783ef1caee799207061d528b21649cd"
+    },
+    {
+      "local_id": "d3",
+      "kind": "function",
+      "name": "call_named",
+      "qualname": "call_named",
+      "parent": null,
+      "lines": [
+        25,
+        29
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "target",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "method_name",
+            "kind": "positional",
+            "annotation": "str",
+            "default": "'on_paid'"
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Attribute access through a variable, on an argument of unknown type.",
+      "canonical_signature": "(positional:target,positional:method_name:str='on_paid')->",
+      "signature_hash": "sha256:d51a731dee1a22590c42627838935e6a",
+      "content_hash": "sha256:0a6842b0c18300c74d96b05b2a1c6f99"
+    },
+    {
+      "local_id": "d4",
+      "kind": "function",
+      "name": "serialise",
+      "qualname": "serialise",
+      "parent": null,
+      "lines": [
+        32,
+        34
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "payload",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Calls into whichever json module the conditional import bound.",
+      "canonical_signature": "(positional:payload)->str",
+      "signature_hash": "sha256:3aff5f971370b6d8475d37a83e3c4cee",
+      "content_hash": "sha256:ce9c337dede3868fb9a8c8955bc424d8"
+    }
+  ],
+  "references": [
+    {
+      "raw": "ImportError",
+      "root": "ImportError",
+      "chain": [
+        "ImportError"
+      ],
+      "context": "name",
+      "line": 11,
+      "enclosing": null,
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 17,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "getattr",
+      "root": "getattr",
+      "chain": [
+        "getattr"
+      ],
+      "context": "call",
+      "line": 19,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "handlers",
+      "root": "handlers",
+      "chain": [
+        "handlers"
+      ],
+      "context": "name",
+      "line": 19,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "event_name",
+      "root": "event_name",
+      "chain": [
+        "event_name"
+      ],
+      "context": "name",
+      "line": 19,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "fn",
+      "root": "fn",
+      "chain": [
+        "fn"
+      ],
+      "context": "name",
+      "line": 20,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "fn",
+      "root": "fn",
+      "chain": [
+        "fn"
+      ],
+      "context": "call",
+      "line": 22,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "payload",
+      "root": "payload",
+      "chain": [
+        "payload"
+      ],
+      "context": "name",
+      "line": 22,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 25,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "hasattr",
+      "root": "hasattr",
+      "chain": [
+        "hasattr"
+      ],
+      "context": "call",
+      "line": 27,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "target",
+      "root": "target",
+      "chain": [
+        "target"
+      ],
+      "context": "name",
+      "line": 27,
+      "enclosing": "d3",
+      "local": true
+    },
+    {
+      "raw": "method_name",
+      "root": "method_name",
+      "chain": [
+        "method_name"
+      ],
+      "context": "name",
+      "line": 27,
+      "enclosing": "d3",
+      "local": true
+    },
+    {
+      "raw": "getattr",
+      "root": "getattr",
+      "chain": [
+        "getattr"
+      ],
+      "context": "call",
+      "line": 28,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "target",
+      "root": "target",
+      "chain": [
+        "target"
+      ],
+      "context": "call",
+      "line": 28,
+      "enclosing": "d3",
+      "local": true
+    },
+    {
+      "raw": "method_name",
+      "root": "method_name",
+      "chain": [
+        "method_name"
+      ],
+      "context": "call",
+      "line": 28,
+      "enclosing": "d3",
+      "local": true
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 32,
+      "enclosing": "d4",
+      "local": false
+    },
+    {
+      "raw": "json.dumps",
+      "root": "json",
+      "chain": [
+        "json",
+        "dumps"
+      ],
+      "context": "call",
+      "line": 34,
+      "enclosing": "d4",
+      "local": false
+    },
+    {
+      "raw": "payload",
+      "root": "payload",
+      "chain": [
+        "payload"
+      ],
+      "context": "name",
+      "line": 34,
+      "enclosing": "d4",
+      "local": true
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "on_created",
+      "line": 14,
+      "enclosing": null
+    },
+    {
+      "kind": "identifier_string",
+      "value": "on_paid",
+      "line": 14,
+      "enclosing": null
+    },
+    {
+      "kind": "getattr",
+      "raw": "getattr(handlers, 'on_' + event_name, None)",
+      "line": 19,
+      "enclosing": "d2"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "on_",
+      "line": 19,
+      "enclosing": "d2"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "on_paid",
+      "line": 25,
+      "enclosing": "d3"
+    },
+    {
+      "kind": "hasattr",
+      "raw": "hasattr(target, method_name)",
+      "line": 27,
+      "enclosing": "d3"
+    },
+    {
+      "kind": "getattr",
+      "raw": "getattr(target, method_name)",
+      "line": 28,
+      "enclosing": "d3"
+    }
+  ]
+}

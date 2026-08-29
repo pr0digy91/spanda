@@ -1,0 +1,130 @@
+{
+  "file": "sample_pkg/__init__.py",
+  "module": "sample_pkg",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:65b0dbc62764edc39efc49aa91a8bce5",
+  "module_docstring": "Sample package root.\n\nExists to test re-export resolution: names below are importable as\n`sample_pkg.Order` even though they are *defined* in submodules. A resolver\nthat only looks at where a name is imported will point here; a correct one\npoints at the real definition in models.py / helpers.py.",
+  "dunder_all": [
+    "Order",
+    "OrderStatus",
+    "format_currency"
+  ],
+  "imports": [
+    {
+      "raw": "from .models import Order, OrderStatus",
+      "module": ".models",
+      "names": [
+        {
+          "name": "Order",
+          "alias": null
+        },
+        {
+          "name": "OrderStatus",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 9,
+      "conditional": false
+    },
+    {
+      "raw": "from .helpers import format_currency",
+      "module": ".helpers",
+      "names": [
+        {
+          "name": "format_currency",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 10,
+      "conditional": false
+    },
+    {
+      "raw": "from . import a",
+      "module": ".",
+      "names": [
+        {
+          "name": "a",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 11,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "variable",
+      "name": "__all__",
+      "qualname": "__all__",
+      "parent": null,
+      "lines": [
+        13,
+        13
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:c1b3b27ce6074b1f81853ae3c7b37f6f"
+    },
+    {
+      "local_id": "d2",
+      "kind": "variable",
+      "name": "VERSION",
+      "qualname": "VERSION",
+      "parent": null,
+      "lines": [
+        15,
+        15
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:f7c1152ced11e787ca946fcc34d4d81a"
+    }
+  ],
+  "references": [],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "Order",
+      "line": 13,
+      "enclosing": null
+    },
+    {
+      "kind": "identifier_string",
+      "value": "OrderStatus",
+      "line": 13,
+      "enclosing": null
+    },
+    {
+      "kind": "identifier_string",
+      "value": "format_currency",
+      "line": 13,
+      "enclosing": null
+    }
+  ]
+}

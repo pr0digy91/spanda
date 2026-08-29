@@ -1,0 +1,108 @@
+{
+  "file": "sample_pkg/b.py",
+  "module": "sample_pkg.b",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:4c8520231d0a6d57ddc9088bc1f5c0d9",
+  "module_docstring": "Half of a deliberate circular import pair: b imports a, a imports b.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from .a import TABLE_PREFIX",
+      "module": ".a",
+      "names": [
+        {
+          "name": "TABLE_PREFIX",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 3,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "function",
+      "name": "validate_table",
+      "qualname": "validate_table",
+      "parent": null,
+      "lines": [
+        6,
+        8
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "table_id",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Check the table id carries the expected prefix.",
+      "canonical_signature": "(positional:table_id:str)->bool",
+      "signature_hash": "sha256:91a3994d9d8dab7d51dbcd71891efe0a",
+      "content_hash": "sha256:d47a9abcf2367048582387aae4e0fe93"
+    }
+  ],
+  "references": [
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 6,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 6,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "table_id.startswith",
+      "root": "table_id",
+      "chain": [
+        "table_id",
+        "startswith"
+      ],
+      "context": "call",
+      "line": 8,
+      "enclosing": "d1",
+      "local": true
+    },
+    {
+      "raw": "TABLE_PREFIX",
+      "root": "TABLE_PREFIX",
+      "chain": [
+        "TABLE_PREFIX"
+      ],
+      "context": "name",
+      "line": 8,
+      "enclosing": "d1",
+      "local": false
+    }
+  ],
+  "dynamic_hints": []
+}

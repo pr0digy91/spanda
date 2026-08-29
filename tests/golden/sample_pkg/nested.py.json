@@ -1,0 +1,532 @@
+{
+  "file": "sample_pkg/nested.py",
+  "module": "sample_pkg.nested",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:b207a764aa61816f51656c10be380af6",
+  "module_docstring": "Nesting, closures, async, and every parameter kind in one place.\n\nExists to check that qualnames and signatures survive the awkward cases:\na function defined inside a function, a class inside a class, and a\nsignature using positional-only, varargs, keyword-only and **kwargs.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "import functools",
+      "module": null,
+      "names": [
+        {
+          "name": "functools",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 8,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "function",
+      "name": "make_multiplier",
+      "qualname": "make_multiplier",
+      "parent": null,
+      "lines": [
+        11,
+        17
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "factor",
+            "kind": "positional",
+            "annotation": "int",
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Returns a closure. `multiply` is a nested definition, not module-level.",
+      "canonical_signature": "(positional:factor:int)->",
+      "signature_hash": "sha256:b1996aa4290575733ac6adec58d9edeb",
+      "content_hash": "sha256:f91d9a089f765bafcbc3c00c9e1efc30"
+    },
+    {
+      "local_id": "d2",
+      "kind": "function",
+      "name": "multiply",
+      "qualname": "make_multiplier.multiply",
+      "parent": "d1",
+      "lines": [
+        14,
+        15
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "value",
+            "kind": "positional",
+            "annotation": "int",
+            "default": null
+          }
+        ],
+        "returns": "int"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:value:int)->int",
+      "signature_hash": "sha256:6cc194678076b385e8e986380d1060bd",
+      "content_hash": "sha256:a38776afe8922e0c2b39a6079f4fe0ca"
+    },
+    {
+      "local_id": "d3",
+      "kind": "function",
+      "name": "expensive_lookup",
+      "qualname": "expensive_lookup",
+      "parent": null,
+      "lines": [
+        20,
+        23
+      ],
+      "decorator_lines": [
+        20,
+        20
+      ],
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "key",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          }
+        ],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "functools.lru_cache(maxsize=128)",
+          "base": "functools.lru_cache"
+        }
+      ],
+      "docstring": "Call-form decorator from an imported module. Not dynamic dispatch.",
+      "canonical_signature": "(positional:key:str)->str",
+      "signature_hash": "sha256:958b88299ad4633cd6d18076cf277dbb",
+      "content_hash": "sha256:aba676d1cc4a2a773f37b92566c9fd1c"
+    },
+    {
+      "local_id": "d4",
+      "kind": "function",
+      "name": "fetch_menu",
+      "qualname": "fetch_menu",
+      "parent": null,
+      "lines": [
+        26,
+        30
+      ],
+      "decorator_lines": null,
+      "is_async": true,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "restaurant_id",
+            "kind": "positional_only",
+            "annotation": "str",
+            "default": null
+          },
+          {
+            "name": "sections",
+            "kind": "vararg",
+            "annotation": "str",
+            "default": null
+          },
+          {
+            "name": "locale",
+            "kind": "keyword_only",
+            "annotation": "str",
+            "default": "'en'"
+          },
+          {
+            "name": "options",
+            "kind": "kwarg",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "dict"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Async, positional-only, varargs, keyword-only and kwargs in one signature.",
+      "canonical_signature": "(positional_only:restaurant_id:str,vararg:sections:str,keyword_only:locale:str='en',kwarg:options)->dict",
+      "signature_hash": "sha256:e5956cf65bfd13eaf9d170022eb5c559",
+      "content_hash": "sha256:43f975f29caf24d1c7a4a5f1b1feffc2"
+    },
+    {
+      "local_id": "d5",
+      "kind": "class",
+      "name": "Outer",
+      "qualname": "Outer",
+      "parent": null,
+      "lines": [
+        33,
+        43
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [],
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Contains a nested class.",
+      "canonical_signature": "bases()",
+      "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
+      "content_hash": "sha256:8b12d42b521c77f3613470dd5665478f"
+    },
+    {
+      "local_id": "d6",
+      "kind": "class",
+      "name": "Inner",
+      "qualname": "Outer.Inner",
+      "parent": "d5",
+      "lines": [
+        36,
+        43
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [],
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Nested class. Its qualname must come out as Outer.Inner.",
+      "canonical_signature": "bases()",
+      "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
+      "content_hash": "sha256:ed37dad8a472c115003d99aea416e1ab"
+    },
+    {
+      "local_id": "d7",
+      "kind": "variable",
+      "name": "depth",
+      "qualname": "Outer.Inner.depth",
+      "parent": "d6",
+      "lines": [
+        39,
+        39
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:cd4d0db839527552004193aaa6426813"
+    },
+    {
+      "local_id": "d8",
+      "kind": "method",
+      "name": "ping",
+      "qualname": "Outer.Inner.ping",
+      "parent": "d6",
+      "lines": [
+        41,
+        43
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Qualname must be Outer.Inner.ping.",
+      "canonical_signature": "(positional:self)->str",
+      "signature_hash": "sha256:241662efb905849dbd20926af7de972d",
+      "content_hash": "sha256:3859ad71301990cd55f16ea6874632c9"
+    }
+  ],
+  "references": [
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 11,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 14,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 14,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "value",
+      "root": "value",
+      "chain": [
+        "value"
+      ],
+      "context": "name",
+      "line": 15,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "factor",
+      "root": "factor",
+      "chain": [
+        "factor"
+      ],
+      "context": "name",
+      "line": 15,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "multiply",
+      "root": "multiply",
+      "chain": [
+        "multiply"
+      ],
+      "context": "name",
+      "line": 17,
+      "enclosing": "d1",
+      "local": true
+    },
+    {
+      "raw": "functools.lru_cache",
+      "root": "functools",
+      "chain": [
+        "functools",
+        "lru_cache"
+      ],
+      "context": "decorator",
+      "line": 20,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 21,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 21,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "key.upper",
+      "root": "key",
+      "chain": [
+        "key",
+        "upper"
+      ],
+      "context": "call",
+      "line": 23,
+      "enclosing": "d3",
+      "local": true
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 27,
+      "enclosing": "d4",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 27,
+      "enclosing": "d4",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 27,
+      "enclosing": "d4",
+      "local": false
+    },
+    {
+      "raw": "dict",
+      "root": "dict",
+      "chain": [
+        "dict"
+      ],
+      "context": "annotation",
+      "line": 28,
+      "enclosing": "d4",
+      "local": false
+    },
+    {
+      "raw": "restaurant_id",
+      "root": "restaurant_id",
+      "chain": [
+        "restaurant_id"
+      ],
+      "context": "name",
+      "line": 30,
+      "enclosing": "d4",
+      "local": true
+    },
+    {
+      "raw": "sections",
+      "root": "sections",
+      "chain": [
+        "sections"
+      ],
+      "context": "name",
+      "line": 30,
+      "enclosing": "d4",
+      "local": true
+    },
+    {
+      "raw": "locale",
+      "root": "locale",
+      "chain": [
+        "locale"
+      ],
+      "context": "name",
+      "line": 30,
+      "enclosing": "d4",
+      "local": true
+    },
+    {
+      "raw": "options",
+      "root": "options",
+      "chain": [
+        "options"
+      ],
+      "context": "name",
+      "line": 30,
+      "enclosing": "d4",
+      "local": true
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 41,
+      "enclosing": "d8",
+      "local": false
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "en",
+      "line": 27,
+      "enclosing": "d4"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "id",
+      "line": 30,
+      "enclosing": "d4"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "sections",
+      "line": 30,
+      "enclosing": "d4"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "locale",
+      "line": 30,
+      "enclosing": "d4"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "pong",
+      "line": 43,
+      "enclosing": "d8"
+    }
+  ]
+}

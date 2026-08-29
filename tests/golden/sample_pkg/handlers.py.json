@@ -1,0 +1,116 @@
+{
+  "file": "sample_pkg/handlers.py",
+  "module": "sample_pkg.handlers",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:55c433be8bb60ddf02d83d5eef6c682a",
+  "module_docstring": "Handlers reached only through getattr in dynamic.py.\n\nNeither function is referenced by name anywhere in this package. Both are\ncalled at runtime. This is the second shape of the same trap as\nmodels._apply_rls_context, arriving via getattr instead of a decorator.",
+  "dunder_all": [],
+  "imports": [],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "function",
+      "name": "on_created",
+      "qualname": "on_created",
+      "parent": null,
+      "lines": [
+        9,
+        11
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "payload",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Invoked as getattr(handlers, \"on_created\").",
+      "canonical_signature": "(positional:payload)->",
+      "signature_hash": "sha256:033cf8593b5c954a789ea791f460bdbc",
+      "content_hash": "sha256:308d0fcbebd690ec53a0d6301ee5f808"
+    },
+    {
+      "local_id": "d2",
+      "kind": "function",
+      "name": "on_paid",
+      "qualname": "on_paid",
+      "parent": null,
+      "lines": [
+        14,
+        16
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "payload",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Invoked as getattr(handlers, \"on_paid\").",
+      "canonical_signature": "(positional:payload)->",
+      "signature_hash": "sha256:033cf8593b5c954a789ea791f460bdbc",
+      "content_hash": "sha256:961dbe66afc5f5ff13cbc20287555430"
+    }
+  ],
+  "references": [
+    {
+      "raw": "payload",
+      "root": "payload",
+      "chain": [
+        "payload"
+      ],
+      "context": "name",
+      "line": 11,
+      "enclosing": "d1",
+      "local": true
+    },
+    {
+      "raw": "payload",
+      "root": "payload",
+      "chain": [
+        "payload"
+      ],
+      "context": "name",
+      "line": 16,
+      "enclosing": "d2",
+      "local": true
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "created",
+      "line": 11,
+      "enclosing": "d1"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "paid",
+      "line": 16,
+      "enclosing": "d2"
+    }
+  ]
+}

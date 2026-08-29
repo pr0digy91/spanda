@@ -1,0 +1,944 @@
+{
+  "file": "sample_pkg/models.py",
+  "module": "sample_pkg.models",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:d9bfd78ed61a3f28036566b5fe827301",
+  "module_docstring": "Domain models, plus the exact failure case this whole project exists for.\n\n`_apply_rls_context` at the bottom is invoked by SQLAlchemy on every flush.\nNothing in this codebase references it by name. A call graph that reports\n\"0 callers\" for it is not merely incomplete \u2014 it is actively misleading,\nbecause \"0 callers\" reads as \"safe to change\".\n\nThe sqlalchemy imports are unresolvable on purpose: the library is not\ninstalled, so a correct resolver marks them external rather than guessing.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from decimal import Decimal",
+      "module": "decimal",
+      "names": [
+        {
+          "name": "Decimal",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 12,
+      "conditional": false
+    },
+    {
+      "raw": "from enum import Enum",
+      "module": "enum",
+      "names": [
+        {
+          "name": "Enum",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 13,
+      "conditional": false
+    },
+    {
+      "raw": "from sqlalchemy import event",
+      "module": "sqlalchemy",
+      "names": [
+        {
+          "name": "event",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 15,
+      "conditional": false
+    },
+    {
+      "raw": "from sqlalchemy.orm import Session",
+      "module": "sqlalchemy.orm",
+      "names": [
+        {
+          "name": "Session",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 16,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "class",
+      "name": "OrderStatus",
+      "qualname": "OrderStatus",
+      "parent": null,
+      "lines": [
+        19,
+        24
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [
+        "Enum"
+      ],
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Lifecycle states for an order.",
+      "canonical_signature": "bases(Enum)",
+      "signature_hash": "sha256:f79c776124183761bb4544f9c464dfc5",
+      "content_hash": "sha256:fa24d170f213aeae0001e529ed06af0c"
+    },
+    {
+      "local_id": "d2",
+      "kind": "variable",
+      "name": "PENDING",
+      "qualname": "OrderStatus.PENDING",
+      "parent": "d1",
+      "lines": [
+        22,
+        22
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:99c9237acb6fac452d308d27537b24ae"
+    },
+    {
+      "local_id": "d3",
+      "kind": "variable",
+      "name": "CONFIRMED",
+      "qualname": "OrderStatus.CONFIRMED",
+      "parent": "d1",
+      "lines": [
+        23,
+        23
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:bca379344d03e362bf3a86e544a44977"
+    },
+    {
+      "local_id": "d4",
+      "kind": "variable",
+      "name": "CANCELLED",
+      "qualname": "OrderStatus.CANCELLED",
+      "parent": "d1",
+      "lines": [
+        24,
+        24
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:0854bbdaa68ce48589da5211f626bea2"
+    },
+    {
+      "local_id": "d5",
+      "kind": "class",
+      "name": "Order",
+      "qualname": "Order",
+      "parent": null,
+      "lines": [
+        27,
+        54
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [],
+      "annotation": null,
+      "decorators": [],
+      "docstring": "A single restaurant order.",
+      "canonical_signature": "bases()",
+      "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
+      "content_hash": "sha256:cb0116a6c704ad2b944e9b59b678b6e9"
+    },
+    {
+      "local_id": "d6",
+      "kind": "variable",
+      "name": "tax_rate",
+      "qualname": "Order.tax_rate",
+      "parent": "d5",
+      "lines": [
+        30,
+        30
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:3ac5e90384abd75174a7f2f51975c6d1"
+    },
+    {
+      "local_id": "d7",
+      "kind": "method",
+      "name": "__init__",
+      "qualname": "Order.__init__",
+      "parent": "d5",
+      "lines": [
+        32,
+        35
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "order_id",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          },
+          {
+            "name": "items",
+            "kind": "positional",
+            "annotation": "list | None",
+            "default": "None"
+          }
+        ],
+        "returns": "None"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:self,positional:order_id:str,positional:items:list | None=None)->None",
+      "signature_hash": "sha256:8184747ded662c375ebb3508c63964c6",
+      "content_hash": "sha256:7f97060890d9041dd168523e8e0d1f0a"
+    },
+    {
+      "local_id": "d8",
+      "kind": "method",
+      "name": "subtotal",
+      "qualname": "Order.subtotal",
+      "parent": "d5",
+      "lines": [
+        37,
+        40
+      ],
+      "decorator_lines": [
+        37,
+        37
+      ],
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "Decimal"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "property",
+          "base": "property"
+        }
+      ],
+      "docstring": "Sum of line items before tax.",
+      "canonical_signature": "(positional:self)->Decimal",
+      "signature_hash": "sha256:2b0b47a3e4c16789f084a303f29246a6",
+      "content_hash": "sha256:ef5fba4b3dee338e30d2ac811814345e"
+    },
+    {
+      "local_id": "d9",
+      "kind": "method",
+      "name": "total",
+      "qualname": "Order.total",
+      "parent": "d5",
+      "lines": [
+        42,
+        44
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "currency",
+            "kind": "keyword_only",
+            "annotation": "str",
+            "default": "'INR'"
+          }
+        ],
+        "returns": "Decimal"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Order total including tax.",
+      "canonical_signature": "(positional:self,keyword_only:currency:str='INR')->Decimal",
+      "signature_hash": "sha256:d5e0dc55f07f3007938014594c286600",
+      "content_hash": "sha256:a7ac76dee3175aa5c6015c60fe1430e6"
+    },
+    {
+      "local_id": "d10",
+      "kind": "method",
+      "name": "is_terminal",
+      "qualname": "Order.is_terminal",
+      "parent": "d5",
+      "lines": [
+        46,
+        49
+      ],
+      "decorator_lines": [
+        46,
+        46
+      ],
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "status",
+            "kind": "positional",
+            "annotation": "OrderStatus",
+            "default": null
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "staticmethod",
+          "base": "staticmethod"
+        }
+      ],
+      "docstring": "Whether an order in this state can still change.",
+      "canonical_signature": "(positional:status:OrderStatus)->bool",
+      "signature_hash": "sha256:b27bd65fcd3deee7cb4ecc872ca25c3b",
+      "content_hash": "sha256:5c5e6e28d322476574bb5a2c7195f057"
+    },
+    {
+      "local_id": "d11",
+      "kind": "method",
+      "name": "empty",
+      "qualname": "Order.empty",
+      "parent": "d5",
+      "lines": [
+        51,
+        54
+      ],
+      "decorator_lines": [
+        51,
+        51
+      ],
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "cls",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "order_id",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          }
+        ],
+        "returns": "'Order'"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "classmethod",
+          "base": "classmethod"
+        }
+      ],
+      "docstring": "Construct an order with no line items.",
+      "canonical_signature": "(positional:cls,positional:order_id:str)->'Order'",
+      "signature_hash": "sha256:5d08580b4d330886bbfa72fe46913f19",
+      "content_hash": "sha256:ae910d3a8057aa9fed85b334b6f1ea80"
+    },
+    {
+      "local_id": "d12",
+      "kind": "function",
+      "name": "_apply_rls_context",
+      "qualname": "_apply_rls_context",
+      "parent": null,
+      "lines": [
+        57,
+        63
+      ],
+      "decorator_lines": [
+        57,
+        57
+      ],
+      "is_async": false,
+      "is_private": true,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "session",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "flush_context",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "instances",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "None"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "event.listens_for(Session, 'before_flush')",
+          "base": "event.listens_for"
+        }
+      ],
+      "docstring": "Apply row-level security context before every flush.\n\nCalled by SQLAlchemy, never by name from this codebase.",
+      "canonical_signature": "(positional:session,positional:flush_context,positional:instances)->None",
+      "signature_hash": "sha256:4edbbf6880ea2a0ad6d0631783033227",
+      "content_hash": "sha256:cfd001096db333db696e2dab74b7b187"
+    },
+    {
+      "local_id": "d13",
+      "kind": "function",
+      "name": "_current_tenant",
+      "qualname": "_current_tenant",
+      "parent": null,
+      "lines": [
+        66,
+        68
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": true,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Reached only from _apply_rls_context, which itself has no static callers.",
+      "canonical_signature": "()->str",
+      "signature_hash": "sha256:fcc4c0c5b51213b840ff1e53f352585c",
+      "content_hash": "sha256:a994342eff668424416eebe7a3305888"
+    }
+  ],
+  "references": [
+    {
+      "raw": "Enum",
+      "root": "Enum",
+      "chain": [
+        "Enum"
+      ],
+      "context": "base_class",
+      "line": 19,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "Decimal",
+      "root": "Decimal",
+      "chain": [
+        "Decimal"
+      ],
+      "context": "call",
+      "line": 30,
+      "enclosing": "d5",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 32,
+      "enclosing": "d7",
+      "local": false
+    },
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "annotation",
+      "line": 32,
+      "enclosing": "d7",
+      "local": false
+    },
+    {
+      "raw": "self.order_id",
+      "root": "self",
+      "chain": [
+        "self",
+        "order_id"
+      ],
+      "context": "assign_target",
+      "line": 33,
+      "enclosing": "d7",
+      "local": true
+    },
+    {
+      "raw": "order_id",
+      "root": "order_id",
+      "chain": [
+        "order_id"
+      ],
+      "context": "name",
+      "line": 33,
+      "enclosing": "d7",
+      "local": true
+    },
+    {
+      "raw": "self.items",
+      "root": "self",
+      "chain": [
+        "self",
+        "items"
+      ],
+      "context": "assign_target",
+      "line": 34,
+      "enclosing": "d7",
+      "local": true
+    },
+    {
+      "raw": "items",
+      "root": "items",
+      "chain": [
+        "items"
+      ],
+      "context": "name",
+      "line": 34,
+      "enclosing": "d7",
+      "local": true
+    },
+    {
+      "raw": "self.status",
+      "root": "self",
+      "chain": [
+        "self",
+        "status"
+      ],
+      "context": "assign_target",
+      "line": 35,
+      "enclosing": "d7",
+      "local": true
+    },
+    {
+      "raw": "OrderStatus.PENDING",
+      "root": "OrderStatus",
+      "chain": [
+        "OrderStatus",
+        "PENDING"
+      ],
+      "context": "name",
+      "line": 35,
+      "enclosing": "d7",
+      "local": false
+    },
+    {
+      "raw": "property",
+      "root": "property",
+      "chain": [
+        "property"
+      ],
+      "context": "decorator",
+      "line": 37,
+      "enclosing": "d8",
+      "local": false
+    },
+    {
+      "raw": "Decimal",
+      "root": "Decimal",
+      "chain": [
+        "Decimal"
+      ],
+      "context": "annotation",
+      "line": 38,
+      "enclosing": "d8",
+      "local": false
+    },
+    {
+      "raw": "sum",
+      "root": "sum",
+      "chain": [
+        "sum"
+      ],
+      "context": "call",
+      "line": 40,
+      "enclosing": "d8",
+      "local": false
+    },
+    {
+      "raw": "item.price",
+      "root": "item",
+      "chain": [
+        "item",
+        "price"
+      ],
+      "context": "name",
+      "line": 40,
+      "enclosing": "d8",
+      "local": true
+    },
+    {
+      "raw": "self.items",
+      "root": "self",
+      "chain": [
+        "self",
+        "items"
+      ],
+      "context": "name",
+      "line": 40,
+      "enclosing": "d8",
+      "local": true
+    },
+    {
+      "raw": "Decimal",
+      "root": "Decimal",
+      "chain": [
+        "Decimal"
+      ],
+      "context": "call",
+      "line": 40,
+      "enclosing": "d8",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 42,
+      "enclosing": "d9",
+      "local": false
+    },
+    {
+      "raw": "Decimal",
+      "root": "Decimal",
+      "chain": [
+        "Decimal"
+      ],
+      "context": "annotation",
+      "line": 42,
+      "enclosing": "d9",
+      "local": false
+    },
+    {
+      "raw": "self.subtotal",
+      "root": "self",
+      "chain": [
+        "self",
+        "subtotal"
+      ],
+      "context": "name",
+      "line": 44,
+      "enclosing": "d9",
+      "local": true
+    },
+    {
+      "raw": "self.tax_rate",
+      "root": "self",
+      "chain": [
+        "self",
+        "tax_rate"
+      ],
+      "context": "name",
+      "line": 44,
+      "enclosing": "d9",
+      "local": true
+    },
+    {
+      "raw": "staticmethod",
+      "root": "staticmethod",
+      "chain": [
+        "staticmethod"
+      ],
+      "context": "decorator",
+      "line": 46,
+      "enclosing": "d10",
+      "local": false
+    },
+    {
+      "raw": "OrderStatus",
+      "root": "OrderStatus",
+      "chain": [
+        "OrderStatus"
+      ],
+      "context": "annotation",
+      "line": 47,
+      "enclosing": "d10",
+      "local": false
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 47,
+      "enclosing": "d10",
+      "local": false
+    },
+    {
+      "raw": "status",
+      "root": "status",
+      "chain": [
+        "status"
+      ],
+      "context": "name",
+      "line": 49,
+      "enclosing": "d10",
+      "local": true
+    },
+    {
+      "raw": "OrderStatus.CONFIRMED",
+      "root": "OrderStatus",
+      "chain": [
+        "OrderStatus",
+        "CONFIRMED"
+      ],
+      "context": "name",
+      "line": 49,
+      "enclosing": "d10",
+      "local": false
+    },
+    {
+      "raw": "OrderStatus.CANCELLED",
+      "root": "OrderStatus",
+      "chain": [
+        "OrderStatus",
+        "CANCELLED"
+      ],
+      "context": "name",
+      "line": 49,
+      "enclosing": "d10",
+      "local": false
+    },
+    {
+      "raw": "classmethod",
+      "root": "classmethod",
+      "chain": [
+        "classmethod"
+      ],
+      "context": "decorator",
+      "line": 51,
+      "enclosing": "d11",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 52,
+      "enclosing": "d11",
+      "local": false
+    },
+    {
+      "raw": "cls",
+      "root": "cls",
+      "chain": [
+        "cls"
+      ],
+      "context": "call",
+      "line": 54,
+      "enclosing": "d11",
+      "local": true
+    },
+    {
+      "raw": "order_id",
+      "root": "order_id",
+      "chain": [
+        "order_id"
+      ],
+      "context": "name",
+      "line": 54,
+      "enclosing": "d11",
+      "local": true
+    },
+    {
+      "raw": "event.listens_for",
+      "root": "event",
+      "chain": [
+        "event",
+        "listens_for"
+      ],
+      "context": "decorator",
+      "line": 57,
+      "enclosing": "d12",
+      "local": false
+    },
+    {
+      "raw": "Session",
+      "root": "Session",
+      "chain": [
+        "Session"
+      ],
+      "context": "decorator",
+      "line": 57,
+      "enclosing": "d12",
+      "local": false
+    },
+    {
+      "raw": "session.execute",
+      "root": "session",
+      "chain": [
+        "session",
+        "execute"
+      ],
+      "context": "call",
+      "line": 63,
+      "enclosing": "d12",
+      "local": true
+    },
+    {
+      "raw": "_current_tenant",
+      "root": "_current_tenant",
+      "chain": [
+        "_current_tenant"
+      ],
+      "context": "call",
+      "line": 63,
+      "enclosing": "d12",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 66,
+      "enclosing": "d13",
+      "local": false
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "pending",
+      "line": 22,
+      "enclosing": "d1"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "confirmed",
+      "line": 23,
+      "enclosing": "d1"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "cancelled",
+      "line": 24,
+      "enclosing": "d1"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "INR",
+      "line": 42,
+      "enclosing": "d9"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "Order",
+      "line": 52,
+      "enclosing": "d11"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "before_flush",
+      "line": 57,
+      "enclosing": "d12"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "tid",
+      "line": 63,
+      "enclosing": "d12"
+    }
+  ]
+}

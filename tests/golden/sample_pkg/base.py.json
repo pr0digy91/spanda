@@ -1,0 +1,236 @@
+{
+  "file": "sample_pkg/base.py",
+  "module": "sample_pkg.base",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:7b9956cd5b74c32dae9939ea9cc15c7b",
+  "module_docstring": "Base class for the cross-file inheritance case.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from abc import ABC, abstractmethod",
+      "module": "abc",
+      "names": [
+        {
+          "name": "ABC",
+          "alias": null
+        },
+        {
+          "name": "abstractmethod",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 3,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "class",
+      "name": "PaymentMethod",
+      "qualname": "PaymentMethod",
+      "parent": null,
+      "lines": [
+        6,
+        17
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [
+        "ABC"
+      ],
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Abstract payment method.",
+      "canonical_signature": "bases(ABC)",
+      "signature_hash": "sha256:37287f0beec8940aa3e3069ab6058090",
+      "content_hash": "sha256:ba607f27b8c2ef2ce01952f59a06d267"
+    },
+    {
+      "local_id": "d2",
+      "kind": "variable",
+      "name": "provider_name",
+      "qualname": "PaymentMethod.provider_name",
+      "parent": "d1",
+      "lines": [
+        9,
+        9
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:b25c34726401c2307404d75a56a16b87"
+    },
+    {
+      "local_id": "d3",
+      "kind": "method",
+      "name": "charge",
+      "qualname": "PaymentMethod.charge",
+      "parent": "d1",
+      "lines": [
+        11,
+        13
+      ],
+      "decorator_lines": [
+        11,
+        11
+      ],
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "amount",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "idempotency_key",
+            "kind": "keyword_only",
+            "annotation": "str | None",
+            "default": "None"
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "abstractmethod",
+          "base": "abstractmethod"
+        }
+      ],
+      "docstring": "Charge the given amount.",
+      "canonical_signature": "(positional:self,positional:amount,keyword_only:idempotency_key:str | None=None)->bool",
+      "signature_hash": "sha256:6d592e89aaceead4407b9f7effe8be19",
+      "content_hash": "sha256:41521dbac5c8081825f58a9227af9dc7"
+    },
+    {
+      "local_id": "d4",
+      "kind": "method",
+      "name": "refund",
+      "qualname": "PaymentMethod.refund",
+      "parent": "d1",
+      "lines": [
+        15,
+        17
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "amount",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Default refund behaviour. Subclasses may inherit this unchanged.",
+      "canonical_signature": "(positional:self,positional:amount)->bool",
+      "signature_hash": "sha256:4b64eebef36863584a6d2aef6207a490",
+      "content_hash": "sha256:13a80cb3e2232e0e336e149534d40c20"
+    }
+  ],
+  "references": [
+    {
+      "raw": "ABC",
+      "root": "ABC",
+      "chain": [
+        "ABC"
+      ],
+      "context": "base_class",
+      "line": 6,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "abstractmethod",
+      "root": "abstractmethod",
+      "chain": [
+        "abstractmethod"
+      ],
+      "context": "decorator",
+      "line": 11,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 12,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 12,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 15,
+      "enclosing": "d4",
+      "local": false
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "unknown",
+      "line": 9,
+      "enclosing": "d1"
+    }
+  ]
+}

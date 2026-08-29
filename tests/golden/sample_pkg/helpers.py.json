@@ -1,0 +1,272 @@
+{
+  "file": "sample_pkg/helpers.py",
+  "module": "sample_pkg.helpers",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:224b690ea7161f98515774f2ce66a25f",
+  "module_docstring": "Utility helpers with a deliberately narrow __all__.\n\n`_internal_only` is excluded, so `from .helpers import *` in star.py must\nnot pull it in. A resolver that ignores __all__ will wrongly believe it did.",
+  "dunder_all": [
+    "format_currency",
+    "slugify"
+  ],
+  "imports": [],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "variable",
+      "name": "__all__",
+      "qualname": "__all__",
+      "parent": null,
+      "lines": [
+        7,
+        7
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:e7795cb3115b8122547b17ae4620fbf2"
+    },
+    {
+      "local_id": "d2",
+      "kind": "function",
+      "name": "format_currency",
+      "qualname": "format_currency",
+      "parent": null,
+      "lines": [
+        10,
+        12
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": true,
+      "signature": {
+        "params": [
+          {
+            "name": "amount",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "currency",
+            "kind": "positional",
+            "annotation": "str",
+            "default": "'INR'"
+          }
+        ],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Render an amount for display.",
+      "canonical_signature": "(positional:amount,positional:currency:str='INR')->str",
+      "signature_hash": "sha256:77d504c435f8742e74142211330fa1e9",
+      "content_hash": "sha256:3bf91163ea648bbe5c0ab98acecd11cd"
+    },
+    {
+      "local_id": "d3",
+      "kind": "function",
+      "name": "slugify",
+      "qualname": "slugify",
+      "parent": null,
+      "lines": [
+        15,
+        17
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": true,
+      "signature": {
+        "params": [
+          {
+            "name": "text",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          }
+        ],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Lowercase and hyphenate a string.",
+      "canonical_signature": "(positional:text:str)->str",
+      "signature_hash": "sha256:58a1c6d4511b7d2e974d7e36463adb43",
+      "content_hash": "sha256:710b8b1f835ebeeea8260f70300948eb"
+    },
+    {
+      "local_id": "d4",
+      "kind": "function",
+      "name": "_internal_only",
+      "qualname": "_internal_only",
+      "parent": null,
+      "lines": [
+        20,
+        22
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": true,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "value",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Excluded from __all__ and from the star import in star.py.",
+      "canonical_signature": "(positional:value)->",
+      "signature_hash": "sha256:742962210558424e50b134d0c028f6e4",
+      "content_hash": "sha256:7e7eba137ebd4554391bc62cd0b30a13"
+    }
+  ],
+  "references": [
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 10,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 10,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "currency",
+      "root": "currency",
+      "chain": [
+        "currency"
+      ],
+      "context": "name",
+      "line": 12,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "amount",
+      "root": "amount",
+      "chain": [
+        "amount"
+      ],
+      "context": "name",
+      "line": 12,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 15,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 15,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "text.strip().lower().replace",
+      "root": null,
+      "chain": null,
+      "context": "call",
+      "line": 17,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "text.strip().lower",
+      "root": null,
+      "chain": null,
+      "context": "call",
+      "line": 17,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "text.strip",
+      "root": "text",
+      "chain": [
+        "text",
+        "strip"
+      ],
+      "context": "call",
+      "line": 17,
+      "enclosing": "d3",
+      "local": true
+    },
+    {
+      "raw": "value",
+      "root": "value",
+      "chain": [
+        "value"
+      ],
+      "context": "name",
+      "line": 22,
+      "enclosing": "d4",
+      "local": true
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "format_currency",
+      "line": 7,
+      "enclosing": null
+    },
+    {
+      "kind": "identifier_string",
+      "value": "slugify",
+      "line": 7,
+      "enclosing": null
+    },
+    {
+      "kind": "identifier_string",
+      "value": "INR",
+      "line": 10,
+      "enclosing": "d2"
+    }
+  ]
+}

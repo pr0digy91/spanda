@@ -1,0 +1,28 @@
+[project]
+name = "spanda"
+version = "0.1.0"
+description = "Deterministic static-analysis indexing engine for Python codebases"
+requires-python = ">=3.11"
+# Deliberately zero runtime dependencies through M3, so the tool runs
+# anywhere with a bare python3. networkx arrives at M6, when there is
+# actually a graph to traverse.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+spanda = "spanda.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["spanda"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# fixtures/ is parsed, never imported or collected: it contains a deliberate
+# syntax error and a genuine circular import.
+norecursedirs = ["fixtures"]

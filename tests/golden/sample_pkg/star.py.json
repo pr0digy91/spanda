@@ -1,0 +1,135 @@
+{
+  "file": "sample_pkg/star.py",
+  "module": "sample_pkg.star",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:482906f891bae7c415cc6915012057ce",
+  "module_docstring": "Star import: the names used below have no explicit import statement.\n\nResolving `slugify` and `format_currency` here requires expanding\n`from .helpers import *` through helpers.__all__.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from .helpers import *",
+      "module": ".helpers",
+      "names": [
+        {
+          "name": "*",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": true,
+      "line": 7,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "function",
+      "name": "build_receipt_line",
+      "qualname": "build_receipt_line",
+      "parent": null,
+      "lines": [
+        10,
+        12
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "item_name",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          },
+          {
+            "name": "price",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Uses two names that exist here only via the star import.",
+      "canonical_signature": "(positional:item_name:str,positional:price)->str",
+      "signature_hash": "sha256:335d27a764afe846179cca0d500ada6a",
+      "content_hash": "sha256:3bda062fbfe8cce377009c8dc61a5b25"
+    }
+  ],
+  "references": [
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 10,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 10,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "slugify",
+      "root": "slugify",
+      "chain": [
+        "slugify"
+      ],
+      "context": "call",
+      "line": 12,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "item_name",
+      "root": "item_name",
+      "chain": [
+        "item_name"
+      ],
+      "context": "name",
+      "line": 12,
+      "enclosing": "d1",
+      "local": true
+    },
+    {
+      "raw": "format_currency",
+      "root": "format_currency",
+      "chain": [
+        "format_currency"
+      ],
+      "context": "call",
+      "line": 12,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "price",
+      "root": "price",
+      "chain": [
+        "price"
+      ],
+      "context": "name",
+      "line": 12,
+      "enclosing": "d1",
+      "local": true
+    }
+  ],
+  "dynamic_hints": []
+}

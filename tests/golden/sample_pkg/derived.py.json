@@ -1,0 +1,219 @@
+{
+  "file": "sample_pkg/derived.py",
+  "module": "sample_pkg.derived",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:395cc6bf1241317891a95505faa0338f",
+  "module_docstring": "Cross-file inheritance: the base class lives in another module.\n\n`settle` calls `self.refund`, which is defined in base.py. Resolving that\ncall requires following the inheritance edge across the file boundary.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from .base import PaymentMethod",
+      "module": ".base",
+      "names": [
+        {
+          "name": "PaymentMethod",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 7,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "class",
+      "name": "UpiPayment",
+      "qualname": "UpiPayment",
+      "parent": null,
+      "lines": [
+        10,
+        21
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [
+        "PaymentMethod"
+      ],
+      "annotation": null,
+      "decorators": [],
+      "docstring": "UPI payment. Overrides charge, inherits refund.",
+      "canonical_signature": "bases(PaymentMethod)",
+      "signature_hash": "sha256:67da52ebd9759409fb3f14bff780bf7b",
+      "content_hash": "sha256:5d19423d1091784ab3078802bce8086a"
+    },
+    {
+      "local_id": "d2",
+      "kind": "variable",
+      "name": "provider_name",
+      "qualname": "UpiPayment.provider_name",
+      "parent": "d1",
+      "lines": [
+        13,
+        13
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:93702bfc007e9ae5dd7e4bd4b05ed7ab"
+    },
+    {
+      "local_id": "d3",
+      "kind": "method",
+      "name": "charge",
+      "qualname": "UpiPayment.charge",
+      "parent": "d1",
+      "lines": [
+        15,
+        17
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "amount",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "idempotency_key",
+            "kind": "keyword_only",
+            "annotation": "str | None",
+            "default": "None"
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Concrete implementation of the abstract base method.",
+      "canonical_signature": "(positional:self,positional:amount,keyword_only:idempotency_key:str | None=None)->bool",
+      "signature_hash": "sha256:6d592e89aaceead4407b9f7effe8be19",
+      "content_hash": "sha256:244c710e1369a94edc84c4333209b435"
+    },
+    {
+      "local_id": "d4",
+      "kind": "method",
+      "name": "settle",
+      "qualname": "UpiPayment.settle",
+      "parent": "d1",
+      "lines": [
+        19,
+        21
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "None"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Calls a method defined only on the cross-file base class.",
+      "canonical_signature": "(positional:self)->None",
+      "signature_hash": "sha256:e4163a39710373fa93ea588760990cfd",
+      "content_hash": "sha256:01e33907925a70650096bf180ee0d891"
+    }
+  ],
+  "references": [
+    {
+      "raw": "PaymentMethod",
+      "root": "PaymentMethod",
+      "chain": [
+        "PaymentMethod"
+      ],
+      "context": "base_class",
+      "line": 10,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 15,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 15,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "amount",
+      "root": "amount",
+      "chain": [
+        "amount"
+      ],
+      "context": "name",
+      "line": 17,
+      "enclosing": "d3",
+      "local": true
+    },
+    {
+      "raw": "self.refund",
+      "root": "self",
+      "chain": [
+        "self",
+        "refund"
+      ],
+      "context": "call",
+      "line": 21,
+      "enclosing": "d4",
+      "local": true
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "upi",
+      "line": 13,
+      "enclosing": "d1"
+    }
+  ]
+}

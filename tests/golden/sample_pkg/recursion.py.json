@@ -1,0 +1,279 @@
+{
+  "file": "sample_pkg/recursion.py",
+  "module": "sample_pkg.recursion",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:12c05d35a2861f6ee60d149d92c3547e",
+  "module_docstring": "Recursion and mutual recursion. The call graph here is not a DAG.\n\nAny traversal that assumes acyclicity will either loop forever or silently\ntruncate. countdown calls itself; is_even and is_odd call each other.",
+  "dunder_all": [],
+  "imports": [],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "function",
+      "name": "countdown",
+      "qualname": "countdown",
+      "parent": null,
+      "lines": [
+        8,
+        12
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "n",
+            "kind": "positional",
+            "annotation": "int",
+            "default": null
+          }
+        ],
+        "returns": "int"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Directly self-recursive.",
+      "canonical_signature": "(positional:n:int)->int",
+      "signature_hash": "sha256:93bfd2c7af437abd15b0bfec4afea38c",
+      "content_hash": "sha256:e7960fb005356cd915fe529396dac003"
+    },
+    {
+      "local_id": "d2",
+      "kind": "function",
+      "name": "is_even",
+      "qualname": "is_even",
+      "parent": null,
+      "lines": [
+        15,
+        19
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "n",
+            "kind": "positional",
+            "annotation": "int",
+            "default": null
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Mutually recursive with is_odd.",
+      "canonical_signature": "(positional:n:int)->bool",
+      "signature_hash": "sha256:3146fa6c05ae9db2b456cca3ad51c21b",
+      "content_hash": "sha256:c8367c87fa1d0d0c76dab76811a9768c"
+    },
+    {
+      "local_id": "d3",
+      "kind": "function",
+      "name": "is_odd",
+      "qualname": "is_odd",
+      "parent": null,
+      "lines": [
+        22,
+        26
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "n",
+            "kind": "positional",
+            "annotation": "int",
+            "default": null
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Mutually recursive with is_even.",
+      "canonical_signature": "(positional:n:int)->bool",
+      "signature_hash": "sha256:3146fa6c05ae9db2b456cca3ad51c21b",
+      "content_hash": "sha256:f5f744e188abc77e39a39dcdfeb4d86d"
+    }
+  ],
+  "references": [
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 8,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 8,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "n",
+      "root": "n",
+      "chain": [
+        "n"
+      ],
+      "context": "name",
+      "line": 10,
+      "enclosing": "d1",
+      "local": true
+    },
+    {
+      "raw": "countdown",
+      "root": "countdown",
+      "chain": [
+        "countdown"
+      ],
+      "context": "call",
+      "line": 12,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "n",
+      "root": "n",
+      "chain": [
+        "n"
+      ],
+      "context": "name",
+      "line": 12,
+      "enclosing": "d1",
+      "local": true
+    },
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 15,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 15,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "n",
+      "root": "n",
+      "chain": [
+        "n"
+      ],
+      "context": "name",
+      "line": 17,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "is_odd",
+      "root": "is_odd",
+      "chain": [
+        "is_odd"
+      ],
+      "context": "call",
+      "line": 19,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "n",
+      "root": "n",
+      "chain": [
+        "n"
+      ],
+      "context": "name",
+      "line": 19,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 22,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 22,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "n",
+      "root": "n",
+      "chain": [
+        "n"
+      ],
+      "context": "name",
+      "line": 24,
+      "enclosing": "d3",
+      "local": true
+    },
+    {
+      "raw": "is_even",
+      "root": "is_even",
+      "chain": [
+        "is_even"
+      ],
+      "context": "call",
+      "line": 26,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "n",
+      "root": "n",
+      "chain": [
+        "n"
+      ],
+      "context": "name",
+      "line": 26,
+      "enclosing": "d3",
+      "local": true
+    }
+  ],
+  "dynamic_hints": []
+}
