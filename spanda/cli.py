@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 
 from spanda.extract import extract_codebase
+from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
 
 
 COLUMNS = [("defs", 6), ("fn", 5), ("cls", 5), ("meth", 6),
@@ -101,6 +102,86 @@ def cmd_parse(args: argparse.Namespace) -> int:
     return 0
 
 
+GAP_HEADINGS = {
+    "dynamic_dispatch_decorator":
+        "Decorated with something that dispatches at runtime — the framework "
+        "calls these,\n  and no reference in this codebase names them:",
+    "runtime_attribute_access":
+        "Call sites that pick their target at runtime — the site is certain, "
+        "the target is not:",
+    "name_in_string_literal":
+        "String literals that spell the name of a symbol defined elsewhere "
+        "(heuristic —\n  a name match is not a call, and must never become an edge):",
+}
+
+
+def cmd_gaps(args: argparse.Namespace) -> int:
+    root = Path(args.path).resolve()
+    if not root.is_dir():
+        print(f"not a directory: {root}", file=sys.stderr)
+        return 2
+
+    scan = extract_codebase(root)
+    patterns = load_patterns(Path(args.patterns) if args.patterns else None)
+    gaps = find_gaps(scan, patterns)
+
+    total_symbols = sum(len(r["definitions"]) for r in scan.records)
+    print(f"{len(scan.records)} files, {total_symbols} symbols, "
+          f"{scan.skipped_count} files not looked at\n")
+
+    if not gaps:
+        print("No gaps found. Treat that with suspicion rather than relief: it "
+              "more likely\nmeans the pattern list needs extending than that "
+              "the codebase has none.")
+    for kind, heading in GAP_HEADINGS.items():
+        found = [g for g in gaps if g.kind == kind]
+        if not found:
+            continue
+        print(f"{heading}\n")
+        for gap in found:
+            print(f"  {gap.file}:{gap.line}")
+            print(f"      {gap.symbol}")
+            print(f"      {gap.detail}")
+        print(f"  ({len(found)})\n")
+
+    if args.unreferenced:
+        orphans = unreferenced_symbols(scan)
+        # A symbol with no references is only dead if nothing else explains
+        # the silence. Cross-referencing the gap list is what separates
+        # "probably unused" from "called by something this tool cannot see" —
+        # and reporting the second as the first is the failure this whole
+        # project exists to avoid.
+        explained = {(g.file, g.symbol): g for g in gaps
+                     if g.kind == "dynamic_dispatch_decorator"}
+        by_name = {g.detail.split('"')[1]: g for g in gaps
+                   if g.kind == "name_in_string_literal"}
+
+        unexplained = []
+        accounted = []
+        for file, line, qualname in orphans:
+            gap = explained.get((file, qualname)) or by_name.get(qualname.split(".")[-1])
+            (accounted if gap else unexplained).append((file, line, qualname, gap))
+
+        print(f"Symbols with no reference anywhere: {len(orphans)}\n")
+
+        if accounted:
+            print(f"  Silence explained ({len(accounted)}) — something calls these that "
+                  "this tool\n  cannot see. Do NOT read these as unused:\n")
+            for file, line, qualname, gap in accounted:
+                print(f"    {file}:{line}  {qualname}")
+                print(f"        {gap.detail}")
+            print()
+
+        print(f"  No explanation found ({len(unexplained)}) — possibly unused, "
+              "but this is a\n  name match over one codebase, not proof. "
+              "Entry points, tests and callers\n  outside this tree are all "
+              "invisible from here:\n")
+        for file, line, qualname, _ in unexplained:
+            print(f"    {file}:{line}  {qualname}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="spanda",
@@ -113,6 +194,14 @@ def main(argv: list[str] | None = None) -> int:
     parse.add_argument("--out", help="directory to write one JSON record per source file")
     parse.add_argument("--quiet", action="store_true", help="suppress the summary")
     parse.set_defaults(func=cmd_parse)
+
+    gaps = subparsers.add_parser(
+        "gaps", help="what static analysis cannot see in this codebase")
+    gaps.add_argument("path", help="root of the codebase to inspect")
+    gaps.add_argument("--patterns", help="override the dynamic-dispatch pattern file")
+    gaps.add_argument("--unreferenced", action="store_true",
+                      help="also list symbols whose name appears in no reference")
+    gaps.set_defaults(func=cmd_gaps)
 
     args = parser.parse_args(argv)
     return args.func(args)

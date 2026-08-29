@@ -1,0 +1,27 @@
+# Decorators whose presence means a symbol's callers cannot be determined by
+# reading the code. One shell-glob pattern per line, matched against the
+# decorator's dotted base name (`event.listens_for`, not the full call).
+#
+# Precision matters more than coverage. A flag on every decorated symbol is
+# worth exactly as much as no flag at all: @property and @staticmethod do not
+# belong here, because a call to a property is still statically visible.
+#
+# Extend this list from the decorator census printed by `spanda parse`, which
+# shows every decorator actually in use in your codebase. That is the point of
+# the census — this file should be grown from evidence, not guessed at.
+#
+# Deliberately absent: framework route decorators. Route detection is out of
+# scope for this build (see PROJECT_INSTRUCTIONS.md).
+
+# ORM and signal event hooks: the framework calls these, nothing else does.
+*.listens_for
+*.receiver
+*.connect
+
+# Dependency injection: the container decides the caller at runtime.
+Depends
+*.Depends
+
+# Dispatch registries: the concrete implementation is chosen at runtime.
+*.register
+*.hookimpl
