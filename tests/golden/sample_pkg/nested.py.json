@@ -177,8 +177,8 @@
       "annotation": null,
       "decorators": [],
       "docstring": "Async, positional-only, varargs, keyword-only and kwargs in one signature.",
-      "canonical_signature": "(positional_only:restaurant_id:str,vararg:sections:str,keyword_only:locale:str='en',kwarg:options)->dict",
-      "signature_hash": "sha256:e5956cf65bfd13eaf9d170022eb5c559",
+      "canonical_signature": "[async](positional_only:restaurant_id:str,vararg:sections:str,keyword_only:locale:str='en',kwarg:options)->dict",
+      "signature_hash": "sha256:9c59f6a081879019a9a766abfc5d50cd",
       "content_hash": "sha256:43f975f29caf24d1c7a4a5f1b1feffc2"
     },
     {

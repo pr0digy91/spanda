@@ -20,7 +20,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """

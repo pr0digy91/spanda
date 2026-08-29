@@ -206,3 +206,80 @@ def test_skipped_files_are_reported_not_silent():
         assert len(scan.records) == 1
         assert scan.skipped_count == 3
         assert set(scan.skipped) == {"node_modules", ".venv", "__pycache__"}
+
+
+# -- what counts as a shape change -----------------------------------------
+
+def _signature_hash(source: str, name: str = "total") -> tuple[str, str]:
+    from spanda.extract import extract_file
+    import tempfile, textwrap
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "m.py"
+        path.write_text(textwrap.dedent(source))
+        definition = next(d for d in extract_file(path, Path(tmp))["definitions"]
+                          if d["name"] == name)
+        return definition["signature_hash"], definition["canonical_signature"]
+
+
+PLAIN = "def total(items, tax):\n    return 1\n"
+
+SHAPE_CHANGES = {
+    "parameter renamed":       "def total(lines, tax):\n    return 1\n",
+    "parameter added":         "def total(items, tax, discount):\n    return 1\n",
+    "parameter removed":       "def total(items):\n    return 1\n",
+    "parameters reordered":    "def total(tax, items):\n    return 1\n",
+    "default added":           "def total(items, tax=1.05):\n    return 1\n",
+    "default changed":         "def total(items, tax=1.18):\n    return 1\n",
+    "annotation added":        "def total(items: list, tax: float):\n    return 1\n",
+    "return annotation added": "def total(items, tax) -> float:\n    return 1\n",
+    "made keyword-only":       "def total(items, *, tax):\n    return 1\n",
+    # Callers now receive a coroutine and must await it. Blunter than any
+    # parameter change, and previously misclassified as internal.
+    "made async":              "async def total(items, tax):\n    return 1\n",
+}
+
+INTERNAL_CHANGES = {
+    "body rewritten":     "def total(items, tax):\n    return 2\n",
+    "docstring added":    'def total(items, tax):\n    """Doc."""\n    return 1\n',
+    "comment added":      "def total(items, tax):\n    # note\n    return 1\n",
+    "reformatted":        "def total(\n    items,\n    tax,\n):\n    return 1\n",
+    "unrelated decorator": "import functools\n@functools.lru_cache(maxsize=128)\ndef total(items, tax):\n    return 1\n",
+}
+
+
+@pytest.mark.parametrize("label,source", SHAPE_CHANGES.items())
+def test_caller_visible_changes_move_the_signature_hash(label, source):
+    assert _signature_hash(source)[0] != _signature_hash(PLAIN)[0], label
+
+
+@pytest.mark.parametrize("label,source", INTERNAL_CHANGES.items())
+def test_internal_changes_leave_the_signature_hash_alone(label, source):
+    assert _signature_hash(source)[0] == _signature_hash(PLAIN)[0], label
+
+
+def test_property_is_part_of_a_methods_shape():
+    """@property decides whether callers write obj.total or obj.total()."""
+    plain = "class C:\n    def total(self):\n        return 1\n"
+    prop = "class C:\n    @property\n    def total(self):\n        return 1\n"
+    assert _signature_hash(plain)[0] != _signature_hash(prop)[0]
+
+
+def test_tuning_an_unrelated_decorator_is_not_a_shape_change():
+    """Otherwise bumping a cache size reports as a breaking change."""
+    small = "import functools\n@functools.lru_cache(maxsize=128)\ndef total(a):\n    return 1\n"
+    large = "import functools\n@functools.lru_cache(maxsize=256)\ndef total(a):\n    return 1\n"
+    assert _signature_hash(small)[0] == _signature_hash(large)[0]
+
+
+def test_moving_a_function_changes_neither_hash():
+    """Line numbers are not part of identity or of either hash."""
+    moved = "\n\n\n" + PLAIN
+    from spanda.extract import extract_file
+    import tempfile
+    def both(source):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "m.py"
+            path.write_text(source)
+            d = extract_file(path, Path(tmp))["definitions"][0]
+            return d["signature_hash"], d["content_hash"]
+    assert both(PLAIN) == both(moved)

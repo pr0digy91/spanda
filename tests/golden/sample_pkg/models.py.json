@@ -287,8 +287,8 @@
         }
       ],
       "docstring": "Sum of line items before tax.",
-      "canonical_signature": "(positional:self)->Decimal",
-      "signature_hash": "sha256:2b0b47a3e4c16789f084a303f29246a6",
+      "canonical_signature": "[property](positional:self)->Decimal",
+      "signature_hash": "sha256:5dcc76f287cb7d9501e17629ba071665",
       "content_hash": "sha256:ef5fba4b3dee338e30d2ac811814345e"
     },
     {
@@ -367,8 +367,8 @@
         }
       ],
       "docstring": "Whether an order in this state can still change.",
-      "canonical_signature": "(positional:status:OrderStatus)->bool",
-      "signature_hash": "sha256:b27bd65fcd3deee7cb4ecc872ca25c3b",
+      "canonical_signature": "[staticmethod](positional:status:OrderStatus)->bool",
+      "signature_hash": "sha256:bb4dc2214ac7d88a41f94aebf5c8485f",
       "content_hash": "sha256:5c5e6e28d322476574bb5a2c7195f057"
     },
     {
@@ -414,8 +414,8 @@
         }
       ],
       "docstring": "Construct an order with no line items.",
-      "canonical_signature": "(positional:cls,positional:order_id:str)->'Order'",
-      "signature_hash": "sha256:5d08580b4d330886bbfa72fe46913f19",
+      "canonical_signature": "[classmethod](positional:cls,positional:order_id:str)->'Order'",
+      "signature_hash": "sha256:50cde892c92ee4cf8f94f9731b4c899a",
       "content_hash": "sha256:ae910d3a8057aa9fed85b334b6f1ea80"
     },
     {

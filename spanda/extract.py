@@ -108,13 +108,44 @@ def _signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> dict:
     return {"params": params, "returns": _unparse(node.returns)}
 
 
+#: Decorators that change how a symbol is *called*, and therefore belong in
+#: its shape. `@property` decides whether callers write `obj.total` or
+#: `obj.total()`; `@staticmethod` and `@classmethod` decide what the first
+#: argument means. Every other decorator — `@lru_cache`, `@wraps`, a route —
+#: leaves the calling convention alone and is deliberately excluded, or
+#: bumping `maxsize=128` to `256` would report as a breaking change.
+CALLING_CONVENTION_DECORATORS = {
+    "property", "cached_property", "staticmethod", "classmethod",
+    "functools.cached_property", "abc.abstractproperty",
+}
+
+
+def _convention_markers(is_async: bool, decorators: list[dict]) -> str:
+    """The parts of a symbol's shape that are not its parameter list.
+
+    `async` is here because it is a caller-visible contract change of the
+    bluntest kind: every call site now receives a coroutine and must await it.
+    Treating that as an internal edit would be exactly the false reassurance
+    this project exists to eliminate.
+    """
+    markers = ["async"] if is_async else []
+    markers += sorted(
+        d["base"] for d in decorators
+        if d["base"] in CALLING_CONVENTION_DECORATORS)
+    return ("[" + ",".join(markers) + "]") if markers else ""
+
+
 def _canonical_signature(kind: str, signature: dict | None, bases: list[str] | None,
-                         annotation: str | None) -> str:
+                         annotation: str | None, is_async: bool = False,
+                         decorators: list[dict] | None = None) -> str:
     """A normalised shape string, hashed to detect signature drift.
 
     Built from the AST rather than source text on purpose: reformatting must
-    not read as a shape change.
+    not read as a shape change. It covers everything a caller can be broken
+    by — parameters, defaults, annotations, async, and the decorators that
+    alter the calling convention — and nothing else.
     """
+    markers = _convention_markers(is_async, decorators or [])
     if kind in ("function", "method") and signature is not None:
         rendered = []
         for param in signature["params"]:
@@ -124,10 +155,13 @@ def _canonical_signature(kind: str, signature: dict | None, bases: list[str] | N
             if param["default"] is not None:
                 piece += f"={param['default']}"
             rendered.append(piece)
-        return "(" + ",".join(rendered) + ")->" + (signature["returns"] or "")
+        return (markers + "(" + ",".join(rendered) + ")->"
+                + (signature["returns"] or ""))
     if kind == "class":
-        return "bases(" + ",".join(bases or []) + ")"
-    return ":" + (annotation or "")
+        # A class's shape is the bases it inherits from: change those and the
+        # methods callers can reach change with them.
+        return markers + "bases(" + ",".join(bases or []) + ")"
+    return markers + ":" + (annotation or "")
 
 
 # --------------------------------------------------------------------------
@@ -306,7 +340,10 @@ class _Walker(ast.NodeVisitor):
             ]
             start = min(start, decorator_lines[0])
 
-        canonical = _canonical_signature(kind, signature, bases, annotation)
+        canonical = _canonical_signature(
+            kind, signature, bases, annotation,
+            is_async=isinstance(node, ast.AsyncFunctionDef),
+            decorators=decorators or [])
         self.out.definitions.append({
             "local_id": local_id,
             "kind": kind,
