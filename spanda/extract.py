@@ -267,6 +267,52 @@ def _dotted_chain(node) -> list[str] | None:
     return chain
 
 
+def _body_hash(node) -> str:
+    """Hash of what a definition *does*, ignoring what it says.
+
+    `content_hash` moves when a docstring is added or an error message is
+    reworded, which makes two functions with identical logic count as two
+    implementations. This hash walks the syntax tree instead: docstrings are
+    left out, every string literal is reduced to "a string", and the
+    definition's own name is dropped, so `_enforce_role` in fourteen files
+    with fourteen differently worded messages hashes the same fourteen times
+    — and differently the moment one of them raises a different exception.
+    """
+    parts: list[str] = []
+
+    def emit(value, drop_name: bool = False) -> None:
+        if isinstance(value, ast.Constant):
+            # Identifier text (`id`, `attr`, `arg`) never arrives here — it
+            # is a plain str field on another node — so this neutralises
+            # only literal strings.
+            parts.append("<str>" if isinstance(value.value, str)
+                         else repr(value.value))
+        elif isinstance(value, ast.AST):
+            parts.append(type(value).__name__ + "(")
+            for field, child in ast.iter_fields(value):
+                if drop_name and field == "name":
+                    continue
+                if field == "body" and isinstance(child, list) \
+                        and _docstring_of(value) is not None:
+                    child = child[1:]  # a lambda's body is one expression
+                parts.append(field + "=")
+                emit(child)
+                parts.append(",")
+            parts.append(")")
+        elif isinstance(value, list):
+            parts.append("[")
+            for item in value:
+                emit(item)
+                parts.append(",")
+            parts.append("]")
+        else:
+            parts.append(repr(value))
+
+    emit(node, drop_name=isinstance(
+        node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)))
+    return _sha256("".join(parts))
+
+
 def _docstring_of(node) -> int | None:
     """The id of a body's leading string constant, if it has one.
 
@@ -379,6 +425,7 @@ class _Walker(ast.NodeVisitor):
             "canonical_signature": canonical,
             "signature_hash": _sha256(canonical),
             "content_hash": _sha256(self._source_of(start, end)),
+            "body_hash": _body_hash(node),
         })
         return local_id
 
@@ -626,10 +673,13 @@ class ScanPlan:
     root: Path
     files: list[Path]
     skipped: dict[str, list[str]] = field(default_factory=dict)
+    #: Python files on disk that git ignores, set aside by the CLI. A scan
+    #: labelled "at commit X" must not contain files that commit does not.
+    ignored: list[str] = field(default_factory=list)
 
     @property
     def skipped_count(self) -> int:
-        return sum(len(paths) for paths in self.skipped.values())
+        return sum(len(paths) for paths in self.skipped.values()) + len(self.ignored)
 
 
 @dataclass

@@ -86,7 +86,8 @@
       "docstring": null,
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
-      "content_hash": "sha256:6ec2b6f86275adf11d8797d31216196a"
+      "content_hash": "sha256:6ec2b6f86275adf11d8797d31216196a",
+      "body_hash": "sha256:c53f5de2224e1e0d69dff6595cb49126"
     },
     {
       "local_id": "d2",
@@ -125,7 +126,8 @@
       "docstring": "Look up a handler by a name assembled at runtime, then call it.",
       "canonical_signature": "(positional:event_name:str,positional:payload)->",
       "signature_hash": "sha256:cd5e2c64ece98839abc6b1206c2542b7",
-      "content_hash": "sha256:3783ef1caee799207061d528b21649cd"
+      "content_hash": "sha256:3783ef1caee799207061d528b21649cd",
+      "body_hash": "sha256:b49d05fff3196b83305aeb0069342a90"
     },
     {
       "local_id": "d3",
@@ -164,7 +166,8 @@
       "docstring": "Attribute access through a variable, on an argument of unknown type.",
       "canonical_signature": "(positional:target,positional:method_name:str='on_paid')->",
       "signature_hash": "sha256:d51a731dee1a22590c42627838935e6a",
-      "content_hash": "sha256:0a6842b0c18300c74d96b05b2a1c6f99"
+      "content_hash": "sha256:0a6842b0c18300c74d96b05b2a1c6f99",
+      "body_hash": "sha256:5d25418bc3e8aa904909b68cbf8ddc99"
     },
     {
       "local_id": "d4",
@@ -197,7 +200,8 @@
       "docstring": "Calls into whichever json module the conditional import bound.",
       "canonical_signature": "(positional:payload)->str",
       "signature_hash": "sha256:3aff5f971370b6d8475d37a83e3c4cee",
-      "content_hash": "sha256:ce9c337dede3868fb9a8c8955bc424d8"
+      "content_hash": "sha256:ce9c337dede3868fb9a8c8955bc424d8",
+      "body_hash": "sha256:1443d79cf8f1da92dc2133a9ae5be86f"
     },
     {
       "local_id": "d5",
@@ -230,7 +234,8 @@
       "docstring": "A module loaded by name at runtime. Not an import statement, so the\nimport audit cannot see it; must surface as a gap instead.",
       "canonical_signature": "(positional:name:str)->",
       "signature_hash": "sha256:3a67b0f78da23c942ce68a99a337d838",
-      "content_hash": "sha256:c59f1d6e452598515a2d877526b57a4f"
+      "content_hash": "sha256:c59f1d6e452598515a2d877526b57a4f",
+      "body_hash": "sha256:825ab006c68a007af5f2f468a103aa80"
     }
   ],
   "references": [

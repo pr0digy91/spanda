@@ -60,7 +60,8 @@
       "docstring": "Uses two names that exist here only via the star import.",
       "canonical_signature": "(positional:item_name:str,positional:price)->str",
       "signature_hash": "sha256:335d27a764afe846179cca0d500ada6a",
-      "content_hash": "sha256:3bda062fbfe8cce377009c8dc61a5b25"
+      "content_hash": "sha256:3bda062fbfe8cce377009c8dc61a5b25",
+      "body_hash": "sha256:637a66e988cbd73c8ca1a99297a9522e"
     }
   ],
   "references": [

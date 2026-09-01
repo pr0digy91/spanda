@@ -88,7 +88,8 @@
       "docstring": "Lifecycle states for an order.",
       "canonical_signature": "bases(Enum)",
       "signature_hash": "sha256:f79c776124183761bb4544f9c464dfc5",
-      "content_hash": "sha256:fa24d170f213aeae0001e529ed06af0c"
+      "content_hash": "sha256:fa24d170f213aeae0001e529ed06af0c",
+      "body_hash": "sha256:39f9be6d199e934a64f50c3466c71da7"
     },
     {
       "local_id": "d2",
@@ -111,7 +112,8 @@
       "docstring": null,
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
-      "content_hash": "sha256:99c9237acb6fac452d308d27537b24ae"
+      "content_hash": "sha256:99c9237acb6fac452d308d27537b24ae",
+      "body_hash": "sha256:8e0fe6697e6ed6924769e254adc4850f"
     },
     {
       "local_id": "d3",
@@ -134,7 +136,8 @@
       "docstring": null,
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
-      "content_hash": "sha256:bca379344d03e362bf3a86e544a44977"
+      "content_hash": "sha256:bca379344d03e362bf3a86e544a44977",
+      "body_hash": "sha256:6649033e19ed899dc5f7c621086eea47"
     },
     {
       "local_id": "d4",
@@ -157,7 +160,8 @@
       "docstring": null,
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
-      "content_hash": "sha256:0854bbdaa68ce48589da5211f626bea2"
+      "content_hash": "sha256:0854bbdaa68ce48589da5211f626bea2",
+      "body_hash": "sha256:10b011a0293f355cce811ef562a22964"
     },
     {
       "local_id": "d5",
@@ -180,7 +184,8 @@
       "docstring": "A single restaurant order.",
       "canonical_signature": "bases()",
       "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
-      "content_hash": "sha256:cb0116a6c704ad2b944e9b59b678b6e9"
+      "content_hash": "sha256:cb0116a6c704ad2b944e9b59b678b6e9",
+      "body_hash": "sha256:b09e71b64c010147b44a8f1fcee9b93b"
     },
     {
       "local_id": "d6",
@@ -203,7 +208,8 @@
       "docstring": null,
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
-      "content_hash": "sha256:3ac5e90384abd75174a7f2f51975c6d1"
+      "content_hash": "sha256:3ac5e90384abd75174a7f2f51975c6d1",
+      "body_hash": "sha256:7bebe85e70229dcb0f957ab390627353"
     },
     {
       "local_id": "d7",
@@ -248,7 +254,8 @@
       "docstring": null,
       "canonical_signature": "(positional:self,positional:order_id:str,positional:items:list | None=None)->None",
       "signature_hash": "sha256:8184747ded662c375ebb3508c63964c6",
-      "content_hash": "sha256:7f97060890d9041dd168523e8e0d1f0a"
+      "content_hash": "sha256:7f97060890d9041dd168523e8e0d1f0a",
+      "body_hash": "sha256:8af0763724f888e476a98f0c0b87896b"
     },
     {
       "local_id": "d8",
@@ -289,7 +296,8 @@
       "docstring": "Sum of line items before tax.",
       "canonical_signature": "[property](positional:self)->Decimal",
       "signature_hash": "sha256:5dcc76f287cb7d9501e17629ba071665",
-      "content_hash": "sha256:ef5fba4b3dee338e30d2ac811814345e"
+      "content_hash": "sha256:ef5fba4b3dee338e30d2ac811814345e",
+      "body_hash": "sha256:7003420275767319ef67223b0c90acc2"
     },
     {
       "local_id": "d9",
@@ -328,7 +336,8 @@
       "docstring": "Order total including tax.",
       "canonical_signature": "(positional:self,keyword_only:currency:str='INR')->Decimal",
       "signature_hash": "sha256:d5e0dc55f07f3007938014594c286600",
-      "content_hash": "sha256:a7ac76dee3175aa5c6015c60fe1430e6"
+      "content_hash": "sha256:a7ac76dee3175aa5c6015c60fe1430e6",
+      "body_hash": "sha256:4d7a7fafb1b602befb629d4267390e51"
     },
     {
       "local_id": "d10",
@@ -369,7 +378,8 @@
       "docstring": "Whether an order in this state can still change.",
       "canonical_signature": "[staticmethod](positional:status:OrderStatus)->bool",
       "signature_hash": "sha256:bb4dc2214ac7d88a41f94aebf5c8485f",
-      "content_hash": "sha256:5c5e6e28d322476574bb5a2c7195f057"
+      "content_hash": "sha256:5c5e6e28d322476574bb5a2c7195f057",
+      "body_hash": "sha256:118d634a05890154b4155caff59317ba"
     },
     {
       "local_id": "d11",
@@ -416,7 +426,8 @@
       "docstring": "Construct an order with no line items.",
       "canonical_signature": "[classmethod](positional:cls,positional:order_id:str)->'Order'",
       "signature_hash": "sha256:50cde892c92ee4cf8f94f9731b4c899a",
-      "content_hash": "sha256:ae910d3a8057aa9fed85b334b6f1ea80"
+      "content_hash": "sha256:ae910d3a8057aa9fed85b334b6f1ea80",
+      "body_hash": "sha256:b0dce32136884c71a45cdf562793c318"
     },
     {
       "local_id": "d12",
@@ -469,7 +480,8 @@
       "docstring": "Apply row-level security context before every flush.\n\nCalled by SQLAlchemy, never by name from this codebase.",
       "canonical_signature": "(positional:session,positional:flush_context,positional:instances)->None",
       "signature_hash": "sha256:4edbbf6880ea2a0ad6d0631783033227",
-      "content_hash": "sha256:cfd001096db333db696e2dab74b7b187"
+      "content_hash": "sha256:cfd001096db333db696e2dab74b7b187",
+      "body_hash": "sha256:7af9a0ace0a127e3c68406d7712bc272"
     },
     {
       "local_id": "d13",
@@ -495,7 +507,8 @@
       "docstring": "Reached only from _apply_rls_context, which itself has no static callers.",
       "canonical_signature": "()->str",
       "signature_hash": "sha256:fcc4c0c5b51213b840ff1e53f352585c",
-      "content_hash": "sha256:a994342eff668424416eebe7a3305888"
+      "content_hash": "sha256:a994342eff668424416eebe7a3305888",
+      "body_hash": "sha256:5f9233490db9ee66bf122d71f6efba8e"
     }
   ],
   "references": [

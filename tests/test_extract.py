@@ -305,3 +305,60 @@ def test_moving_a_function_changes_neither_hash():
             d = extract_file(path, Path(tmp))["definitions"][0]
             return d["signature_hash"], d["content_hash"]
     assert both(PLAIN) == both(moved)
+
+
+# -- body_hash: what the code does, not what it says -----------------------
+
+def _hashes(source: str) -> dict:
+    from spanda.extract import extract_file
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "m.py"
+        path.write_text(source)
+        d = extract_file(path, Path(tmp))["definitions"][0]
+        return {"body": d["body_hash"], "content": d["content_hash"],
+                "signature": d["signature_hash"]}
+
+
+GATE = 'def gate(role):\n    if role != "Admin":\n        raise PermissionError("no")\n    return True\n'
+
+
+def test_a_docstring_moves_content_but_not_body():
+    """A docstring is text about the code, not the code."""
+    documented = GATE.replace('def gate(role):\n', 'def gate(role):\n    """Only admins."""\n')
+    assert _hashes(documented)["content"] != _hashes(GATE)["content"]
+    assert _hashes(documented)["body"] == _hashes(GATE)["body"]
+
+
+def test_rewording_a_message_keeps_the_body():
+    """Fourteen copies that differ only in their error text are one body."""
+    reworded = GATE.replace('"no"', '"Administrators only, sorry"')
+    assert _hashes(reworded)["body"] == _hashes(GATE)["body"]
+    assert _hashes(reworded)["content"] != _hashes(GATE)["content"]
+
+
+def test_a_different_exception_is_a_different_body():
+    """The wording is set aside; the behaviour is not."""
+    stricter = GATE.replace("PermissionError", "SystemExit")
+    assert _hashes(stricter)["body"] != _hashes(GATE)["body"]
+
+
+def test_a_different_role_is_a_different_body():
+    """A string literal changes hash only when it stops being a string —
+    the *value* is neutralised, so 'Admin' vs 'Owner' hash the same. This
+    pins that limit so it is chosen, not discovered."""
+    other_role = GATE.replace('"Admin"', '"Owner"')
+    assert _hashes(other_role)["body"] == _hashes(GATE)["body"]
+
+
+def test_the_name_is_not_part_of_the_body():
+    """Same code under two names is the same body, ready for the day the
+    profile looks for copies that were renamed."""
+    renamed = GATE.replace("def gate(", "def check_role(")
+    assert _hashes(renamed)["body"] == _hashes(GATE)["body"]
+    assert _hashes(renamed)["signature"] == _hashes(GATE)["signature"]
+
+
+def test_a_lambda_body_does_not_break_the_hash():
+    """A lambda's body is one expression, not a list — regression."""
+    assert _hashes("f = lambda x: x + 1\n")["body"].startswith("sha256:")

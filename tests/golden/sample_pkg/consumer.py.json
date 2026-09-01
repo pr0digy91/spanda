@@ -52,7 +52,8 @@
       "docstring": null,
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
-      "content_hash": "sha256:a7d399f29bfc13731227ead54be87438"
+      "content_hash": "sha256:a7d399f29bfc13731227ead54be87438",
+      "body_hash": "sha256:089e438bf3d5c4d40db1194b1eef1c34"
     },
     {
       "local_id": "d2",
@@ -85,7 +86,8 @@
       "docstring": "Calls two names that arrive here through re-export chains.",
       "canonical_signature": "(positional:order_id:str)->str",
       "signature_hash": "sha256:1c71e8766901814c4ca50bcf51fc32fe",
-      "content_hash": "sha256:20c83dada926c7be3eb557a371f12f54"
+      "content_hash": "sha256:20c83dada926c7be3eb557a371f12f54",
+      "body_hash": "sha256:cbc4872c3c343f703fb26a318bb29280"
     }
   ],
   "references": [

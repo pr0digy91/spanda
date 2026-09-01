@@ -21,7 +21,7 @@ from spanda.modules import (EXTERNAL, ModuleIndex, build_import_graph,
                             cycle_groups, processing_order, resolve_imports)
 from spanda.resolve import SymbolTable, build_scopes, resolve_record
 from spanda.drift import compare
-from spanda.store import Index, IndexError_, db_path, prepare_db_path
+from spanda.store import SCHEMA_VERSION, Index, IndexError_, db_path, prepare_db_path
 
 
 #: Not this codebase's symbols, so not the resolver's to find.
@@ -224,6 +224,10 @@ PROGRESS_EVERY = 200
 
 def _run_scan(db_path, root, plan, patterns):
     with Index(db_path, codebase_root=root) as index:
+        if index.migrated_from:
+            print(f"index brought forward from schema {index.migrated_from} "
+                  f"to {SCHEMA_VERSION}; this scan fills in what the new "
+                  f"columns need")
         scan_id = index.begin_scan(plan.root, plan.skipped_count)
         print(f"scan {scan_id}: {len(plan.files)} files under {plan.root}")
 
@@ -250,7 +254,7 @@ def _run_scan(db_path, root, plan, patterns):
         index.record_cycles(scan_id, _cycles_from(collected, module_index))
 
         totals = index.finish_scan(scan_id)
-        missing = index.missing_at(scan_id)
+        missing = index.gone_since_previous(scan_id)
     return totals, missing, scan_id, counts
 
 
@@ -261,7 +265,7 @@ def cmd_index(args: argparse.Namespace) -> int:
         print(f"not a directory: {root}", file=sys.stderr)
         return 2
 
-    plan = plan_scan(root)
+    plan = _plan(root)
     patterns = load_patterns(Path(args.patterns) if args.patterns else None)
 
     target = Path(args.db) if args.db else prepare_db_path(root)
@@ -272,7 +276,10 @@ def cmd_index(args: argparse.Namespace) -> int:
     print(f"\nscan {scan_id} complete")
     print(f"  {totals['parsed_files']} files parsed, "
           f"{totals['unparseable_files']} unparseable, "
-          f"{totals['skipped_files']} not looked at")
+          f"{totals['skipped_files']} not looked at"
+          + (f" ({len(plan.ignored)} of them .py files git ignores: "
+             f"{', '.join(plan.ignored[:3])}"
+             f"{', ...' if len(plan.ignored) > 3 else ''})" if plan.ignored else ""))
     print(f"  {totals['total_symbols']} symbols "
           f"({totals['ambiguous_symbols']} defined more than once in their file)")
     print(f"  {counts['edges']} references resolved to a definition, "
@@ -288,8 +295,8 @@ def cmd_index(args: argparse.Namespace) -> int:
         print("  not a git repository — incremental re-index will not be available")
 
     if missing:
-        print(f"\n  {len(missing)} symbols known to the index were not seen "
-              f"in this scan:")
+        print(f"\n  {len(missing)} symbols seen by the previous scan are gone "
+              f"in this one:")
         for row in missing[:10]:
             print(f"    {row['file_path']}:{row['line_start']}  {row['qualname']}"
                   f"  (last seen in scan {row['last_seen_scan_id']})")
@@ -625,7 +632,7 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                         continue
                     committed = datetime.fromtimestamp(
                         int(when), timezone.utc).isoformat(timespec="seconds")
-                    plan = plan_scan(worktree)
+                    plan = _plan(worktree)
                     scan_id = index.begin_scan(
                         worktree, plan.skipped_count, record_root=root,
                         commit_override=commit, dirty_override=False,
@@ -674,10 +681,40 @@ def cmd_backfill(args: argparse.Namespace) -> int:
     return 0
 
 
+def _plan(root: Path):
+    """What a scan will read: everything on disk, minus what git ignores.
+
+    A full scan walks the filesystem and a backfill follows git, and they
+    disagree on exactly one thing: a `.py` file that is on disk but ignored.
+    the target codebase had one — a helper script under a gitignored `scripts/` — and
+    the full scan recorded it as *added* in a scan labelled "at commit
+    7e4ae187, clean tree", which that commit does not contain. So a git
+    repository is scanned as git sees it, and the files set aside are
+    counted and reported, not dropped. Outside git nothing changes.
+    """
+    plan = plan_scan(root)
+    listing = _git(root, "ls-files", "--others", "--ignored", "--exclude-standard",
+                   "-z", strip=False)
+    if not listing:
+        return plan
+    ignored = {p for p in listing.split("\0") if p.endswith(".py")}
+    if not ignored:
+        return plan
+    keep = []
+    for path in plan.files:
+        relative = path.relative_to(plan.root).as_posix()
+        if relative in ignored:
+            plan.ignored.append(relative)
+        else:
+            keep.append(path)
+    plan.files = keep
+    return plan
+
+
 def _import_survey(root: Path):
     """Resolve every import in a codebase. Keeps only what the graph needs,
     so memory stays flat rather than holding every record."""
-    plan = plan_scan(root)
+    plan = _plan(root)
     index, statements = ModuleIndex(), []
     for record in stream_records(plan):
         index.add(record["file"], record["module"])
@@ -734,7 +771,7 @@ def _resolve_collected(collected, module_index, table):
 def _resolve_codebase(root: Path, patterns):
     """Parse a codebase and resolve it, for callers that have not already
     parsed it themselves."""
-    plan = plan_scan(root)
+    plan = _plan(root)
     module_index, table, collected = ModuleIndex(), SymbolTable(), []
     for record in stream_records(plan):
         module_index.add(record["file"], record["module"])

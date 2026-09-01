@@ -54,7 +54,8 @@
       "docstring": "Check the table id carries the expected prefix.",
       "canonical_signature": "(positional:table_id:str)->bool",
       "signature_hash": "sha256:91a3994d9d8dab7d51dbcd71891efe0a",
-      "content_hash": "sha256:d47a9abcf2367048582387aae4e0fe93"
+      "content_hash": "sha256:d47a9abcf2367048582387aae4e0fe93",
+      "body_hash": "sha256:d7f17cb1f9198618b1c7c28ab42a662f"
     }
   ],
   "references": [

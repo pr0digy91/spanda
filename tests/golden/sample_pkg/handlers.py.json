@@ -39,7 +39,8 @@
       "docstring": "Invoked as getattr(handlers, \"on_created\").",
       "canonical_signature": "(positional:payload)->",
       "signature_hash": "sha256:033cf8593b5c954a789ea791f460bdbc",
-      "content_hash": "sha256:308d0fcbebd690ec53a0d6301ee5f808"
+      "content_hash": "sha256:308d0fcbebd690ec53a0d6301ee5f808",
+      "body_hash": "sha256:3dd8b3f59916dcb361ca9d3055f5ad63"
     },
     {
       "local_id": "d2",
@@ -72,7 +73,8 @@
       "docstring": "Invoked as getattr(handlers, \"on_paid\").",
       "canonical_signature": "(positional:payload)->",
       "signature_hash": "sha256:033cf8593b5c954a789ea791f460bdbc",
-      "content_hash": "sha256:961dbe66afc5f5ff13cbc20287555430"
+      "content_hash": "sha256:961dbe66afc5f5ff13cbc20287555430",
+      "body_hash": "sha256:3dd8b3f59916dcb361ca9d3055f5ad63"
     }
   ],
   "references": [

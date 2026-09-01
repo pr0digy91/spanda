@@ -270,3 +270,35 @@ def test_backfill_end_to_end_matches_a_full_scan_of_head(repo, tmp_path):
     with Index(fresh, codebase_root=repo) as index:
         full_state = snapshot(index, full_scan(index, repo, load_patterns()))
     assert backfilled == full_state
+
+
+def test_a_gitignored_file_is_set_aside_and_named(repo, capsys):
+    """On disk but in no commit: a scan labelled with that commit must not
+    contain it, and must say it was there."""
+    from spanda.cli import main
+    from spanda.store import Index, db_path
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "totp.py").write_text("def make_code():\n    return 1\n")
+    (repo / ".gitignore").write_text("scripts/\n")
+    git(repo, "add", ".gitignore")
+    git(repo, "commit", "-qm", "ignore scripts")
+
+    assert main(["index", str(repo)]) == 0
+    report = capsys.readouterr().out
+    assert "1 of them .py files git ignores: scripts/totp.py" in report
+    assert "(clean tree)" in report
+    with Index(db_path(repo)) as index:
+        assert index.find("make_code") == []
+        assert index.scan(1)["skipped_files"] == 1
+
+
+def test_outside_git_everything_on_disk_is_read(tmp_path, capsys):
+    src = tmp_path / "plain"
+    (src / "scripts").mkdir(parents=True)
+    (src / "scripts" / "totp.py").write_text("def make_code():\n    return 1\n")
+    (src / ".gitignore").write_text("scripts/\n")
+    from spanda.cli import main
+    from spanda.store import Index, db_path
+    assert main(["index", str(src)]) == 0
+    with Index(db_path(src)) as index:
+        assert len(index.find("make_code")) == 1

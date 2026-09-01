@@ -21,7 +21,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS symbol_versions (
     signature_hash      TEXT,
     canonical_signature TEXT,
     line_start          INTEGER,
+    body_hash           TEXT,
     PRIMARY KEY (symbol_uuid, scan_id)
 );
 
@@ -150,6 +151,10 @@ CREATE TABLE IF NOT EXISTS symbols (
     signature_varies     INTEGER NOT NULL DEFAULT 0,
     content_hash         TEXT,
     signature_hash       TEXT,
+    -- Hash of the code with docstrings and string wording removed: what the
+    -- symbol does rather than what it says. NULL only for a symbol recorded
+    -- before schema 11 and not re-read since.
+    body_hash            TEXT,
     first_seen_scan_id   INTEGER NOT NULL,
     last_seen_scan_id    INTEGER NOT NULL
 );
@@ -228,8 +233,17 @@ SYMBOL_FIELDS = [
     "name", "qualname", "kind", "module", "file_path", "line_start",
     "line_end", "signature", "canonical_signature", "docstring", "decorators",
     "has_dynamic_dispatch", "definition_count", "signature_varies",
-    "content_hash", "signature_hash",
+    "content_hash", "signature_hash", "body_hash",
 ]
+
+#: Additive changes an older index can be brought forward by, keyed by the
+#: version they produce. Anything that cannot be expressed as one of these is
+#: not a migration, and the guard below says so rather than guessing.
+MIGRATIONS: dict[int, list[tuple[str, str, str]]] = {
+    # (table, column, declaration) — applied only if the column is missing.
+    11: [("symbols", "body_hash", "TEXT"),
+         ("symbol_versions", "body_hash", "TEXT")],
+}
 
 
 class IndexError_(Exception):
@@ -338,6 +352,9 @@ def merge_duplicate_definitions(definitions: list[dict]) -> list[dict]:
             combined = "|".join(d["content_hash"] for d in group)
             first["content_hash"] = "sha256:" + hashlib.sha256(
                 combined.encode()).hexdigest()[:32]
+            bodies = "|".join(d["body_hash"] for d in group)
+            first["body_hash"] = "sha256:" + hashlib.sha256(
+                bodies.encode()).hexdigest()[:32]
             first["definition_count"] = len(group)
             first["signature_varies"] = len({d["signature_hash"] for d in group}) > 1
             first["docstring"] = next((d["docstring"] for d in group if d["docstring"]), None)
@@ -389,6 +406,9 @@ class Index:
         self.connection = sqlite3.connect(self.path, isolation_level=None, timeout=15)
         self.connection.row_factory = sqlite3.Row
         self._open_scan: int | None = None
+        #: Set when opening brought an older index forward, so a command can
+        #: say so instead of leaving the user to wonder why a column is empty.
+        self.migrated_from: int | None = None
 
         if fresh:
             self.connection.executescript(SCHEMA)
@@ -420,12 +440,44 @@ class Index:
             raise IndexError_(
                 f"{self.path} predates schema versioning and cannot be read "
                 f"safely. Delete it and re-index.")
-        if int(stored) != SCHEMA_VERSION:
-            direction = "newer than" if int(stored) > SCHEMA_VERSION else "older than"
+        version = int(stored)
+        if version == SCHEMA_VERSION:
+            return
+        if version > SCHEMA_VERSION:
             raise IndexError_(
-                f"{self.path} has schema version {stored}, {direction} this "
-                f"build's version {SCHEMA_VERSION}. There are no migrations "
-                f"yet: delete the file and re-index.")
+                f"{self.path} has schema version {stored}, newer than this "
+                f"build's version {SCHEMA_VERSION}. Upgrade spanda, or delete "
+                f"the file and re-index.")
+        if any(step not in MIGRATIONS for step in range(version + 1, SCHEMA_VERSION + 1)):
+            raise IndexError_(
+                f"{self.path} has schema version {stored}, older than this "
+                f"build's version {SCHEMA_VERSION}, and no migration covers "
+                f"the gap: delete the file and re-index.")
+        self._migrate(version)
+
+    def _migrate(self, version: int) -> None:
+        """Bring an older index forward, one additive step at a time.
+
+        Only columns are ever added, and the new column is NULL for every
+        row that was written before it existed. That is the honest state: a
+        migration cannot invent a hash for source it never read. The next
+        `spanda index` fills the column for every symbol it re-reads.
+        """
+        self.connection.execute("BEGIN IMMEDIATE")
+        try:
+            for step in range(version + 1, SCHEMA_VERSION + 1):
+                for table, column, declaration in MIGRATIONS[step]:
+                    present = {row["name"] for row in self.connection.execute(
+                        f"PRAGMA table_info({table})")}
+                    if column not in present:
+                        self.connection.execute(
+                            f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+                self._set_meta("schema_version", str(step))
+            self.connection.execute("COMMIT")
+        except Exception:
+            self.connection.execute("ROLLBACK")
+            raise
+        self.migrated_from = version
 
     def _check_codebase(self, root: Path) -> None:
         stored = self.meta("codebase_root")
@@ -622,6 +674,7 @@ class Index:
                 json.dumps(definition["decorators"]), int(dynamic),
                 definition["definition_count"], int(definition["signature_varies"]),
                 definition["content_hash"], definition["signature_hash"],
+                definition["body_hash"],
             )
 
             existing = self.connection.execute(
@@ -653,11 +706,11 @@ class Index:
             if changed:
                 self.connection.execute(
                     "INSERT OR REPLACE INTO symbol_versions (symbol_uuid, scan_id,"
-                    " content_hash, signature_hash, canonical_signature, line_start)"
-                    " VALUES (?, ?, ?, ?, ?, ?)",
+                    " content_hash, signature_hash, canonical_signature, line_start,"
+                    " body_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (symbol_uuid, scan_id, definition["content_hash"],
                      definition["signature_hash"], definition["canonical_signature"],
-                     definition["lines"][0]))
+                     definition["lines"][0], definition["body_hash"]))
 
         return len(definitions)
 
@@ -920,6 +973,22 @@ class Index:
         return self.connection.execute(
             "SELECT * FROM symbols WHERE last_seen_scan_id < ?"
             " ORDER BY file_path, line_start", (scan_id,)).fetchall()
+
+    def gone_since_previous(self, scan_id: int) -> list[sqlite3.Row]:
+        """Symbols present in the completed scan before this one and absent now.
+
+        `missing_at` answers "what has ever gone"; after a 425-scan backfill
+        that is 1,500 rows, every one of them old news. This is the list a
+        scan report should show: what this scan is the first not to see.
+        """
+        previous = self.connection.execute(
+            "SELECT MAX(scan_id) FROM scans WHERE completed = 1 AND scan_id < ?",
+            (scan_id,)).fetchone()[0]
+        if previous is None:
+            return []
+        return self.connection.execute(
+            "SELECT * FROM symbols WHERE last_seen_scan_id = ?"
+            " ORDER BY file_path, line_start", (previous,)).fetchall()
 
     def version_at(self, symbol_uuid: str, scan_id: int) -> sqlite3.Row | None:
         """What a symbol looked like as of a given scan.

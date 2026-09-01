@@ -41,21 +41,51 @@ def test_reuse_counts_files_and_distinct_bodies(indexed):
 
 
 def test_verbatim_copies_are_told_apart_from_same_named_variants(tmp_path):
-    """Three files, one body: copying. Three files, three bodies: not."""
+    """Three files, one body: copying. Three files, three bodies: not.
+
+    `worded` is the case the ri-be-test reviewer caught: identical logic
+    under three different docstrings and three differently worded messages.
+    Counting those as three bodies made one behaviour read as three."""
     src = tmp_path / "p"
     src.mkdir()
     for n in range(3):
         (src / f"m{n}.py").write_text(
             "def copied():\n    return 1\n\n\n"
-            f"def variant():\n    return {n}\n")
+            f"def variant():\n    return {n}\n\n\n"
+            f"def worded(x):\n    \"\"\"Version {n}.\"\"\"\n"
+            f"    if x:\n        raise ValueError(\"message {n}\")\n\n\n"
+            f"def shaped({', '.join('abc'[:n + 1])}):\n    return 1\n")
     assert main(["index", str(src)]) == 0
     with Index(prepare_db_path(src)) as index:
         profile = build(index, min_files=3)
     by_name = {r.name: r for r in profile.reused}
     assert by_name["copied"].distinct_bodies == 1
     assert by_name["variant"].distinct_bodies == 3
+    assert by_name["worded"].distinct_bodies == 1
+    assert by_name["worded"].distinct_shapes == 1
+    assert by_name["shaped"].distinct_shapes == 3
     text = render(profile, "p")
     assert "identical copies" in text.split("copied")[1].split("\n")[0]
+    assert "identical copies" in text.split(" worded")[1].split("\n")[0]
+
+
+def test_bodies_unknown_are_marked_not_counted(tmp_path):
+    """A definition with no body hash yet shows '?', never '1 body'."""
+    src = tmp_path / "p"
+    src.mkdir()
+    for n in range(3):
+        (src / f"m{n}.py").write_text("def copied():\n    return 1\n")
+    assert main(["index", str(src)]) == 0
+    with Index(prepare_db_path(src)) as index:
+        index.connection.execute(
+            "UPDATE symbols SET body_hash = NULL WHERE file_path = 'm1.py'")
+        profile = build(index, min_files=3)
+        text = render(profile, "p")
+    copied = next(r for r in profile.reused if r.name == "copied")
+    assert copied.unhashed == 1
+    line = text.split(" copied")[0].split("\n")[-1]
+    assert "? bodies" in line and "identical copies" not in text
+    assert "run `spanda index`" in text
 
 
 def test_dunder_methods_do_not_count_as_reuse(tmp_path):

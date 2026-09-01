@@ -80,6 +80,11 @@ you and is the safer route.
 - `signature_hash` — hash of the above. **Moves only when callers could
   break.**
 - `content_hash` — hash of the whole symbol. Moves on any edit at all.
+- `body_hash` — hash of the code with docstrings left out and every string
+  literal reduced to "a string". Two definitions with the same `body_hash`
+  do the same thing and may say it differently; a reworded error message
+  does not move it, a different exception class does. NULL only for a symbol
+  recorded before this column existed and not re-read since.
 - `has_dynamic_dispatch` — 1 means something calls it that the source does not
   show.
 - `definition_count` — >1 means the same name is defined several times in one
@@ -200,7 +205,8 @@ asking the index anything.
 
 `spanda profile {{repo}}` reads this index for repetition rather than gaps:
 the same name defined separately in many files (and whether those are
-verbatim copies), how parameters are named and annotated, docstring
+one body under different wording, or genuinely different code — that is
+`body_hash`, above), how parameters are named and annotated, docstring
 coverage, decorators, and which symbols' shapes never settle. Descriptive
 only — it says what the corpus does, not whether that is good.
 

@@ -26,7 +26,14 @@ class Reuse:
     name: str
     kind: str
     files: int
+    #: Distinct `body_hash` values — code with docstrings and string wording
+    #: removed. One body across many files is copying; many is divergence.
     distinct_bodies: int
+    #: Distinct `signature_hash` values: how many different parameter lists.
+    distinct_shapes: int
+    #: Definitions with no body hash yet (recorded before schema 11 and not
+    #: re-read since). Reported rather than counted as one body each.
+    unhashed: int
     examples: list[str]
 
 
@@ -58,7 +65,7 @@ def build(index, include_tests: bool = False, min_files: int = 3) -> Profile:
 
     rows = connection.execute(
         "SELECT name, qualname, kind, file_path, signature, canonical_signature,"
-        "       docstring, decorators, content_hash, uuid"
+        "       docstring, decorators, body_hash, signature_hash, uuid"
         " FROM symbols WHERE last_seen_scan_id = ?", (latest,)).fetchall()
 
     excluded = 0
@@ -87,9 +94,12 @@ def build(index, include_tests: bool = False, min_files: int = 3) -> Profile:
     for (name, kind), group in by_name.items():
         files = {r["file_path"] for r in group}
         if len(files) >= min_files:
+            bodies = {r["body_hash"] for r in group if r["body_hash"]}
             profile.reused.append(Reuse(
                 name=name, kind=kind, files=len(files),
-                distinct_bodies=len({r["content_hash"] for r in group}),
+                distinct_bodies=len(bodies),
+                distinct_shapes=len({r["signature_hash"] for r in group}),
+                unhashed=sum(1 for r in group if not r["body_hash"]),
                 examples=sorted(files)[:3]))
     profile.reused.sort(key=lambda x: (-x.files, x.name))
 
@@ -170,15 +180,26 @@ def render(profile: Profile, repo: str) -> str:
     p("")
 
     p("NAMES DEFINED AGAIN AND AGAIN — same name, separate definition, in many files")
-    p("  'bodies' counts distinct content hashes: 21 files / 1 body is verbatim copying,")
-    p("  21 files / 21 bodies is the same name doing different things everywhere.")
+    p("  'bodies' counts distinct code once docstrings and string wording are set aside:")
+    p("  a reworded error message is the same body, a different exception is not.")
+    p("  21 files / 1 body is copying; 21 files / 21 bodies is the same name doing")
+    p("  different things everywhere. 'shapes' counts distinct parameter lists.")
     p("")
     if not profile.reused:
         p("  none defined in three or more files")
+    unhashed = 0
     for r in profile.reused[:15]:
-        note = " ← identical copies" if r.distinct_bodies == 1 and r.files > 1 else ""
-        p(f"  {r.files:>3} files  {r.distinct_bodies:>3} bodies   {r.kind:<8} {r.name}{note}")
+        unhashed += r.unhashed
+        bodies = f"{r.distinct_bodies:>3}" if not r.unhashed else "  ?"
+        note = " ← identical copies" if r.distinct_bodies == 1 and not r.unhashed \
+            and r.files > 1 else ""
+        p(f"  {r.files:>3} files  {bodies} bodies  {r.distinct_shapes:>3} shapes   "
+          f"{r.kind:<8} {r.name}{note}")
         p(f"             e.g. {', '.join(r.examples)}")
+    if unhashed:
+        p("")
+        p("  '?' — some of these definitions predate the body hash and have not been")
+        p("  re-read since; run `spanda index` once to fill it in.")
     p("")
 
     p("PARAMETERS — how they are named, and whether the code says what they are")

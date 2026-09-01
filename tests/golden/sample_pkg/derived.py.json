@@ -46,7 +46,8 @@
       "docstring": "UPI payment. Overrides charge, inherits refund.",
       "canonical_signature": "bases(PaymentMethod)",
       "signature_hash": "sha256:67da52ebd9759409fb3f14bff780bf7b",
-      "content_hash": "sha256:5d19423d1091784ab3078802bce8086a"
+      "content_hash": "sha256:5d19423d1091784ab3078802bce8086a",
+      "body_hash": "sha256:6903899f152b723746f105b02b0220b5"
     },
     {
       "local_id": "d2",
@@ -69,7 +70,8 @@
       "docstring": null,
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
-      "content_hash": "sha256:93702bfc007e9ae5dd7e4bd4b05ed7ab"
+      "content_hash": "sha256:93702bfc007e9ae5dd7e4bd4b05ed7ab",
+      "body_hash": "sha256:915bbcac90d775fa088dcd72d9b48b6f"
     },
     {
       "local_id": "d3",
@@ -114,7 +116,8 @@
       "docstring": "Concrete implementation of the abstract base method.",
       "canonical_signature": "(positional:self,positional:amount,keyword_only:idempotency_key:str | None=None)->bool",
       "signature_hash": "sha256:6d592e89aaceead4407b9f7effe8be19",
-      "content_hash": "sha256:244c710e1369a94edc84c4333209b435"
+      "content_hash": "sha256:244c710e1369a94edc84c4333209b435",
+      "body_hash": "sha256:a1dcbcd64a99c6d6af556d205f463843"
     },
     {
       "local_id": "d4",
@@ -147,7 +150,8 @@
       "docstring": "Calls a method defined only on the cross-file base class.",
       "canonical_signature": "(positional:self)->None",
       "signature_hash": "sha256:e4163a39710373fa93ea588760990cfd",
-      "content_hash": "sha256:01e33907925a70650096bf180ee0d891"
+      "content_hash": "sha256:01e33907925a70650096bf180ee0d891",
+      "body_hash": "sha256:cbbc865f2ba7039c731407b1ec801a32"
     }
   ],
   "references": [

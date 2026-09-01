@@ -78,7 +78,8 @@ def test_duplicate_definitions_merge_rather_than_collide():
     def definition(line, sig_hash):
         return {"qualname": "find_library", "kind": "function",
                 "lines": [line, line + 2], "content_hash": f"sha256:c{line}",
-                "signature_hash": sig_hash, "docstring": None}
+                "signature_hash": sig_hash, "docstring": None,
+                "body_hash": f"sha256:b{line}"}
 
     merged = merge_duplicate_definitions(
         [definition(10, "sha256:s1"), definition(20, "sha256:s1"),
@@ -419,3 +420,95 @@ def test_identical_content_produces_an_identical_fingerprint(tmp_path):
     with Index(db) as index:
         three = index.scans()[2]
     assert three["content_fingerprint"] != one["content_fingerprint"]
+
+
+# -- migrations --------------------------------------------------------------
+
+def _drop_body_hash(path: Path) -> None:
+    """Make a schema-11 index look like a schema-10 one."""
+    import sqlite3
+    connection = sqlite3.connect(path)
+    for table in ("symbols", "symbol_versions"):
+        connection.execute(f"ALTER TABLE {table} DROP COLUMN body_hash")
+    connection.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '10')")
+    connection.commit()
+    connection.close()
+
+
+def test_an_older_index_is_brought_forward_not_refused(workspace):
+    """Schema 10 to 11 adds one column. The rows written before it keep
+    NULL there — a migration cannot hash source it never read — and the
+    next scan fills it in for everything it re-reads."""
+    workspace, _ = workspace
+    from spanda.cli import main
+    assert main(["index", str(workspace)]) == 0
+    target = db_path(workspace)
+    _drop_body_hash(target)
+
+    with Index(target, codebase_root=workspace) as index:
+        assert index.migrated_from == 10
+        assert index.meta("schema_version") == "11"
+        empty = index.connection.execute(
+            "SELECT COUNT(*) FROM symbols WHERE body_hash IS NULL").fetchone()[0]
+        assert empty > 0
+
+    assert main(["index", str(workspace)]) == 0
+    with Index(target) as index:
+        assert index.migrated_from is None
+        empty = index.connection.execute(
+            "SELECT COUNT(*) FROM symbols WHERE body_hash IS NULL"
+            " AND last_seen_scan_id = (SELECT MAX(scan_id) FROM scans)").fetchone()[0]
+        assert empty == 0
+
+
+def test_a_newer_index_is_still_refused(workspace):
+    workspace, _ = workspace
+    from spanda.cli import main
+    assert main(["index", str(workspace)]) == 0
+    target = db_path(workspace)
+    with Index(target) as index:
+        index._set_meta("schema_version", "99")
+    with pytest.raises(IndexError_, match="newer than"):
+        Index(target)
+
+
+def test_a_gap_no_migration_covers_is_refused(workspace):
+    """Version 3 to 11 has no recorded steps: say so, do not guess."""
+    workspace, _ = workspace
+    from spanda.cli import main
+    assert main(["index", str(workspace)]) == 0
+    target = db_path(workspace)
+    with Index(target) as index:
+        index._set_meta("schema_version", "3")
+    with pytest.raises(IndexError_, match="no migration covers"):
+        Index(target)
+
+
+def test_scan_report_names_only_what_went_missing_this_time(workspace, capsys):
+    """After a long history `missing_at` is every symbol that ever went; the
+    report after a scan should name what *this* scan is the first not to see,
+    and nothing from earlier scans."""
+    from spanda.cli import main
+    workspace, _ = workspace
+    helpers = workspace / "sample_pkg" / "helpers.py"
+    original = helpers.read_text()
+    helpers.write_text(original + "\ndef first_extra():\n    return 1\n\n\ndef second_extra():\n    return 2\n")
+    assert main(["index", str(workspace)]) == 0
+
+    helpers.write_text(original + "\ndef second_extra():\n    return 2\n")
+    assert main(["index", str(workspace)]) == 0
+    report = capsys.readouterr().out
+    assert "1 symbols seen by the previous scan are gone" in report
+    assert "first_extra" in report
+
+    helpers.write_text(original)
+    assert main(["index", str(workspace)]) == 0
+    report = capsys.readouterr().out
+    assert "1 symbols seen by the previous scan are gone" in report
+    assert "second_extra" in report and "first_extra" not in report
+
+    assert main(["index", str(workspace)]) == 0
+    assert "gone" not in capsys.readouterr().out
+    with Index(db_path(workspace)) as index:
+        assert len(index.missing_at(4)) == 2, "history keeps both"
