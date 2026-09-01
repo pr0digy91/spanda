@@ -7,3 +7,6 @@ venv/
 *.sqlite
 *.db
 out/
+
+# Working notes, kept local rather than committed.
+project-documents/
