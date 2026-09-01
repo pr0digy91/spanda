@@ -375,3 +375,23 @@ def test_files_sharing_a_module_name_get_their_own_scopes(tmp_path):
              if r.edge_type == "calls" and r.target_symbol}
     assert ("t1/conftest.py", "lib.alpha.a|function") in calls
     assert ("t2/conftest.py", "lib.beta.b|function") in calls
+
+
+def test_a_function_local_import_is_audited_too(tmp_path):
+    """Imports written inside a function body are recorded like any other
+    and must be checked. A zero that only covered top-of-file imports would
+    be a zero that sounds bigger than it is."""
+    from spanda.extract import plan_scan, stream_records
+    from spanda.modules import ModuleIndex
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text("")
+    (tmp_path / "user.py").write_text(
+        "def go():\n    from pkg import thing\n    return thing()\n")
+    plan, patterns = plan_scan(tmp_path), load_patterns()
+    index, table, records = ModuleIndex(), SymbolTable(), []
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        records.append(record)
+    _scopes, lost = build_scopes(records, table, index)
+    assert [t.name for t in lost] == ["thing"]

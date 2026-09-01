@@ -28,7 +28,7 @@ EXPECTED_COUNTS = {
     "sample_pkg/checkout.py":  (4, 4, 0, 0, 0),
     "sample_pkg/base.py":      (4, 0, 1, 2, 1),
     "sample_pkg/derived.py":   (4, 0, 1, 2, 1),
-    "sample_pkg/dynamic.py":   (4, 3, 0, 0, 1),
+    "sample_pkg/dynamic.py":   (5, 4, 0, 0, 1),
     "sample_pkg/handlers.py":  (2, 2, 0, 0, 0),
     "sample_pkg/helpers.py":   (4, 3, 0, 0, 1),
     "sample_pkg/models.py":    (13, 2, 2, 5, 4),
@@ -71,7 +71,7 @@ def test_definition_counts_match_answer_key(records, path, expected):
 
 def test_totals(records):
     assert len(records) == 17
-    assert sum(len(r["definitions"]) for r in records.values()) == 57
+    assert sum(len(r["definitions"]) for r in records.values()) == 58
     parsed = [r for r in records.values() if r["parse_status"] == "ok"]
     assert len(parsed) == 16
 

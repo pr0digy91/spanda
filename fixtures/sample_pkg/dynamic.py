@@ -32,3 +32,10 @@ def call_named(target, method_name: str = "on_paid"):
 def serialise(payload) -> str:
     """Calls into whichever json module the conditional import bound."""
     return json.dumps(payload)
+
+
+def load_plugin(name: str):
+    """A module loaded by name at runtime. Not an import statement, so the
+    import audit cannot see it; must surface as a gap instead."""
+    import importlib
+    return importlib.import_module(f"sample_pkg.{name}")

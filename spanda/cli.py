@@ -142,6 +142,9 @@ GAP_HEADINGS = {
     "runtime_attribute_access":
         "Call sites that pick their target at runtime — the site is certain, "
         "the target is not:",
+    "dynamic_import":
+        "Modules loaded by calling importlib rather than by an import statement. "
+        "Whatever\n  they load has no static importer, so it will look unreferenced:",
     "name_in_string_literal":
         "String literals that spell the name of a symbol defined elsewhere "
         "(heuristic —\n  a name match is not a call, and must never become an edge):",
@@ -680,7 +683,9 @@ def _report_lost_trails(lost) -> None:
     from this run deserves suspicion until the cause is found.
     """
     if not lost:
-        print("  self-audit: every imported name was traced to its definition")
+        print("  self-audit: every name brought in by an import statement was "
+              "traced to its definition\n  (imports done by calling importlib "
+              "are not statements; `spanda gaps` lists those)")
         return
     print(f"\n  SELF-AUDIT: {len(lost)} imported name(s) whose definition could "
           f"not be found.")

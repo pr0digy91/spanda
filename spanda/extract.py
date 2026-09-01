@@ -35,6 +35,11 @@ IDENTIFIER_RE = re.compile(r"[A-Za-z_]\w*\Z")
 #: the gap is visible rather than absent.
 DYNAMIC_BUILTINS = {"getattr", "setattr", "hasattr", "delattr"}
 
+#: Imports performed by calling a function. Not import statements, so the
+#: resolver's import audit cannot see them, and whatever they load has no
+#: static importer and looks unreferenced. Recorded as their own hint kind.
+DYNAMIC_IMPORTS = {"__import__", "importlib.import_module", "import_module"}
+
 
 def _sha256(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
@@ -513,6 +518,13 @@ class _Walker(ast.NodeVisitor):
         if chain and chain[-1] in DYNAMIC_BUILTINS and len(chain) == 1:
             self.out.dynamic_hints.append({
                 "kind": chain[0],
+                "raw": ast.unparse(node),
+                "line": node.lineno,
+                "enclosing": self.scope.local_id,
+            })
+        elif chain and ".".join(chain) in DYNAMIC_IMPORTS:
+            self.out.dynamic_hints.append({
+                "kind": "dynamic_import",
                 "raw": ast.unparse(node),
                 "line": node.lineno,
                 "enclosing": self.scope.local_id,

@@ -106,10 +106,10 @@ def test_indexing_unchanged_code_twice_produces_zero_drift(workspace):
         versions = index.connection.execute(
             "SELECT COUNT(*) c FROM symbol_versions WHERE scan_id = 2").fetchone()
 
-    assert rows["total"] == 57
+    assert rows["total"] == 58
     assert rows["added"] == 0, "a re-index of unchanged code invented new symbols"
     assert rows["removed"] == 0, "a re-index of unchanged code lost symbols"
-    assert rows["uuids"] == rows["keys"] == 57
+    assert rows["uuids"] == rows["keys"] == 58
     assert versions["c"] == 0, "unchanged symbols must not write version rows"
 
 

@@ -3,7 +3,7 @@
   "module": "sample_pkg.dynamic",
   "parse_status": "ok",
   "parse_error": null,
-  "file_hash": "sha256:7b9893d54276b69391200733d08f1e65",
+  "file_hash": "sha256:82d5abf7cc0ac07bc869d302287d3cbd",
   "module_docstring": "Dynamic dispatch: none of the call targets here are statically knowable.\n\nAlso carries a conditional import, which is resolvable only at runtime and\nmust be recorded as conditional rather than silently treated as certain.",
   "dunder_all": [],
   "imports": [
@@ -48,6 +48,20 @@
       "is_star": false,
       "line": 12,
       "conditional": true
+    },
+    {
+      "raw": "import importlib",
+      "module": null,
+      "names": [
+        {
+          "name": "importlib",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 40,
+      "conditional": false
     }
   ],
   "definitions": [
@@ -184,6 +198,39 @@
       "canonical_signature": "(positional:payload)->str",
       "signature_hash": "sha256:3aff5f971370b6d8475d37a83e3c4cee",
       "content_hash": "sha256:ce9c337dede3868fb9a8c8955bc424d8"
+    },
+    {
+      "local_id": "d5",
+      "kind": "function",
+      "name": "load_plugin",
+      "qualname": "load_plugin",
+      "parent": null,
+      "lines": [
+        37,
+        41
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "name",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "A module loaded by name at runtime. Not an import statement, so the\nimport audit cannot see it; must surface as a gap instead.",
+      "canonical_signature": "(positional:name:str)->",
+      "signature_hash": "sha256:3a67b0f78da23c942ce68a99a337d838",
+      "content_hash": "sha256:c59f1d6e452598515a2d877526b57a4f"
     }
   ],
   "references": [
@@ -385,6 +432,40 @@
       "line": 34,
       "enclosing": "d4",
       "local": true
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 37,
+      "enclosing": "d5",
+      "local": false
+    },
+    {
+      "raw": "importlib.import_module",
+      "root": "importlib",
+      "chain": [
+        "importlib",
+        "import_module"
+      ],
+      "context": "call",
+      "line": 41,
+      "enclosing": "d5",
+      "local": true
+    },
+    {
+      "raw": "name",
+      "root": "name",
+      "chain": [
+        "name"
+      ],
+      "context": "name",
+      "line": 41,
+      "enclosing": "d5",
+      "local": true
     }
   ],
   "dynamic_hints": [
@@ -429,6 +510,12 @@
       "raw": "getattr(target, method_name)",
       "line": 28,
       "enclosing": "d3"
+    },
+    {
+      "kind": "dynamic_import",
+      "raw": "importlib.import_module(f'sample_pkg.{name}')",
+      "line": 41,
+      "enclosing": "d5"
     }
   ]
 }

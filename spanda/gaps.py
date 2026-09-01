@@ -88,6 +88,10 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
                 gaps.append(Gap(
                     "runtime_attribute_access", record["file"], hint["line"],
                     by_id.get(hint["enclosing"], "<module>"), hint["raw"]))
+            elif hint["kind"] == "dynamic_import":
+                gaps.append(Gap(
+                    "dynamic_import", record["file"], hint["line"],
+                    by_id.get(hint["enclosing"], "<module>"), hint["raw"]))
 
     # 3. A string literal that spells the name of a symbol nothing references.
     #    Restricted to otherwise-unreferenced symbols on purpose: if a symbol

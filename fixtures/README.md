@@ -29,7 +29,7 @@ Both are deliberate.
 | `checkout.py` | 4 | 4 | 0 | 0 | 0 |
 | `base.py` | 4 | 0 | 1 | 2 | 1 |
 | `derived.py` | 4 | 0 | 1 | 2 | 1 |
-| `dynamic.py` | 4 | 3 | 0 | 0 | 1 |
+| `dynamic.py` | 5 | 4 | 0 | 0 | 1 |
 | `handlers.py` | 2 | 2 | 0 | 0 | 0 |
 | `helpers.py` | 4 | 3 | 0 | 0 | 1 |
 | `models.py` | 13 | 2 | 2 | 5 | 4 |
@@ -39,7 +39,7 @@ Both are deliberate.
 | `registry/impl.py` | 1 | 1 | 0 | 0 | 0 |
 | `star.py` | 1 | 1 | 0 | 0 | 0 |
 | `broken.py` | — | unparseable; the reported line and wording vary by interpreter |
-| **Total** | **57** | 27 | 6 | 10 | 14 |
+| **Total** | **58** | 28 | 6 | 10 | 14 |
 
 17 files: 16 parse, 1 does not.
 
@@ -56,7 +56,7 @@ Both are deliberate.
 | `helpers.py` | `__all__` that deliberately excludes `_internal_only`. |
 | `star.py` | `from .helpers import *` — names used with no import statement naming them. |
 | `handlers.py` | Two functions with zero static references that are called at runtime. |
-| `dynamic.py` | `getattr`/`hasattr` dispatch, runtime-assembled names, conditional import. |
+| `dynamic.py` | `getattr`/`hasattr` dispatch, runtime-assembled names, conditional import, and an `importlib.import_module` call the import audit cannot see. |
 | `recursion.py` | Self- and mutual recursion. The graph is not a DAG. |
 | `nested.py` | Nested function, nested class, async, and every parameter kind. |
 | `broken.py` | A syntax error must be recorded, not fatal. |

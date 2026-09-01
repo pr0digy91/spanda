@@ -85,3 +85,13 @@ def test_the_three_untraceable_symbols_are_never_reported_as_unused(scan, gaps):
     assert MAKE_OR_BREAK <= explained, (
         "every symbol with no static callers must carry an explicit reason; "
         "silence without a reason is the CodeGraph failure")
+
+
+def test_a_dynamic_import_is_a_visible_gap(gaps):
+    """importlib.import_module(...) is not an import statement, so the
+    resolver's import audit cannot see it. It has to surface here instead,
+    or the modules it loads look unreferenced with nothing to explain why."""
+    dynamic = [g for g in gaps if g.kind == "dynamic_import"]
+    assert len(dynamic) == 1
+    assert dynamic[0].file == "sample_pkg/dynamic.py"
+    assert "import_module" in dynamic[0].detail
