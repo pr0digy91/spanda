@@ -19,34 +19,44 @@ Next: evaluate whether the drift reports change a decision worth making.
 
 ## Use
 
-Zero dependencies. Needs Python 3.9+, but run it on the newest
-interpreter you have: a parser cannot read syntax newer than itself, and
-the output is identical across versions.
+Zero dependencies. Needs Python 3.9+, but run it on the newest interpreter you
+have: a parser cannot read syntax newer than itself, and the output is
+identical across versions.
+
+On macOS, `python3` is usually Apple's older build. Check with
+`python3 --version`; if it is behind the code you want to read, use a newer one
+explicitly. The commands below use this project's virtual environment, which is
+built on the newest interpreter found at setup:
+
+```sh
+python3.14 -m venv .venv && .venv/bin/pip install -q pytest
+.venv/bin/python --version
+```
 
 ```sh
 # What is defined in this codebase, file by file
-python -m spanda.cli parse <path>
+.venv/bin/python -m spanda.cli parse <path>
 
 # The same, dumped as one inspectable JSON record per source file
-python -m spanda.cli parse <path> --out out/
+.venv/bin/python -m spanda.cli parse <path> --out out/
 
 # What static analysis cannot see here
-python -m spanda.cli gaps <path>
+.venv/bin/python -m spanda.cli gaps <path>
 
 # ...plus symbols nothing references, split by whether the silence is explained
-python -m spanda.cli gaps <path> --unreferenced
+.venv/bin/python -m spanda.cli gaps <path> --unreferenced
 
 # Store it. Re-running is safe: symbols keep their identity across scans.
-python -m spanda.cli index <path>
-python -m spanda.cli scans <path>
-python -m spanda.cli find <path> "Order*"
+.venv/bin/python -m spanda.cli index <path>
+.venv/bin/python -m spanda.cli scans <path>
+.venv/bin/python -m spanda.cli find <path> "Order*"
 
 # Replay past commits, so drift has real history to read today
-python -m spanda.cli backfill <path> --last 10
+.venv/bin/python -m spanda.cli backfill <path> --last 10
 
 # What changed between two scans (defaults to the last two)
-python -m spanda.cli drift <path>
-python -m spanda.cli drift <path> 3 7 --brief
+.venv/bin/python -m spanda.cli drift <path>
+.venv/bin/python -m spanda.cli drift <path> 3 7 --brief
 ```
 
 The index lives at `<path>/.spanda/index.db` — one authoritative index per
@@ -68,7 +78,6 @@ callers unknowable. Grow that file from the census rather than guessing.
 ## Tests
 
 ```sh
-python -m venv .venv && .venv/bin/pip install -q pytest
 .venv/bin/python -m pytest tests/ -q
 ```
 
@@ -78,5 +87,5 @@ wrong — that is what the fixture is for. `tests/golden/` holds the frozen
 extractor output; regenerate it deliberately with:
 
 ```sh
-python -m spanda.cli parse fixtures --out tests/golden
+.venv/bin/python -m spanda.cli parse fixtures --out tests/golden
 ```
