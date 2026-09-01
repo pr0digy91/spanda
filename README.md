@@ -15,7 +15,8 @@ milestone plan.
 M1 complete: per-file extraction (Stage 1) and gap reporting.
 M2 complete: SQLite storage with stable symbol identity across scans.
 M3 complete: drift reporting and backfill of past commits.
-Next: evaluate whether the drift reports change a decision worth making.
+M4 complete: import resolution, processing order, circular import groups.
+Next: M5, resolving references so the tool can say what calls what.
 
 ## Use
 
@@ -50,6 +51,10 @@ python3.14 -m venv .venv && .venv/bin/pip install -q pytest
 .venv/bin/python -m spanda.cli index <path>
 .venv/bin/python -m spanda.cli scans <path>
 .venv/bin/python -m spanda.cli find <path> "Order*"
+
+# Which file does each import point at, and what imports circularly
+.venv/bin/python -m spanda.cli imports <path>
+.venv/bin/python -m spanda.cli imports <path> --order
 
 # Replay past commits, so drift has real history to read today
 .venv/bin/python -m spanda.cli backfill <path> --last 10

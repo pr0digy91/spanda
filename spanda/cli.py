@@ -14,6 +14,8 @@ from pathlib import Path
 
 from spanda.extract import extract_codebase, plan_scan, stream_records
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
+from spanda.modules import (EXTERNAL, ModuleIndex, build_import_graph,
+                            cycle_groups, processing_order, resolve_imports)
 from spanda.drift import compare
 from spanda.store import Index, IndexError_, db_path, prepare_db_path
 
@@ -489,6 +491,63 @@ def cmd_backfill(args: argparse.Namespace) -> int:
     return 0
 
 
+def _import_survey(root: Path):
+    """Resolve every import in a codebase. Keeps only what the graph needs,
+    so memory stays flat rather than holding every record."""
+    plan = plan_scan(root)
+    index, statements = ModuleIndex(), []
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        statements.append({"file": record["file"], "module": record["module"],
+                           "imports": record["imports"]})
+    edges = []
+    for record in statements:
+        edges.extend(resolve_imports(record, index))
+    return plan, index, edges
+
+
+def cmd_imports(args: argparse.Namespace) -> int:
+    root = Path(args.path).resolve()
+    if not root.is_dir():
+        print(f"not a directory: {root}", file=sys.stderr)
+        return 2
+
+    plan, index, edges = _import_survey(root)
+    graph = build_import_graph(edges, list(index.by_file))
+    cycles = cycle_groups(graph)
+
+    internal = [e for e in edges if e.target_file]
+    external = [e for e in edges if e.reason == EXTERNAL]
+    unresolved = [e for e in edges if e.reason and e.reason != EXTERNAL]
+
+    print(f"{len(plan.files)} files, {len(edges)} import statements")
+    print(f"  {len(internal)} resolved to a file in this codebase")
+    print(f"  {len(external)} point outside it (stdlib or installed packages)")
+    if unresolved:
+        print(f"  {len(unresolved)} look internal but match no file — "
+              f"a gap in this tool, not in the code")
+        for edge in unresolved[:8]:
+            print(f"      {edge.source_file}:{edge.line}  {edge.raw}  [{edge.reason}]")
+
+    print(f"\n{len(cycles)} circular import group(s)")
+    for group in cycles:
+        print(f"\n  {len(group)} files importing each other:")
+        for member in group:
+            print(f"      {member}")
+
+    if args.order:
+        units = processing_order(graph)
+        print(f"\n\nprocessing order — {len(units)} units, dependencies first\n")
+        for number, unit in enumerate(units, start=1):
+            if len(unit) == 1:
+                print(f"  {number:>4}  {unit[0]}")
+            else:
+                print(f"  {number:>4}  [cycle group, order within is arbitrary]")
+                for member in unit:
+                    print(f"        {member}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="spanda",
@@ -529,6 +588,13 @@ def main(argv: list[str] | None = None) -> int:
     find_cmd.add_argument("pattern", help="name or qualname, * allowed as a wildcard")
     find_cmd.add_argument("--db", default=None, help="pin a specific index file")
     find_cmd.set_defaults(func=cmd_find)
+
+    imports_cmd = subparsers.add_parser(
+        "imports", help="Stage 0: resolve imports, find circular import groups")
+    imports_cmd.add_argument("path", help="root of the codebase")
+    imports_cmd.add_argument("--order", action="store_true",
+                             help="also print the full processing order")
+    imports_cmd.set_defaults(func=cmd_imports)
 
     drift_cmd = subparsers.add_parser(
         "drift", help="what changed between two scans")

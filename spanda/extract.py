@@ -61,7 +61,12 @@ def module_name_for(path: Path, root: Path) -> str:
     parts: list[str] = []
     stem = path.stem
     directory = path.parent
-    while (directory / "__init__.py").exists() and directory != root.parent:
+    # Stop at the root, never above it. The root is the directory that would
+    # be on sys.path, so it is not itself part of any module name — even when
+    # it contains an __init__.py, which many project roots do. Including it
+    # prefixes every module with the checkout's directory name, and then no
+    # import in the codebase resolves against anything.
+    while directory != root and (directory / "__init__.py").exists():
         parts.append(directory.name)
         directory = directory.parent
     parts.reverse()
