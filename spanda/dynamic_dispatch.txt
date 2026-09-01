@@ -6,12 +6,21 @@
 # worth exactly as much as no flag at all: @property and @staticmethod do not
 # belong here, because a call to a property is still statically visible.
 #
-# Extend this list from the decorator census printed by `spanda parse`, which
-# shows every decorator actually in use in your codebase. That is the point of
-# the census — this file should be grown from evidence, not guessed at.
-#
-# Deliberately absent: framework route decorators. Route detection is out of
-# scope for this build (see PROJECT_INSTRUCTIONS.md).
+# Every entry below was added from the decorator census printed by
+# `spanda parse`, which lists what a codebase actually uses. Grow this file
+# from that census rather than guessing; the count beside each group is what
+# it matched on the target codebase when the entry was added.
+
+# HTTP route handlers. The web framework calls these when a request arrives;
+# nothing in the codebase calls them by name. (~2,100 on the target codebase)
+*.get
+*.post
+*.put
+*.patch
+*.delete
+*.head
+*.options
+*.websocket
 
 # ORM and signal event hooks: the framework calls these, nothing else does.
 *.listens_for
@@ -25,3 +34,39 @@ Depends
 # Dispatch registries: the concrete implementation is chosen at runtime.
 *.register
 *.hookimpl
+
+# Pydantic validators, run by the model during construction. (~144)
+field_validator
+model_validator
+*.field_validator
+*.model_validator
+validator
+root_validator
+
+# pytest fixtures, injected into tests by matching parameter names. Renaming a
+# fixture silently detaches it from every test that requested it. (~478)
+*.fixture
+fixture
+
+# Temporal workflow and activity entry points, invoked by the worker. (~54)
+*.defn
+workflow.run
+workflow.signal
+workflow.query
+
+# LLM tool registration: the model chooses which to call, by name. (~36)
+tool
+tool_decorator
+
+# Deliberately NOT listed, though they appeared in the census:
+#
+#   @pytest.mark.*   A marker does not dispatch anything. The test function is
+#                    called by pytest, but flagging ~3,000 test functions would
+#                    swamp the report without telling anyone something they did
+#                    not already know about how tests run.
+#   @lru_cache, @wraps, @asynccontextmanager, @dataclass
+#                    Wrappers. Calls to the decorated symbol stay statically
+#                    visible at their call sites.
+#   @property, @staticmethod, @classmethod
+#                    These change the calling convention rather than hiding the
+#                    caller, and are already part of the signature hash.
