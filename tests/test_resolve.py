@@ -185,3 +185,15 @@ def test_a_submodule_import_is_still_a_module_not_a_re_export(resolved):
     reasons = {r.raw: r.reason for r in references
                if r.source_file == "sample_pkg/dynamic.py"}
     assert reasons.get("handlers") == "module_reference"
+
+
+def test_a_closure_used_inside_its_parent_resolves(resolved):
+    """`make_multiplier` returns `multiply`, and returning it is a reference.
+
+    A nested function is a local name, so Stage 1 marks it resolved-locally
+    and a naive Stage 2 skips it — leaving closures passed to `re.sub` as
+    callbacks reported as having no callers at all.
+    """
+    _table, references = resolved
+    assert ("sample_pkg.nested.make_multiplier|function",
+            "sample_pkg.nested.make_multiplier.multiply|function") in edges(references)

@@ -257,6 +257,17 @@ def resolve_record(record: dict, table: SymbolTable,
     owner: dict[str, str] = {}
 
     by_local = {d["local_id"]: d for d in record["definitions"]}
+    # Functions defined inside another function. A closure passed to re.sub
+    # as a callback is a local name, so Stage 1 marks it resolved-locally and
+    # nothing here would look further — leaving a function that is plainly
+    # used reported as having no callers.
+    nested: dict[tuple[str, str], str] = {}
+    for definition in record["definitions"]:
+        parent = definition["parent"]
+        if parent is not None and by_local.get(parent, {}).get("kind") != "class":
+            nested[(parent, definition["name"])] = symbol_key(
+                record["file"], definition["qualname"], definition["kind"])
+
     for definition in record["definitions"]:
         key = symbol_key(record["file"], definition["qualname"], definition["kind"])
         owner[definition["local_id"]] = key
@@ -292,9 +303,14 @@ def resolve_record(record: dict, table: SymbolTable,
             continue
 
         if reference["local"]:
-            # A local name used bare is already accounted for. Used as
-            # `thing.method()`, the type of `thing` is not knowable here.
-            if len(chain) > 1:
+            # A local name used bare is already accounted for — unless it
+            # names a function defined in this same scope, which is a real
+            # reference to a real definition.
+            if len(chain) == 1:
+                inner = nested.get((reference["enclosing"], root))
+                if inner is not None:
+                    emit(inner)
+            else:
                 emit(None, R_UNKNOWN_TYPE)
             continue
 
