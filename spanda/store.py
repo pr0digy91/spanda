@@ -21,7 +21,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -183,6 +183,7 @@ CREATE INDEX IF NOT EXISTS idx_edges_source ON edges (source_symbol_uuid);
 CREATE INDEX IF NOT EXISTS idx_unresolved_attr ON unresolved_refs (attr_name);
 CREATE INDEX IF NOT EXISTS idx_versions_scan ON symbol_versions (scan_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols (file_path);
+CREATE INDEX IF NOT EXISTS idx_symbols_carry ON symbols (file_path, last_seen_scan_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols (name);
 CREATE INDEX IF NOT EXISTS idx_symbols_last_seen ON symbols (last_seen_scan_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_module ON symbols (module);
@@ -481,8 +482,23 @@ class Index:
         self._open_scan = None
 
     def finish_scan(self, scan_id: int) -> dict:
-        tally = self._tally or {"digest": hashlib.sha256(), "files": 0,
-                                "parsed": 0, "unparseable": 0, "symbols": 0}
+        # Derived from the files this scan says are present, not accumulated
+        # as they streamed past. An incremental scan only opens the files that
+        # changed, so an accumulator would describe the diff rather than the
+        # codebase — and the fingerprint has to mean the same thing whether a
+        # scan read 1,098 files or three.
+        digest = hashlib.sha256()
+        files = parsed = unparseable = symbols = 0
+        for row in self.connection.execute(
+                "SELECT file_path, file_hash, parse_status, symbol_count"
+                " FROM files WHERE last_seen_scan_id = ? ORDER BY file_path",
+                (scan_id,)):
+            digest.update(f"{row['file_path']}:{row['file_hash']}\n".encode())
+            files += 1
+            parsed += row["parse_status"] == "ok"
+            unparseable += row["parse_status"] != "ok"
+            symbols += row["symbol_count"] or 0
+
         ambiguous = self.connection.execute(
             "SELECT COUNT(*) FROM symbols"
             " WHERE last_seen_scan_id = ? AND definition_count > 1",
@@ -492,9 +508,8 @@ class Index:
             "UPDATE scans SET total_files = ?, parsed_files = ?,"
             " unparseable_files = ?, total_symbols = ?, ambiguous_symbols = ?,"
             " content_fingerprint = ?, completed = 1 WHERE scan_id = ?",
-            (tally["files"], tally["parsed"], tally["unparseable"],
-             tally["symbols"], ambiguous,
-             "sha256:" + tally["digest"].hexdigest()[:32], scan_id))
+            (files, parsed, unparseable, symbols, ambiguous,
+             "sha256:" + digest.hexdigest()[:32], scan_id))
         self.connection.execute("COMMIT")
         self._open_scan = None
         self._tally = None
@@ -651,6 +666,71 @@ class Index:
         if getattr(self, "_prev_cache", (None, None))[0] != scan_id:
             self._prev_cache = (scan_id, self.previous_scan_id(scan_id))
         return self._prev_cache[1]
+
+    def carry_forward(self, scan_id: int, present: set[str],
+                      reparsed: set[str]) -> dict:
+        """Mark everything the scan did not look at as still present.
+
+        This is the step an incremental index cannot skip. A file that was not
+        re-read has not disappeared — it simply was not looked at — and
+        without this the first incremental run reports the whole unchanged
+        codebase as deleted.
+
+        It works from the files that exist *now*, not from the previous scan's
+        id. Keying on "whatever was last seen at scan N-1" means a single
+        missed carry-forward strands a file permanently: the next scan looks
+        for N-1 and the file is at N-2, so it is never picked up again. That
+        stranding is silent, and it is what a naive version of this does.
+        """
+        carry = sorted(present - reparsed)
+        self.connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS _carry"
+            " (path TEXT PRIMARY KEY, last_seen INTEGER)")
+        self.connection.execute("DELETE FROM _carry")
+        if carry:
+            placeholders = ",".join("?" * len(carry))
+            self.connection.execute(
+                f"INSERT INTO _carry (path, last_seen)"
+                f" SELECT file_path, last_seen_scan_id FROM files"
+                f" WHERE file_path IN ({placeholders})", tuple(carry))
+
+        files = self.connection.execute(
+            "UPDATE files SET last_seen_scan_id = ?"
+            " WHERE file_path IN (SELECT path FROM _carry)", (scan_id,)).rowcount
+
+        # Only symbols that were present the last time the file was actually
+        # read. A symbol deleted back then must not be resurrected by a scan
+        # that never opened the file.
+        symbols = self.connection.execute(
+            "UPDATE symbols SET last_seen_scan_id = ?"
+            " WHERE EXISTS (SELECT 1 FROM _carry c WHERE c.path = symbols.file_path"
+            "               AND c.last_seen = symbols.last_seen_scan_id)",
+            (scan_id,)).rowcount
+
+        # Extend each carried symbol's run of presence rather than starting a
+        # new one, then open a run for any that had none reaching this scan.
+        self.connection.execute(
+            "UPDATE symbol_spans SET to_scan = ?"
+            " WHERE symbol_uuid IN (SELECT uuid FROM symbols"
+            "                       WHERE last_seen_scan_id = ?)"
+            "   AND to_scan = (SELECT MAX(to_scan) FROM symbol_spans sp"
+            "                  WHERE sp.symbol_uuid = symbol_spans.symbol_uuid)"
+            "   AND to_scan < ?", (scan_id, scan_id, scan_id))
+
+        self.connection.execute(
+            "INSERT OR IGNORE INTO symbol_spans (symbol_uuid, from_scan, to_scan)"
+            " SELECT uuid, ?, ? FROM symbols WHERE last_seen_scan_id = ?"
+            "   AND NOT EXISTS (SELECT 1 FROM symbol_spans sp"
+            "                   WHERE sp.symbol_uuid = symbols.uuid"
+            "                     AND sp.to_scan >= ?)",
+            (scan_id, scan_id, scan_id, scan_id))
+
+        self.connection.execute(
+            "UPDATE edges SET last_seen_scan_id = ?"
+            " WHERE source_file IN (SELECT path FROM _carry)"
+            "   AND last_seen_scan_id < ?", (scan_id, scan_id))
+
+        return {"files": files, "symbols": symbols}
 
     # -- references -------------------------------------------------------
     def write_references(self, scan_id: int, references, keys_to_uuid: dict) -> dict:

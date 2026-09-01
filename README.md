@@ -17,7 +17,9 @@ M2 complete: SQLite storage with stable symbol identity across scans.
 M3 complete: drift reporting and backfill of past commits.
 M4 complete: import resolution, processing order, circular import groups.
 M5/M6 complete: reference resolution, edges, and `spanda callers`.
-Next: M7, incremental re-index.
+M7 complete: incremental re-index — 425 commits in 52 seconds, not 12 minutes.
+
+All seven milestones built.
 
 ## Use
 

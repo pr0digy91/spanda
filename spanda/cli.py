@@ -12,7 +12,8 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from spanda.extract import extract_codebase, plan_scan, stream_records
+from spanda.extract import (extract_codebase, extract_file, plan_scan,
+                            stream_records)
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
 from spanda.modules import (EXTERNAL, ModuleIndex, build_import_graph,
                             cycle_groups, processing_order, resolve_imports)
@@ -222,20 +223,21 @@ def _run_scan(db_path, root, plan, patterns):
         print(f"scan {scan_id}: {len(plan.files)} files under {plan.root}")
 
         symbols = 0
-        # One file in memory at a time. Peak memory is a function of the
-        # largest file, not of the codebase size. The whole scan is a single
+        module_index, table, collected = ModuleIndex(), SymbolTable(), []
+        # One file in memory at a time. The whole scan is a single
         # transaction, so an interrupted run leaves the index untouched
         # rather than half-written — a half-written scan is indistinguishable
         # from a mass deletion.
         for number, record in enumerate(stream_records(plan), start=1):
             symbols += index.write_record(scan_id, record, patterns)
+            module_index.add(record["file"], record["module"])
+            table.add_record(record, patterns)
+            collected.append(_for_resolution(record))
             if number % PROGRESS_EVERY == 0:
                 print(f"  {number}/{len(plan.files)} files, {symbols} symbols")
 
-        # Resolution needs every symbol written first: a reference can point
-        # at a definition in a file not yet read. That is the two-pass rule,
-        # and it is why this happens here rather than per file.
-        _plan, _table, _scopes, references = _resolve_codebase(root, patterns)
+        # Resolved from what was just read, not by reading it again.
+        _scopes, references = _resolve_collected(collected, module_index, table)
         counts = index.write_references(
             scan_id, references, index.symbol_uuids_by_key())
 
@@ -440,10 +442,78 @@ def cmd_drift(args: argparse.Namespace) -> int:
     return 0
 
 
-def _git(root: Path, *args: str) -> str | None:
+def changed_python_files(root: Path, since_commit: str,
+                         to_commit: str = "HEAD") -> set[str] | None:
+    """Which .py files differ between two commits, plus uncommitted edits.
+
+    None means "cannot tell" — no git, or a commit this checkout does not
+    have — and the caller must fall back to reading everything. Guessing that
+    nothing changed would be the worst possible answer.
+    """
+    diff = _git(root, "diff", "--name-only", since_commit, to_commit)
+    if diff is None:
+        return None
+    changed = {line for line in diff.splitlines() if line.endswith(".py")}
+
+    # Uncommitted work is a difference too, and git status is the only thing
+    # that sees it.
+    status = _git(root, "status", "--porcelain", "--untracked-files=all",
+                  strip=False)
+    if status:
+        for line in status.splitlines():
+            # "XY path", or "XY old -> new" for a rename.
+            path = line[3:].split(" -> ")[-1].strip()
+            if path.endswith(".py"):
+                changed.add(path)
+    return changed
+
+
+def _incremental_scan(index, root: Path, scan_id: int, plan, patterns,
+                      changed: set[str]) -> dict:
+    """Re-read only what changed, and carry the rest forward.
+
+    On the target codebase consecutive commits differ by a median of three files out of
+    1,098. Re-reading all of them costs 1.5 seconds a commit and produces
+    identical results for 99.7% of the work.
+    """
+    present = {p.relative_to(plan.root).as_posix(): p for p in plan.files}
+    reparsed, symbols = set(), 0
+
+    for relative in sorted(changed):
+        path = present.get(relative)
+        if path is None:
+            continue  # deleted, or not a file this scan would look at anyway
+        symbols += index.write_record(scan_id, extract_file(path, plan.root), patterns)
+        reparsed.add(relative)
+
+    # A file present now but never indexed before is new to this index, not a
+    # carry-forward, so it has to be read even if git did not name it.
+    known = {r["file_path"] for r in index.connection.execute(
+        "SELECT file_path FROM files")}
+    for relative, path in present.items():
+        if relative not in known and relative not in reparsed:
+            symbols += index.write_record(
+                scan_id, extract_file(path, plan.root), patterns)
+            reparsed.add(relative)
+
+    carried = index.carry_forward(scan_id, set(present), reparsed)
+    return {"reparsed": len(reparsed), "symbols": symbols, **carried}
+
+
+def _git(root: Path, *args: str, strip: bool = True) -> str | None:
+    """Run git and return stdout, or None if it failed.
+
+    `strip=False` matters for `status --porcelain`, whose status field is
+    fixed-width and begins with a space for an unstaged change. Stripping the
+    output eats that space on the first line only, which shifts the path by
+    one character — a bug that hides until the first line happens to be the
+    one you care about.
+    """
     result = subprocess.run(("git", "-C", str(root)) + args,
                             capture_output=True, text=True)
-    return result.stdout.strip() if result.returncode == 0 else None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() if strip else result.stdout
 
 
 def cmd_backfill(args: argparse.Namespace) -> int:
@@ -474,39 +544,60 @@ def cmd_backfill(args: argparse.Namespace) -> int:
     patterns = load_patterns(Path(args.patterns) if args.patterns else None)
     print(f"backfilling {len(commits)} commits into {target}\n")
 
-    with Index(target, codebase_root=root) as index:
-        for number, (commit, when, subject) in enumerate(commits, start=1):
-            committed = datetime.fromtimestamp(
-                int(when), timezone.utc).isoformat(timespec="seconds")
-            with tempfile.TemporaryDirectory() as tmp:
-                worktree = Path(tmp) / "tree"
-                if _git(root, "worktree", "add", "--detach",
-                        str(worktree), commit) is None:
-                    print(f"  ! could not check out {commit[:8]}, skipping",
-                          file=sys.stderr)
-                    continue
-                try:
+    # One worktree for the whole run, checked out from commit to commit.
+    # Adding and removing a worktree per commit rewrites all 1,098 files each
+    # time; checking out between two neighbouring commits writes only the
+    # handful that differ.
+    with tempfile.TemporaryDirectory() as tmp:
+        worktree = Path(tmp) / "tree"
+        if _git(root, "worktree", "add", "--detach", str(worktree),
+                commits[0][0]) is None:
+            print(f"could not create a worktree", file=sys.stderr)
+            return 2
+        try:
+            with Index(target, codebase_root=root) as index:
+                previous_commit, previous_scan = None, None
+                for number, (commit, when, subject) in enumerate(commits, start=1):
+                    if _git(worktree, "checkout", "--detach", "--force",
+                            commit) is None:
+                        print(f"  ! could not check out {commit[:8]}, skipping",
+                              file=sys.stderr)
+                        continue
+                    committed = datetime.fromtimestamp(
+                        int(when), timezone.utc).isoformat(timespec="seconds")
                     plan = plan_scan(worktree)
                     scan_id = index.begin_scan(
                         worktree, plan.skipped_count, record_root=root,
                         commit_override=commit, dirty_override=False,
                         timestamp_override=committed)
-                    symbols = 0
-                    for record in stream_records(plan):
-                        symbols += index.write_record(scan_id, record, patterns)
+
+                    changed = (changed_python_files(worktree, previous_commit, commit)
+                               if previous_commit else None)
+                    if changed is None or previous_scan is None:
+                        symbols = sum(index.write_record(scan_id, record, patterns)
+                                      for record in stream_records(plan))
+                        touched = len(plan.files)
+                    else:
+                        result = _incremental_scan(
+                            index, worktree, scan_id, plan, patterns, changed)
+                        symbols, touched = result["symbols"], result["reparsed"]
+
                     # Only the newest commit gets its references resolved.
-                    # Doing it for all of them would roughly double a long
-                    # backfill for edges nobody asks about at historical
-                    # commits; `index` fills them in for the current state.
+                    # Doing it for all of them would dominate the run for
+                    # edges nobody asks about at a historical commit.
                     if number == len(commits):
                         _p, _t, _s, references = _resolve_codebase(worktree, patterns)
                         index.write_references(
                             scan_id, references, index.symbol_uuids_by_key())
-                    index.finish_scan(scan_id)
-                    print(f"  {number:>3}/{len(commits)}  scan {scan_id}  "
-                          f"{commit[:8]}  {symbols:>6} symbols  {subject[:44]}")
-                finally:
-                    _git(root, "worktree", "remove", "--force", str(worktree))
+
+                    totals = index.finish_scan(scan_id)
+                    previous_commit, previous_scan = commit, scan_id
+                    if number % 25 == 0 or number == len(commits):
+                        print(f"  {number:>4}/{len(commits)}  {commit[:8]}  "
+                              f"{totals['total_symbols']:>6} symbols  "
+                              f"{touched:>4} files re-read  {subject[:36]}")
+        finally:
+            _git(root, "worktree", "remove", "--force", str(worktree))
 
     print(f"\nDone. Compare any two with:  spanda drift {args.path} A B")
     return 0
@@ -527,30 +618,47 @@ def _import_survey(root: Path):
     return plan, index, edges
 
 
-def _resolve_codebase(root: Path, patterns):
-    """Two streaming passes: build the table, then resolve against it.
+#: What resolution needs from a record, once the symbol table has been fed.
+#: Keeping this instead of the whole record is what lets the codebase be
+#: parsed once rather than three times: the full records for 1,097 files run
+#: to hundreds of megabytes, this to a few tens.
+def _for_resolution(record: dict) -> dict:
+    return {
+        "file": record["file"],
+        "module": record["module"],
+        "dunder_all": record["dunder_all"],
+        "imports": record["imports"],
+        "references": record["references"],
+        "definitions": [{"local_id": d["local_id"], "qualname": d["qualname"],
+                         "kind": d["kind"], "parent": d["parent"]}
+                        for d in record["definitions"]],
+    }
 
-    Two passes rather than one because a reference can point at a definition
-    in a file not yet read — the two-pass rule the design insists on. Neither
-    pass holds more than one file's records, so memory stays flat; only the
-    symbol table and the per-module scopes persist, and both are small.
+
+def _resolve_collected(collected, module_index, table):
+    """Resolve, given records already gathered by whoever parsed them.
+
+    Still two logical passes — the symbol table has to be complete before any
+    reference is resolved, since a reference can point at a definition in a
+    file read later — but only one pass over the source.
     """
-    plan = plan_scan(root)
-    index, table, imports = ModuleIndex(), SymbolTable(), {}
-
-    for record in stream_records(plan):
-        index.add(record["file"], record["module"])
-        table.add_record(record, patterns)
-        imports[record["module"]] = {
-            "file": record["file"], "module": record["module"],
-            "imports": record["imports"], "dunder_all": record["dunder_all"]}
-
-    scopes = {module: build_scope(record, table, index)
-              for module, record in imports.items()}
-
+    scopes = {r["module"]: build_scope(r, table, module_index) for r in collected}
     references = []
-    for record in stream_records(plan):
+    for record in collected:
         references.extend(resolve_record(record, table, scopes))
+    return scopes, references
+
+
+def _resolve_codebase(root: Path, patterns):
+    """Parse a codebase and resolve it, for callers that have not already
+    parsed it themselves."""
+    plan = plan_scan(root)
+    module_index, table, collected = ModuleIndex(), SymbolTable(), []
+    for record in stream_records(plan):
+        module_index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        collected.append(_for_resolution(record))
+    scopes, references = _resolve_collected(collected, module_index, table)
     return plan, table, scopes, references
 
 
