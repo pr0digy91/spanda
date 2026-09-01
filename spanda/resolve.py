@@ -149,13 +149,20 @@ def build_scope(record: dict, table: SymbolTable, index: ModuleIndex
     them from somewhere else in turn. Those are resolved by `build_scopes`
     once every module has a scope to consult.
     """
-    module = record["module"]
     scope: dict[str, Target] = {}
     pending: list[tuple] = []
 
-    # Names defined in this file.
-    for name, key in table.module_names.get(module, {}).items():
-        scope[name] = Target("symbol", symbol=key)
+    # Names defined in this file — taken from the file's own record, never
+    # from the symbol table's per-module dict. That dict is keyed by module
+    # name, and twenty-six conftest.py files share the name "conftest": seeded
+    # from it, a file's scope holds every same-named file's definitions, last
+    # writer winning, and a bare call to `client()` resolves to a function in
+    # a different directory. A wrong edge, not a missing one, and invisible to
+    # the import audit because no import is involved.
+    for definition in record["definitions"]:
+        if definition["parent"] is None:
+            scope[definition["name"]] = Target("symbol", symbol=symbol_key(
+                record["file"], definition["qualname"], definition["kind"]))
 
     for edge in resolve_imports(record, index):
         target_module = (index.by_file.get(edge.target_file)

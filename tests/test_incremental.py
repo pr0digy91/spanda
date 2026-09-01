@@ -202,3 +202,25 @@ def test_the_index_command_resolves_references_end_to_end(repo):
             " WHERE s.qualname = 'make_multiplier.multiply'").fetchone()[0]
     assert edges > 0
     assert closure == 1, "the closure edge must survive the slimmed record"
+
+
+def test_changed_files_are_relative_to_the_scan_root_not_the_git_root(repo):
+    """`spanda backfill ~/repo/services` where ~/repo is the git root. git
+    names changes relative to ~/repo; the scan wants them relative to
+    services/. Mismatched, every change misses the lookup and is carried
+    forward stale — silently."""
+    services = repo / "services"
+    services.mkdir()
+    (services / "billing.py").write_text("def total():\n    return 1\n")
+    (repo / "elsewhere.py").write_text("def other():\n    return 2\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "add services")
+    before = git(repo, "rev-parse", "HEAD")
+
+    (services / "billing.py").write_text("def total():\n    return 2\n")
+    (repo / "elsewhere.py").write_text("def other():\n    return 3\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "change both")
+
+    changed = changed_python_files(services, before)
+    assert changed == {"billing.py"}, "relative to services/, and only what is under it"

@@ -395,3 +395,32 @@ def test_a_function_local_import_is_audited_too(tmp_path):
         records.append(record)
     _scopes, lost = build_scopes(records, table, index)
     assert [t.name for t in lost] == ["thing"]
+
+
+def test_same_named_modules_do_not_share_definitions(tmp_path):
+    """Two conftest.py files each define client(). A bare call to client()
+    in one must resolve to its own, not to whichever was indexed last.
+
+    The scope-by-file fix covered imports. This is the other half: the symbol
+    table's per-module dict merges same-named files, and seeding a scope from
+    it produces a *wrong* edge that no audit sees, because no import is
+    involved.
+    """
+    from spanda.extract import plan_scan, stream_records
+    from spanda.modules import ModuleIndex
+    for sub in ("t1", "t2"):
+        (tmp_path / sub).mkdir()
+        (tmp_path / sub / "conftest.py").write_text(
+            f"def client():\n    return '{sub}'\n\n\ndef use():\n    return client()\n")
+    plan, patterns = plan_scan(tmp_path), load_patterns()
+    index, table, records = ModuleIndex(), SymbolTable(), []
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        records.append(record)
+    scopes, _lost = build_scopes(records, table, index)
+    for record in records:
+        calls = [r.target_symbol for r in resolve_record(record, table, scopes)
+                 if r.edge_type == "calls" and r.target_symbol]
+        own = record["file"].split("/")[0]
+        assert calls == [f"{own}.conftest.client|function"], record["file"]

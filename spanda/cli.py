@@ -460,7 +460,24 @@ def changed_python_files(root: Path, since_commit: str,
     diff = _git(root, "diff", "--name-only", since_commit, to_commit)
     if diff is None:
         return None
-    changed = {line for line in diff.splitlines() if line.endswith(".py")}
+    # git reports paths relative to the repository root. The scan root may
+    # sit below it — `spanda backfill ~/repo/services` — and then every
+    # changed path misses the scan's own file list, gets treated as "deleted
+    # or not ours", and is carried forward with stale content. Silently.
+    top = _git(root, "rev-parse", "--show-toplevel")
+    if top is None:
+        return None
+    prefix = Path(root).resolve().relative_to(Path(top).resolve()).as_posix()
+    prefix = "" if prefix == "." else prefix + "/"
+
+    def ours(path: str) -> str | None:
+        if not path.endswith(".py"):
+            return None
+        if prefix and not path.startswith(prefix):
+            return None  # changed, but outside the scan root
+        return path[len(prefix):]
+
+    changed = {p for p in (ours(line) for line in diff.splitlines()) if p}
 
     # Uncommitted work is a difference too, and git status is the only thing
     # that sees it.
@@ -469,8 +486,8 @@ def changed_python_files(root: Path, since_commit: str,
     if status:
         for line in status.splitlines():
             # "XY path", or "XY old -> new" for a rename.
-            path = line[3:].split(" -> ")[-1].strip()
-            if path.endswith(".py"):
+            path = ours(line[3:].split(" -> ")[-1].strip())
+            if path:
                 changed.add(path)
     return changed
 
