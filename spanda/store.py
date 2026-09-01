@@ -21,7 +21,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -148,12 +148,50 @@ CREATE TABLE IF NOT EXISTS symbol_spans (
 
 CREATE INDEX IF NOT EXISTS idx_spans_range ON symbol_spans (from_scan, to_scan);
 CREATE INDEX IF NOT EXISTS idx_file_versions_scan ON file_versions (scan_id);
+-- Resolved references. Deduped the way symbols are: an edge that survives a
+-- scan keeps its identity rather than being rewritten every time.
+CREATE TABLE IF NOT EXISTS edges (
+    uuid               TEXT    PRIMARY KEY,
+    edge_key           TEXT    NOT NULL UNIQUE,
+    source_symbol_uuid TEXT,             -- NULL means module-level code
+    source_file        TEXT    NOT NULL,
+    target_symbol_uuid TEXT    NOT NULL,
+    edge_type          TEXT    NOT NULL, -- calls | inherits | uses
+    first_seen_scan_id INTEGER NOT NULL,
+    last_seen_scan_id  INTEGER NOT NULL
+);
+
+-- References that could have pointed at this codebase and did not resolve.
+-- Held for the most recent scan only: this describes the code as it is now
+-- rather than being a drift signal, and 34,000 rows per scan would dwarf
+-- everything else in the index.
+--
+-- `attr_name` is the member being reached for. It is what makes "who else
+-- might be calling this" answerable at all when the object's type is unknown.
+CREATE TABLE IF NOT EXISTS unresolved_refs (
+    scan_id            INTEGER NOT NULL,
+    source_file        TEXT    NOT NULL,
+    source_symbol_uuid TEXT,
+    raw                TEXT,
+    attr_name          TEXT,
+    line               INTEGER,
+    reason             TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_edges_target ON edges (target_symbol_uuid);
+CREATE INDEX IF NOT EXISTS idx_edges_source ON edges (source_symbol_uuid);
+CREATE INDEX IF NOT EXISTS idx_unresolved_attr ON unresolved_refs (attr_name);
 CREATE INDEX IF NOT EXISTS idx_versions_scan ON symbol_versions (scan_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols (file_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols (name);
 CREATE INDEX IF NOT EXISTS idx_symbols_last_seen ON symbols (last_seen_scan_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_module ON symbols (module);
 """
+
+#: Unresolved reasons worth storing: these could have pointed at this
+#: codebase. Externals and builtins could not, and would only add bulk.
+KEEPABLE_REASONS = frozenset({
+    "attribute_on_unknown_type", "no_such_attribute", "not_found"})
 
 SYMBOL_FIELDS = [
     "name", "qualname", "kind", "module", "file_path", "line_start",
@@ -613,6 +651,76 @@ class Index:
         if getattr(self, "_prev_cache", (None, None))[0] != scan_id:
             self._prev_cache = (scan_id, self.previous_scan_id(scan_id))
         return self._prev_cache[1]
+
+    # -- references -------------------------------------------------------
+    def write_references(self, scan_id: int, references, keys_to_uuid: dict) -> dict:
+        """Store resolved edges, and the unresolved references worth keeping."""
+        counts = {"edges": 0, "unresolved": 0}
+        self.connection.execute(
+            "DELETE FROM unresolved_refs WHERE scan_id != ?", (scan_id,))
+
+        for reference in references:
+            source_uuid = (keys_to_uuid.get(reference.source_symbol)
+                           if reference.source_symbol else None)
+
+            if reference.target_symbol:
+                target_uuid = keys_to_uuid.get(reference.target_symbol)
+                if target_uuid is None:
+                    continue
+                key = (f"{reference.source_symbol or reference.source_file}"
+                       f"->{reference.target_symbol}|{reference.edge_type}")
+                existing = self.connection.execute(
+                    "SELECT uuid FROM edges WHERE edge_key = ?", (key,)).fetchone()
+                if existing:
+                    self.connection.execute(
+                        "UPDATE edges SET last_seen_scan_id = ? WHERE uuid = ?",
+                        (scan_id, existing["uuid"]))
+                else:
+                    self.connection.execute(
+                        "INSERT INTO edges (uuid, edge_key, source_symbol_uuid,"
+                        " source_file, target_symbol_uuid, edge_type,"
+                        " first_seen_scan_id, last_seen_scan_id)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (uuid_module.uuid4().hex, key, source_uuid,
+                         reference.source_file, target_uuid,
+                         reference.edge_type, scan_id, scan_id))
+                counts["edges"] += 1
+            elif reference.reason in KEEPABLE_REASONS:
+                self.connection.execute(
+                    "INSERT INTO unresolved_refs (scan_id, source_file,"
+                    " source_symbol_uuid, raw, attr_name, line, reason)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (scan_id, reference.source_file, source_uuid,
+                     reference.raw, reference.raw.rpartition(".")[2],
+                     reference.line, reference.reason))
+                counts["unresolved"] += 1
+        return counts
+
+    def symbol_uuids_by_key(self) -> dict[str, str]:
+        return {r["symbol_key"]: r["uuid"] for r in
+                self.connection.execute("SELECT symbol_key, uuid FROM symbols")}
+
+    def callers_of(self, symbol_uuid: str) -> list[sqlite3.Row]:
+        latest = self.connection.execute(
+            "SELECT MAX(scan_id) AS s FROM scans WHERE completed = 1").fetchone()["s"]
+        return self.connection.execute(
+            "SELECT e.edge_type, e.source_file, s.qualname, s.kind, s.file_path,"
+            "       s.line_start, s.has_dynamic_dispatch"
+            " FROM edges e LEFT JOIN symbols s ON s.uuid = e.source_symbol_uuid"
+            " WHERE e.target_symbol_uuid = ? AND e.last_seen_scan_id = ?"
+            " ORDER BY s.file_path, s.line_start", (symbol_uuid, latest)).fetchall()
+
+    def possible_callers_of(self, name: str) -> list[sqlite3.Row]:
+        """Unresolved references reaching for this name.
+
+        `obj.create_receipt()` where the type of `obj` is unknown may or may
+        not be a call to this symbol. Reporting the count is the difference
+        between "3 callers" and "3 callers, plus 12 places reaching for this
+        name on something I could not identify".
+        """
+        return self.connection.execute(
+            "SELECT source_file, line, raw, reason FROM unresolved_refs"
+            " WHERE attr_name = ? ORDER BY source_file, line", (name,)).fetchall()
 
     # -- queries ----------------------------------------------------------
     def present_at(self, scan_id: int) -> set[str]:

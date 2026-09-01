@@ -16,7 +16,8 @@ M1 complete: per-file extraction (Stage 1) and gap reporting.
 M2 complete: SQLite storage with stable symbol identity across scans.
 M3 complete: drift reporting and backfill of past commits.
 M4 complete: import resolution, processing order, circular import groups.
-Next: M5, resolving references so the tool can say what calls what.
+M5/M6 complete: reference resolution, edges, and `spanda callers`.
+Next: M7, incremental re-index.
 
 ## Use
 
@@ -51,6 +52,12 @@ python3.14 -m venv .venv && .venv/bin/pip install -q pytest
 .venv/bin/python -m spanda.cli index <path>
 .venv/bin/python -m spanda.cli scans <path>
 .venv/bin/python -m spanda.cli find <path> "Order*"
+
+# What calls this symbol, and what might but cannot be proven to
+.venv/bin/python -m spanda.cli callers <path> create_goods_receipt
+
+# Link every reference to a definition, with reasons for the ones that fail
+.venv/bin/python -m spanda.cli resolve <path> --reasons 3
 
 # Which file does each import point at, and what imports circularly
 .venv/bin/python -m spanda.cli imports <path>

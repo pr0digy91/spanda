@@ -16,9 +16,13 @@ from spanda.extract import extract_codebase, plan_scan, stream_records
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
 from spanda.modules import (EXTERNAL, ModuleIndex, build_import_graph,
                             cycle_groups, processing_order, resolve_imports)
+from spanda.resolve import (SymbolTable, build_scope, resolve_record)
 from spanda.drift import compare
 from spanda.store import Index, IndexError_, db_path, prepare_db_path
 
+
+#: Not this codebase's symbols, so not the resolver's to find.
+EXTERNAL_REASONS = ("external_module", "builtin", "module_reference")
 
 COLUMN_NAMES = ["defs", "fn", "cls", "meth", "var", "refs", "open", "hints"]
 
@@ -228,9 +232,16 @@ def _run_scan(db_path, root, plan, patterns):
             if number % PROGRESS_EVERY == 0:
                 print(f"  {number}/{len(plan.files)} files, {symbols} symbols")
 
+        # Resolution needs every symbol written first: a reference can point
+        # at a definition in a file not yet read. That is the two-pass rule,
+        # and it is why this happens here rather than per file.
+        _plan, _table, _scopes, references = _resolve_codebase(root, patterns)
+        counts = index.write_references(
+            scan_id, references, index.symbol_uuids_by_key())
+
         totals = index.finish_scan(scan_id)
         missing = index.missing_at(scan_id)
-    return totals, missing, scan_id
+    return totals, missing, scan_id, counts
 
 
 
@@ -246,7 +257,7 @@ def cmd_index(args: argparse.Namespace) -> int:
     target = Path(args.db) if args.db else prepare_db_path(root)
     print(f"index: {target}")
 
-    totals, missing, scan_id = _run_scan(target, root, plan, patterns)
+    totals, missing, scan_id, counts = _run_scan(target, root, plan, patterns)
 
     print(f"\nscan {scan_id} complete")
     print(f"  {totals['parsed_files']} files parsed, "
@@ -254,6 +265,8 @@ def cmd_index(args: argparse.Namespace) -> int:
           f"{totals['skipped_files']} not looked at")
     print(f"  {totals['total_symbols']} symbols "
           f"({totals['ambiguous_symbols']} defined more than once in their file)")
+    print(f"  {counts['edges']} references resolved to a definition, "
+          f"{counts['unresolved']} could not be")
     print(f"  content fingerprint {totals['content_fingerprint']}")
     if totals["git_commit_hash"]:
         print(f"  at commit {totals['git_commit_hash'][:12]} (clean tree)")
@@ -481,6 +494,14 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                     symbols = 0
                     for record in stream_records(plan):
                         symbols += index.write_record(scan_id, record, patterns)
+                    # Only the newest commit gets its references resolved.
+                    # Doing it for all of them would roughly double a long
+                    # backfill for edges nobody asks about at historical
+                    # commits; `index` fills them in for the current state.
+                    if number == len(commits):
+                        _p, _t, _s, references = _resolve_codebase(worktree, patterns)
+                        index.write_references(
+                            scan_id, references, index.symbol_uuids_by_key())
                     index.finish_scan(scan_id)
                     print(f"  {number:>3}/{len(commits)}  scan {scan_id}  "
                           f"{commit[:8]}  {symbols:>6} symbols  {subject[:44]}")
@@ -504,6 +525,74 @@ def _import_survey(root: Path):
     for record in statements:
         edges.extend(resolve_imports(record, index))
     return plan, index, edges
+
+
+def _resolve_codebase(root: Path, patterns):
+    """Two streaming passes: build the table, then resolve against it.
+
+    Two passes rather than one because a reference can point at a definition
+    in a file not yet read — the two-pass rule the design insists on. Neither
+    pass holds more than one file's records, so memory stays flat; only the
+    symbol table and the per-module scopes persist, and both are small.
+    """
+    plan = plan_scan(root)
+    index, table, imports = ModuleIndex(), SymbolTable(), {}
+
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        imports[record["module"]] = {
+            "file": record["file"], "module": record["module"],
+            "imports": record["imports"], "dunder_all": record["dunder_all"]}
+
+    scopes = {module: build_scope(record, table, index)
+              for module, record in imports.items()}
+
+    references = []
+    for record in stream_records(plan):
+        references.extend(resolve_record(record, table, scopes))
+    return plan, table, scopes, references
+
+
+def cmd_resolve(args: argparse.Namespace) -> int:
+    root = Path(args.path).resolve()
+    if not root.is_dir():
+        print(f"not a directory: {root}", file=sys.stderr)
+        return 2
+
+    patterns = load_patterns(Path(args.patterns) if args.patterns else None)
+    plan, table, _scopes, references = _resolve_codebase(root, patterns)
+
+    resolved = [r for r in references if r.target_symbol]
+    unresolved = [r for r in references if not r.target_symbol]
+    by_reason = Counter(r.reason for r in unresolved)
+
+    print(f"{len(plan.files)} files, {len(table.symbols)} symbols, "
+          f"{len(references)} references\n")
+    print(f"  {len(resolved)} resolved to a definition in this codebase")
+    print(f"  {len(unresolved)} not resolved, by reason:")
+    for reason, count in by_reason.most_common():
+        print(f"      {count:>7}  {reason}")
+
+    share = len(resolved) / max(len(references) - sum(
+        by_reason[x] for x in EXTERNAL_REASONS), 1)
+    print(f"\n  Of references that could point at this codebase, "
+          f"{share:.0%} were resolved.")
+    print(f"  The rest are listed above with a reason — none are dropped.")
+
+    edges = Counter(r.edge_type for r in resolved)
+    print(f"\n  edges by type:")
+    for kind, count in edges.most_common():
+        print(f"      {count:>7}  {kind}")
+
+    if args.reasons:
+        print()
+        for reason in by_reason:
+            examples = [r for r in unresolved if r.reason == reason][:args.reasons]
+            print(f"  {reason}:")
+            for r in examples:
+                print(f"      {r.source_file}:{r.line}  {r.raw}")
+    return 0
 
 
 def cmd_imports(args: argparse.Namespace) -> int:
@@ -545,6 +634,58 @@ def cmd_imports(args: argparse.Namespace) -> int:
                 print(f"  {number:>4}  [cycle group, order within is arbitrary]")
                 for member in unit:
                     print(f"        {member}")
+    return 0
+
+
+def cmd_callers(args: argparse.Namespace) -> int:
+    target = resolve_db(args)
+    if target is None:
+        print(f"no index yet at {db_path(Path(args.path).resolve())} — "
+              f"run `spanda index` first")
+        return 1
+
+    with Index(target) as index:
+        matches = index.find(args.name.replace("*", "%"), limit=20)
+        if not matches:
+            print(f"no symbol named {args.name!r} in this index")
+            return 1
+
+        for symbol in matches:
+            callers = index.callers_of(symbol["uuid"])
+            maybe = index.possible_callers_of(symbol["name"])
+
+            print(f"\n{symbol['file_path']}:{symbol['line_start']}  "
+                  f"{symbol['kind']} {symbol['qualname']}")
+            print(f"    {symbol['canonical_signature']}")
+
+            if callers:
+                print(f"\n  {len(callers)} static caller(s):")
+                for row in callers:
+                    where = (f"{row['file_path']}:{row['line_start']}  {row['qualname']}"
+                             if row["qualname"] else
+                             f"{row['source_file']}  <module-level code>")
+                    print(f"      {row['edge_type']:<9} {where}")
+            else:
+                print("\n  no static callers found")
+
+            if symbol["has_dynamic_dispatch"]:
+                print("\n  ...but this symbol is dispatched at runtime. Whatever "
+                      "calls it is not\n     visible in the source, so the count "
+                      "above is not the whole story.")
+
+            if maybe:
+                print(f"\n  plus {len(maybe)} place(s) reaching for the name "
+                      f"'{symbol['name']}' on an object\n     whose type could "
+                      f"not be determined — each may or may not be this symbol:")
+                for row in maybe[:args.limit]:
+                    print(f"      {row['source_file']}:{row['line']}  {row['raw']}")
+                if len(maybe) > args.limit:
+                    print(f"      ... and {len(maybe) - args.limit} more")
+
+            if not callers and not symbol["has_dynamic_dispatch"] and not maybe:
+                print("\n  Nothing references it, and nothing explains the "
+                      "silence. Possibly unused —\n     though entry points and "
+                      "callers outside this codebase are invisible here.")
     return 0
 
 
@@ -595,6 +736,23 @@ def main(argv: list[str] | None = None) -> int:
     imports_cmd.add_argument("--order", action="store_true",
                              help="also print the full processing order")
     imports_cmd.set_defaults(func=cmd_imports)
+
+    resolve_cmd = subparsers.add_parser(
+        "resolve", help="Stage 2: link references to the definitions they name")
+    resolve_cmd.add_argument("path", help="root of the codebase")
+    resolve_cmd.add_argument("--patterns", help="override the dynamic-dispatch pattern file")
+    resolve_cmd.add_argument("--reasons", type=int, default=0, metavar="N",
+                             help="show N examples of each unresolved reason")
+    resolve_cmd.set_defaults(func=cmd_resolve)
+
+    callers_cmd = subparsers.add_parser(
+        "callers", help="what calls a symbol, and what might but cannot be proven to")
+    callers_cmd.add_argument("path", help="root of the indexed codebase")
+    callers_cmd.add_argument("name", help="symbol name, * allowed as a wildcard")
+    callers_cmd.add_argument("--limit", type=int, default=10,
+                             help="how many unprovable call sites to list")
+    callers_cmd.add_argument("--db", default=None, help="pin a specific index file")
+    callers_cmd.set_defaults(func=cmd_callers)
 
     drift_cmd = subparsers.add_parser(
         "drift", help="what changed between two scans")
