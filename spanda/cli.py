@@ -17,19 +17,42 @@ from spanda.drift import compare
 from spanda.store import Index, IndexError_, db_path, prepare_db_path
 
 
-COLUMNS = [("defs", 6), ("fn", 5), ("cls", 5), ("meth", 6),
-           ("var", 5), ("refs", 8), ("open", 8), ("hints", 7)]
+COLUMN_NAMES = ["defs", "fn", "cls", "meth", "var", "refs", "open", "hints"]
+
+
+def _counts_for(record) -> dict:
+    kinds = Counter(d["kind"] for d in record["definitions"])
+    return {
+        "defs": len(record["definitions"]),
+        "fn": kinds["function"],
+        "cls": kinds["class"],
+        "meth": kinds["method"],
+        "var": kinds["variable"],
+        "refs": len(record["references"]),
+        # references still unresolved after local scope: Stage 2's inbox
+        "open": sum(1 for r in record["references"] if not r["local"]),
+        "hints": len(record["dynamic_hints"]),
+    }
 
 
 def _summarise(scan) -> None:
     records = scan.records
     width = min(max((len(r["file"]) for r in records), default=20) + 2, 62)
 
-    header = f"{'file':<{width}}" + "".join(f"{n:>{w}}" for n, w in COLUMNS)
+    # Size each column to its largest value. Fixed widths silently run the
+    # numbers together on a real codebase, which is where the summary is
+    # needed most.
+    rows = [_counts_for(r) for r in records if r["parse_status"] == "ok"]
+    totals = Counter()
+    for row in rows:
+        totals.update(row)
+    columns = [(name, max(len(name), len(f"{totals[name]:,}")) + 2)
+               for name in COLUMN_NAMES]
+
+    header = f"{'file':<{width}}" + "".join(f"{n:>{w}}" for n, w in columns)
     print(header)
     print("-" * len(header))
 
-    totals = Counter()
     unparseable = []
     for record in records:
         name = record["file"]
@@ -38,25 +61,15 @@ def _summarise(scan) -> None:
         if record["parse_status"] != "ok":
             error = record["parse_error"]
             unparseable.append((record["file"], error["line"], error["message"]))
-            print(f"{name:<{width}}{'UNPARSEABLE':>{sum(w for _, w in COLUMNS)}}")
+            print(f"{name:<{width}}{'UNPARSEABLE':>{sum(w for _, w in columns)}}")
             continue
-        kinds = Counter(d["kind"] for d in record["definitions"])
-        counts = {
-            "defs": len(record["definitions"]),
-            "fn": kinds["function"],
-            "cls": kinds["class"],
-            "meth": kinds["method"],
-            "var": kinds["variable"],
-            "refs": len(record["references"]),
-            # references still unresolved after local scope: Stage 2's inbox
-            "open": sum(1 for r in record["references"] if not r["local"]),
-            "hints": len(record["dynamic_hints"]),
-        }
-        totals.update(counts)
-        print(f"{name:<{width}}" + "".join(f"{counts[n]:>{w}}" for n, w in COLUMNS))
+        counts = _counts_for(record)
+        print(f"{name:<{width}}"
+              + "".join(f"{counts[n]:>{w},}" for n, w in columns))
 
     print("-" * len(header))
-    print(f"{'TOTAL':<{width}}" + "".join(f"{totals[n]:>{w}}" for n, w in COLUMNS))
+    print(f"{'TOTAL':<{width}}"
+          + "".join(f"{totals[n]:>{w},}" for n, w in columns))
 
     print(f"\n{len(records)} files parsed, {len(unparseable)} unparseable")
     for name, line, message in unparseable:
