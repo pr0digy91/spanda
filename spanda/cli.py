@@ -632,7 +632,11 @@ def _for_resolution(record: dict) -> dict:
         "references": record["references"],
         "definitions": [{"local_id": d["local_id"], "name": d["name"],
                          "qualname": d["qualname"], "kind": d["kind"],
-                         "parent": d["parent"]}
+                         "parent": d["parent"],
+                         "signature": ({"params": [
+                             {"name": p["name"], "annotation": p["annotation"]}
+                             for p in d["signature"]["params"]]}
+                             if d["signature"] else None)}
                         for d in record["definitions"]],
     }
 

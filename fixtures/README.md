@@ -26,6 +26,7 @@ Both are deliberate.
 | `consumer.py` | 2 | 1 | 0 | 0 | 1 |
 | `a.py` | 3 | 2 | 0 | 0 | 1 |
 | `b.py` | 1 | 1 | 0 | 0 | 0 |
+| `checkout.py` | 4 | 4 | 0 | 0 | 0 |
 | `base.py` | 4 | 0 | 1 | 2 | 1 |
 | `derived.py` | 4 | 0 | 1 | 2 | 1 |
 | `dynamic.py` | 4 | 3 | 0 | 0 | 1 |
@@ -38,15 +39,16 @@ Both are deliberate.
 | `registry/impl.py` | 1 | 1 | 0 | 0 | 0 |
 | `star.py` | 1 | 1 | 0 | 0 | 0 |
 | `broken.py` | — | unparseable; the reported line and wording vary by interpreter |
-| **Total** | **53** | 23 | 6 | 10 | 14 |
+| **Total** | **57** | 27 | 6 | 10 | 14 |
 
-16 files: 15 parse, 1 does not.
+17 files: 16 parse, 1 does not.
 
 ## What each file proves
 
 | File | The thing it breaks |
 |---|---|
 | `__init__.py` | Re-exports. `Order` is importable here but *defined* in `models.py`. |
+| `checkout.py` | Attribute access on an annotated parameter — `method: PaymentMethod` then `method.charge()`. Three resolvable forms and one unannotated control. |
 | `registry/` → `consumer.py` | A three-hop re-export: defined in `registry/impl.py`, re-exported by `registry/__init__.py`, re-exported again by the package root, used from `consumer.py`. |
 | `a.py` ↔ `b.py` | A real circular import. Cycle detection must group them, not hang. |
 | `models.py` | The core case: `@event.listens_for` dispatch, plus unresolvable external imports. |

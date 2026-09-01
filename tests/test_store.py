@@ -106,10 +106,10 @@ def test_indexing_unchanged_code_twice_produces_zero_drift(workspace):
         versions = index.connection.execute(
             "SELECT COUNT(*) c FROM symbol_versions WHERE scan_id = 2").fetchone()
 
-    assert rows["total"] == 53
+    assert rows["total"] == 57
     assert rows["added"] == 0, "a re-index of unchanged code invented new symbols"
     assert rows["removed"] == 0, "a re-index of unchanged code lost symbols"
-    assert rows["uuids"] == rows["keys"] == 53
+    assert rows["uuids"] == rows["keys"] == 57
     assert versions["c"] == 0, "unchanged symbols must not write version rows"
 
 
@@ -242,8 +242,8 @@ def test_unchanged_files_do_not_write_a_row_every_scan(tmp_path):
         later = index.connection.execute(
             "SELECT COUNT(*) c FROM file_versions WHERE scan_id > 1").fetchone()["c"]
 
-    assert files == 16, "one row per file, not per file per scan"
-    assert versions == 16, "every file recorded once, at the scan that found it"
+    assert files == 17, "one row per file, not per file per scan"
+    assert versions == 17, "every file recorded once, at the scan that found it"
     assert later == 0, "three scans of unchanged code add nothing"
 
 

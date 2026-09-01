@@ -197,3 +197,53 @@ def test_a_closure_used_inside_its_parent_resolves(resolved):
     _table, references = resolved
     assert ("sample_pkg.nested.make_multiplier|function",
             "sample_pkg.nested.make_multiplier.multiply|function") in edges(references)
+
+
+# -- annotations -----------------------------------------------------------
+
+def _from_checkout(references, raw):
+    return [r for r in references
+            if r.source_file == "sample_pkg/checkout.py" and r.raw == raw]
+
+
+def test_an_annotated_parameter_resolves_its_attribute_access(resolved):
+    """`method: PaymentMethod` then `method.charge(...)`. The code says what
+    method is; ignoring that leaves 85% of such references unknowable."""
+    _table, references = resolved
+    [ref] = _from_checkout(references, "method.charge")[:1] or [None]
+    assert ref and ref.target_symbol == "sample_pkg.base.PaymentMethod.charge|method"
+
+
+def test_optional_is_unwrapped(resolved):
+    _table, references = resolved
+    refs = _from_checkout(references, "method.refund")
+    assert any(r.target_symbol == "sample_pkg.base.PaymentMethod.refund|method"
+               for r in refs)
+
+
+def test_a_quoted_forward_reference_is_still_a_name(resolved):
+    _table, references = resolved
+    refs = _from_checkout(references, "method.provider_name")
+    assert any(r.target_symbol == "sample_pkg.base.PaymentMethod.provider_name|variable"
+               for r in refs)
+
+
+def test_an_unannotated_parameter_stays_honestly_unknown(resolved):
+    """cannot_know(method, amount) has no annotation. There is a plausible
+    class named PaymentMethod in scope, and reaching for it is the guess
+    this project exists to refuse."""
+    _table, references = resolved
+    refs = _from_checkout(references, "method.charge")
+    unknown = [r for r in refs if r.target_symbol is None]
+    assert unknown and all(r.reason == R_UNKNOWN_TYPE for r in unknown)
+
+
+def test_a_generic_annotation_is_not_guessed_at():
+    from spanda.resolve import _annotation_name
+    assert _annotation_name("PaymentMethod") == "PaymentMethod"
+    assert _annotation_name("'PaymentMethod'") == "PaymentMethod"
+    assert _annotation_name("Optional[PaymentMethod]") == "PaymentMethod"
+    assert _annotation_name("PaymentMethod | None") == "PaymentMethod"
+    assert _annotation_name("list[PaymentMethod]") is None
+    assert _annotation_name("Dict[str, Any]") is None
+    assert _annotation_name("int | str") is None

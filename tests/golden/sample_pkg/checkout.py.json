@@ -1,0 +1,370 @@
+{
+  "file": "sample_pkg/checkout.py",
+  "module": "sample_pkg.checkout",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:2982dfbd63e3a6a27895d2128bcf97df",
+  "module_docstring": "Attribute access on a parameter whose type the signature declares.\n\n`method` is unannotated in the wild often enough, but here the code says what\nit is. That declaration is the only thing standing between `method.charge()`\nand \"attribute on unknown type\" \u2014 and it points at a class in another file,\nwhose `charge` is abstract and whose `refund` is inherited.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from typing import Optional",
+      "module": "typing",
+      "names": [
+        {
+          "name": "Optional",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 9,
+      "conditional": false
+    },
+    {
+      "raw": "from .base import PaymentMethod",
+      "module": ".base",
+      "names": [
+        {
+          "name": "PaymentMethod",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 11,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "function",
+      "name": "take_payment",
+      "qualname": "take_payment",
+      "parent": null,
+      "lines": [
+        14,
+        16
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "method",
+            "kind": "positional",
+            "annotation": "PaymentMethod",
+            "default": null
+          },
+          {
+            "name": "amount",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Resolves through the annotation to the class in base.py.",
+      "canonical_signature": "(positional:method:PaymentMethod,positional:amount)->bool",
+      "signature_hash": "sha256:a6cd820b907afe5e1cc59f081399cd97",
+      "content_hash": "sha256:298518d7df9ee32f5b6b4c8c12c77f40"
+    },
+    {
+      "local_id": "d2",
+      "kind": "function",
+      "name": "maybe_refund",
+      "qualname": "maybe_refund",
+      "parent": null,
+      "lines": [
+        19,
+        21
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "method",
+            "kind": "positional",
+            "annotation": "Optional[PaymentMethod]",
+            "default": null
+          },
+          {
+            "name": "amount",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Optional[...] is unwrapped; the call still resolves.",
+      "canonical_signature": "(positional:method:Optional[PaymentMethod],positional:amount)->bool",
+      "signature_hash": "sha256:4b942af3a9b6ac70777d0799fd6c2712",
+      "content_hash": "sha256:51a4fb94165342c74f30a2da868d74b6"
+    },
+    {
+      "local_id": "d3",
+      "kind": "function",
+      "name": "forward_ref",
+      "qualname": "forward_ref",
+      "parent": null,
+      "lines": [
+        24,
+        26
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "method",
+            "kind": "positional",
+            "annotation": "'PaymentMethod'",
+            "default": null
+          }
+        ],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "A quoted forward reference is still a name.",
+      "canonical_signature": "(positional:method:'PaymentMethod')->str",
+      "signature_hash": "sha256:7bf3a761f24d94d722e463516f44cd90",
+      "content_hash": "sha256:7005ddbc108c70bb2e596f07cad9ddcb"
+    },
+    {
+      "local_id": "d4",
+      "kind": "function",
+      "name": "cannot_know",
+      "qualname": "cannot_know",
+      "parent": null,
+      "lines": [
+        29,
+        31
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "method",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "amount",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "bool"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "No annotation, so this stays honestly unknown.",
+      "canonical_signature": "(positional:method,positional:amount)->bool",
+      "signature_hash": "sha256:02add74c8d2bc3704481621ece170c21",
+      "content_hash": "sha256:073c8929baadf159817a7a0c9ce823d1"
+    }
+  ],
+  "references": [
+    {
+      "raw": "PaymentMethod",
+      "root": "PaymentMethod",
+      "chain": [
+        "PaymentMethod"
+      ],
+      "context": "annotation",
+      "line": 14,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 14,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "method.charge",
+      "root": "method",
+      "chain": [
+        "method",
+        "charge"
+      ],
+      "context": "call",
+      "line": 16,
+      "enclosing": "d1",
+      "local": true
+    },
+    {
+      "raw": "amount",
+      "root": "amount",
+      "chain": [
+        "amount"
+      ],
+      "context": "name",
+      "line": 16,
+      "enclosing": "d1",
+      "local": true
+    },
+    {
+      "raw": "Optional",
+      "root": "Optional",
+      "chain": [
+        "Optional"
+      ],
+      "context": "annotation",
+      "line": 19,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "PaymentMethod",
+      "root": "PaymentMethod",
+      "chain": [
+        "PaymentMethod"
+      ],
+      "context": "annotation",
+      "line": 19,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 19,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "method",
+      "root": "method",
+      "chain": [
+        "method"
+      ],
+      "context": "name",
+      "line": 21,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "method.refund",
+      "root": "method",
+      "chain": [
+        "method",
+        "refund"
+      ],
+      "context": "call",
+      "line": 21,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "amount",
+      "root": "amount",
+      "chain": [
+        "amount"
+      ],
+      "context": "name",
+      "line": 21,
+      "enclosing": "d2",
+      "local": true
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 24,
+      "enclosing": "d3",
+      "local": false
+    },
+    {
+      "raw": "method.provider_name",
+      "root": "method",
+      "chain": [
+        "method",
+        "provider_name"
+      ],
+      "context": "name",
+      "line": 26,
+      "enclosing": "d3",
+      "local": true
+    },
+    {
+      "raw": "bool",
+      "root": "bool",
+      "chain": [
+        "bool"
+      ],
+      "context": "annotation",
+      "line": 29,
+      "enclosing": "d4",
+      "local": false
+    },
+    {
+      "raw": "method.charge",
+      "root": "method",
+      "chain": [
+        "method",
+        "charge"
+      ],
+      "context": "call",
+      "line": 31,
+      "enclosing": "d4",
+      "local": true
+    },
+    {
+      "raw": "amount",
+      "root": "amount",
+      "chain": [
+        "amount"
+      ],
+      "context": "name",
+      "line": 31,
+      "enclosing": "d4",
+      "local": true
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "PaymentMethod",
+      "line": 24,
+      "enclosing": "d3"
+    }
+  ]
+}
