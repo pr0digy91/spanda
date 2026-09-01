@@ -195,3 +195,68 @@ def test_refuses_to_compare_against_an_incomplete_scan(project):
         index.connection.execute("UPDATE scans SET completed = 0 WHERE scan_id = 2")
         with pytest.raises(IndexError_, match="never completed"):
             compare(index, 1, 2)
+
+
+# -- edges and cycles (M8) --------------------------------------------------
+
+def index_via_cli(source: Path) -> None:
+    from spanda.cli import main
+    assert main(["index", str(source)]) == 0
+
+
+def test_a_lost_reference_is_reported(tmp_path):
+    """Remove the one call to a function. Symbol drift sees nothing — the
+    callee is unchanged — but the reference graph lost an edge, and that is
+    the thing a reader deleting the callee would want to know."""
+    source = tmp_path / "code"
+    shutil.copytree(FIXTURES, source, ignore=shutil.ignore_patterns(".spanda"))
+    index_via_cli(source)
+    derived = source / "sample_pkg" / "derived.py"
+    derived.write_text(derived.read_text().replace("        self.refund(0)", "        return None"))
+    index_via_cli(source)
+
+    report = drift_between(prepare_db_path(source), 1, 2)
+    assert any("UpiPayment.settle -> PaymentMethod.refund (calls)" in e
+               for e in report.edges_removed), report.edges_removed
+    assert not any("refund" in c.qualname for c in report.shape + report.removed)
+
+
+def test_a_new_circular_import_is_reported(tmp_path):
+    """Make base.py import derived.py: base <-> derived is now a cycle."""
+    source = tmp_path / "code"
+    shutil.copytree(FIXTURES, source, ignore=shutil.ignore_patterns(".spanda"))
+    index_via_cli(source)
+    base = source / "sample_pkg" / "base.py"
+    base.write_text("from .derived import UpiPayment\n" + base.read_text())
+    index_via_cli(source)
+
+    report = drift_between(prepare_db_path(source), 1, 2)
+    assert ["sample_pkg/base.py", "sample_pkg/derived.py"] in report.cycles_appeared
+    assert report.cycles_gone == []
+
+
+def test_a_dissolved_cycle_is_reported(tmp_path):
+    """Break the fixture's deliberate a <-> b cycle."""
+    source = tmp_path / "code"
+    shutil.copytree(FIXTURES, source, ignore=shutil.ignore_patterns(".spanda"))
+    index_via_cli(source)
+    (source / "sample_pkg" / "b.py").write_text(
+        'def validate_table(table_id: str) -> bool:\n    return table_id.startswith("tbl_")\n')
+    index_via_cli(source)
+
+    report = drift_between(prepare_db_path(source), 1, 2)
+    assert ["sample_pkg/a.py", "sample_pkg/b.py"] in report.cycles_gone
+
+
+def test_missing_edge_data_is_a_caveat_not_a_zero(tmp_path):
+    """A scan with no resolved references must not read as 'no edges changed'."""
+    source = tmp_path / "code"
+    shutil.copytree(FIXTURES, source, ignore=shutil.ignore_patterns(".spanda"))
+    db = prepare_db_path(source)
+    index_once(db, source)          # symbols only: no references, no cycles
+    index_via_cli(source)           # full: references and cycles
+
+    report = drift_between(db, 1, 2)
+    assert report.edges_added == [] and report.edges_removed == []
+    assert any("no reference data" in c for c in report.caveats)
+    assert any("import graph was never computed" in c for c in report.caveats)

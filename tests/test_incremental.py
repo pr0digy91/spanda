@@ -241,3 +241,32 @@ def test_callers_on_a_deleted_symbol_says_gone_not_unused(repo, capsys):
     out = capsys.readouterr().out
     assert "no longer exists" in out
     assert "possibly unused" not in out.lower()
+
+
+def test_backfill_end_to_end_matches_a_full_scan_of_head(repo, tmp_path):
+    """Three commits through the real command — worktree, checkout, git diff,
+    incremental carry-forward, final resolution — and the newest scan must
+    equal a plain full index of the same commit. The wrapper around
+    _incremental_scan was verified only by hand before this."""
+    from spanda.cli import main
+    helpers = repo / "sample_pkg" / "helpers.py"
+    helpers.write_text(helpers.read_text() + "\n\ndef second():\n    return 2\n")
+    git(repo, "add", "-A"); git(repo, "commit", "-qm", "second")
+    (repo / "sample_pkg" / "handlers.py").unlink()
+    git(repo, "add", "-A"); git(repo, "commit", "-qm", "third: drop handlers")
+
+    assert main(["backfill", str(repo), "--last", "3"]) == 0
+    with Index(prepare_db_path(repo)) as index:
+        scans = index.scans(complete_only=True)
+        assert [s["scan_id"] for s in scans] == [1, 2, 3]
+        newest = scans[-1]
+        backfilled = snapshot(index, newest["scan_id"])
+        assert newest["cycles_recorded"] == 1
+        assert index.connection.execute("SELECT COUNT(*) FROM edges").fetchone()[0] > 0
+        gone = {r["qualname"] for r in index.missing_at(3)}
+        assert {"on_created", "on_paid"} <= gone
+
+    fresh = tmp_path / "fresh.db"
+    with Index(fresh, codebase_root=repo) as index:
+        full_state = snapshot(index, full_scan(index, repo, load_patterns()))
+    assert backfilled == full_state

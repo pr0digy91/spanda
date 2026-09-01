@@ -44,17 +44,29 @@ class DriftReport:
     shape: list[Change] = field(default_factory=list)
     internal: list[Change] = field(default_factory=list)
     unchanged_count: int = 0
+    #: Reference edges gained and lost, as "source -> target (type)". Empty
+    #: with a caveat, never silently empty, when a scan holds no edge data.
+    edges_added: list[str] = field(default_factory=list)
+    edges_removed: list[str] = field(default_factory=list)
+    #: Circular-import groups that appeared or dissolved, as sorted file lists.
+    cycles_appeared: list[list[str]] = field(default_factory=list)
+    cycles_gone: list[list[str]] = field(default_factory=list)
     #: Reasons the comparison itself may be incomplete, e.g. files that failed
     #: to parse in either scan. Surfaced rather than quietly tolerated.
     caveats: list[str] = field(default_factory=list)
 
     @property
     def identical(self) -> bool:
-        return not (self.added or self.removed or self.shape or self.internal)
+        return not (self.added or self.removed or self.shape or self.internal
+                    or self.edges_added or self.edges_removed
+                    or self.cycles_appeared or self.cycles_gone)
 
     @property
     def total_changes(self) -> int:
-        return len(self.added) + len(self.removed) + len(self.shape) + len(self.internal)
+        return (len(self.added) + len(self.removed) + len(self.shape)
+                + len(self.internal) + len(self.edges_added)
+                + len(self.edges_removed) + len(self.cycles_appeared)
+                + len(self.cycles_gone))
 
 
 def _describe(row) -> str:
@@ -118,7 +130,49 @@ def compare(index, scan_a: int, scan_b: int) -> DriftReport:
         bucket.sort(key=Change.sort_key)
 
     report.caveats = _caveats(index, a, b)
+    _compare_edges(index, scan_a, scan_b, report)
+    _compare_cycles(index, scan_a, scan_b, report)
     return report
+
+
+def _edge_label(row) -> str:
+    source = row["source_name"] or f"{row['source_file']} <module>"
+    return f"{source} -> {row['target_name']} ({row['edge_type']})"
+
+
+def _compare_edges(index, scan_a: int, scan_b: int, report: DriftReport) -> None:
+    """What now calls, uses or inherits from what, versus before.
+
+    Only when both scans hold reference data. Backfill resolves references at
+    its newest commit alone, so against an earlier backfilled scan every edge
+    would read as added — a fact about the tool, and one the reader is told.
+    """
+    for scan_id in (scan_a, scan_b):
+        if not index.has_edge_data_at(scan_id):
+            report.caveats.append(
+                f"scan {scan_id} holds no reference data (references are resolved "
+                f"by `spanda index`, and by `backfill` only at its newest commit); "
+                f"edge changes cannot be reported for this pair")
+            return
+    before = index.edges_at(scan_a)
+    after = index.edges_at(scan_b)
+    report.edges_added = sorted(_edge_label(after[k]) for k in after.keys() - before.keys())
+    report.edges_removed = sorted(_edge_label(before[k]) for k in before.keys() - after.keys())
+
+
+def _compare_cycles(index, scan_a: int, scan_b: int, report: DriftReport) -> None:
+    """Circular-import groups that appeared or dissolved."""
+    before = index.cycles_at(scan_a)
+    after = index.cycles_at(scan_b)
+    for scan_id, groups in ((scan_a, before), (scan_b, after)):
+        if groups is None:
+            report.caveats.append(
+                f"scan {scan_id} read only the files that changed, so its import "
+                f"graph was never computed; circular-import changes cannot be "
+                f"reported for this pair")
+            return
+    report.cycles_appeared = sorted(sorted(g) for g in after - before)
+    report.cycles_gone = sorted(sorted(g) for g in before - after)
 
 
 def _caveats(index, a, b) -> list[str]:

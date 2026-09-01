@@ -246,6 +246,7 @@ def _run_scan(db_path, root, plan, patterns):
             scan_id, references, index.symbol_uuids_by_key())
         index.record_lost_trails(scan_id, lost)
         counts["lost"] = lost
+        index.record_cycles(scan_id, _cycles_from(collected, module_index))
 
         totals = index.finish_scan(scan_id)
         missing = index.missing_at(scan_id)
@@ -403,6 +404,12 @@ def cmd_drift(args: argparse.Namespace) -> int:
             headline.append(f"{len(report.added)} added")
         if report.internal:
             headline.append(f"{len(report.internal)} changed internally")
+        if report.edges_added or report.edges_removed:
+            headline.append(f"{len(report.edges_added)} references gained, "
+                            f"{len(report.edges_removed)} lost")
+        if report.cycles_appeared or report.cycles_gone:
+            headline.append(f"{len(report.cycles_appeared)} circular-import "
+                            f"group(s) appeared, {len(report.cycles_gone)} dissolved")
         print(", ".join(headline).capitalize() + ".")
         print(f"{report.unchanged_count} symbols untouched.\n")
 
@@ -434,6 +441,34 @@ def cmd_drift(args: argparse.Namespace) -> int:
     elif report.internal:
         print(f"({len(report.internal)} internal-only changes hidden; "
               f"drop --brief to list them)\n")
+
+    if report.cycles_appeared:
+        print("CIRCULAR IMPORTS APPEARED — these files now import each other\n")
+        for group in report.cycles_appeared:
+            for member in group:
+                print(f"    {member}")
+            print()
+    if report.cycles_gone:
+        print("CIRCULAR IMPORTS DISSOLVED\n")
+        for group in report.cycles_gone:
+            for member in group:
+                print(f"    {member}")
+            print()
+
+    if (report.edges_added or report.edges_removed) and not args.brief:
+        if report.edges_removed:
+            print("REFERENCES LOST — something no longer calls, uses or inherits this\n")
+            for label in report.edges_removed:
+                print(f"    {label}")
+            print()
+        if report.edges_added:
+            print("REFERENCES GAINED\n")
+            for label in report.edges_added:
+                print(f"    {label}")
+            print()
+    elif report.edges_added or report.edges_removed:
+        print(f"({len(report.edges_added)} references gained and "
+              f"{len(report.edges_removed)} lost hidden; drop --brief to list them)\n")
 
     if report.caveats:
         print("Caveats\n")
@@ -598,8 +633,12 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                     changed = (changed_python_files(worktree, previous_commit, commit)
                                if previous_commit else None)
                     if changed is None or previous_scan is None:
-                        symbols = sum(index.write_record(scan_id, record, patterns)
-                                      for record in stream_records(plan))
+                        full_index, full_records, symbols = ModuleIndex(), [], 0
+                        for record in stream_records(plan):
+                            symbols += index.write_record(scan_id, record, patterns)
+                            full_index.add(record["file"], record["module"])
+                            full_records.append(_for_resolution(record))
+                        index.record_cycles(scan_id, _cycles_from(full_records, full_index))
                         touched = len(plan.files)
                     else:
                         result = _incremental_scan(
@@ -614,6 +653,12 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                         index.write_references(
                             scan_id, references, index.symbol_uuids_by_key())
                         index.record_lost_trails(scan_id, lost)
+                        if not index.scan(scan_id)["cycles_recorded"]:
+                            full_index, full_records = ModuleIndex(), []
+                            for record in stream_records(plan):
+                                full_index.add(record["file"], record["module"])
+                                full_records.append(_for_resolution(record))
+                            index.record_cycles(scan_id, _cycles_from(full_records, full_index))
 
                     totals = index.finish_scan(scan_id)
                     previous_commit, previous_scan = commit, scan_id
@@ -663,6 +708,12 @@ def _for_resolution(record: dict) -> dict:
                              if d["signature"] else None)}
                         for d in record["definitions"]],
     }
+
+
+def _cycles_from(collected, module_index) -> list[list[str]]:
+    """Circular-import groups from records already in hand."""
+    edges = [e for r in collected for e in resolve_imports(r, module_index)]
+    return cycle_groups(build_import_graph(edges, list(module_index.by_file)))
 
 
 def _resolve_collected(collected, module_index, table):

@@ -21,7 +21,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -59,7 +59,22 @@ CREATE TABLE IF NOT EXISTS scans (
     -- commits is itself a drift signal — someone added a pattern the tool
     -- cannot follow.
     lost_trails         INTEGER DEFAULT 0,
+    -- 1 when this scan read every file and so could compute the import
+    -- graph. An incremental backfill scan reads a handful of files and
+    -- cannot; drift must say "no cycle data at scan N", never "no cycles".
+    cycles_recorded     INTEGER NOT NULL DEFAULT 0,
     completed           INTEGER NOT NULL DEFAULT 0
+);
+
+-- Circular-import groups as they stood at a scan, one row per member file.
+-- Import edges are file-to-file, not symbol-to-symbol, so they do not fit the
+-- edges table; the groups are the thing drift needs, so the groups are what
+-- is kept.
+CREATE TABLE IF NOT EXISTS scan_cycles (
+    scan_id   INTEGER NOT NULL,
+    group_id  INTEGER NOT NULL,
+    file_path TEXT    NOT NULL,
+    PRIMARY KEY (scan_id, group_id, file_path)
 );
 
 -- One row per file, not per file per scan. Storing the full listing every
@@ -787,6 +802,64 @@ class Index:
         self.connection.execute(
             "UPDATE scans SET lost_trails = ? WHERE scan_id = ?",
             (len(lost), scan_id))
+
+    def record_cycles(self, scan_id: int, groups: list[list[str]]) -> None:
+        """Store this scan's circular-import groups, and mark that it could."""
+        self.connection.executemany(
+            "INSERT OR IGNORE INTO scan_cycles (scan_id, group_id, file_path)"
+            " VALUES (?, ?, ?)",
+            [(scan_id, n, f) for n, group in enumerate(groups) for f in group])
+        self.connection.execute(
+            "UPDATE scans SET cycles_recorded = 1 WHERE scan_id = ?", (scan_id,))
+
+    def cycles_at(self, scan_id: int) -> set[frozenset[str]] | None:
+        """Cycle groups at a scan, or None if that scan never computed them."""
+        row = self.scan(scan_id)
+        if row is None or not row["cycles_recorded"]:
+            return None
+        groups: dict[int, set[str]] = {}
+        for r in self.connection.execute(
+                "SELECT group_id, file_path FROM scan_cycles WHERE scan_id = ?",
+                (scan_id,)):
+            groups.setdefault(r["group_id"], set()).add(r["file_path"])
+        return {frozenset(g) for g in groups.values()}
+
+    def has_edge_data_at(self, scan_id: int) -> bool:
+        """Whether any references had been resolved as of this scan.
+
+        Backfill resolves references only at its newest commit, so an earlier
+        backfilled scan has no edges at all. Diffing against it would report
+        every edge as "added", which is a fact about the tool, not the code.
+        """
+        return self.connection.execute(
+            "SELECT 1 FROM edges WHERE first_seen_scan_id <= ? LIMIT 1",
+            (scan_id,)).fetchone() is not None
+
+    def edges_at(self, scan_id: int) -> dict[str, sqlite3.Row]:
+        """Edges present at a scan, by edge_key.
+
+        An edge is taken as present between its first and last sighting, and
+        only while both of its endpoint symbols were present. Edges carry no
+        presence spans of their own, so an edge that vanished and returned
+        inside that window reads as present throughout — narrower than the
+        symbol case, since both endpoints are checked, but not exact.
+        """
+        present = self.present_at(scan_id)
+        found: dict[str, sqlite3.Row] = {}
+        for r in self.connection.execute(
+                "SELECT e.*, s.qualname AS source_name, t.qualname AS target_name,"
+                "       t.file_path AS target_file"
+                " FROM edges e"
+                " LEFT JOIN symbols s ON s.uuid = e.source_symbol_uuid"
+                " JOIN symbols t ON t.uuid = e.target_symbol_uuid"
+                " WHERE e.first_seen_scan_id <= ? AND e.last_seen_scan_id >= ?",
+                (scan_id, scan_id)):
+            if r["target_symbol_uuid"] not in present:
+                continue
+            if r["source_symbol_uuid"] and r["source_symbol_uuid"] not in present:
+                continue
+            found[r["edge_key"]] = r
+        return found
 
     def symbol_uuids_by_key(self) -> dict[str, str]:
         return {r["symbol_key"]: r["uuid"] for r in
