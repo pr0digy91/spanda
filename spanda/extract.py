@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import os
 import re
 import tokenize
 from dataclasses import dataclass, field
@@ -259,24 +260,26 @@ def _dotted_chain(node) -> list[str] | None:
     return chain
 
 
-def _docstring_nodes(tree: ast.Module) -> set[int]:
-    """Identify docstring expressions so they are not mistaken for string data."""
-    found: set[int] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            body = getattr(node, "body", None)
-            if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
-                    and isinstance(body[0].value.value, str):
-                found.add(id(body[0].value))
-    return found
+def _docstring_of(node) -> int | None:
+    """The id of a body's leading string constant, if it has one.
+
+    Noted as each definition is entered rather than by a separate walk over
+    the whole tree: that second walk cost as much as everything else the
+    extractor does for a file, to find nodes the main walk passes anyway.
+    """
+    body = getattr(node, "body", None)
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+            and isinstance(body[0].value.value, str):
+        return id(body[0].value)
+    return None
 
 
 class _Walker(ast.NodeVisitor):
     def __init__(self, source_lines: list[str], dunder_all: list[str],
-                 docstrings: set[int]) -> None:
+                 module_docstring: int | None) -> None:
         self.lines = source_lines
         self.dunder_all = dunder_all
-        self.docstrings = docstrings
+        self.docstrings: set[int] = {module_docstring} if module_docstring else set()
         self.out = _FileResult()
         self.scopes: list[_Scope] = [_Scope(None, "", False, False)]
         self.context = "name"
@@ -384,6 +387,9 @@ class _Walker(ast.NodeVisitor):
         return rendered
 
     def _visit_def(self, node) -> None:
+        doc = _docstring_of(node)
+        if doc is not None:
+            self.docstrings.add(doc)
         kind = "method" if self.scope.is_class else "function"
         local_id = self._add_definition(
             node, kind, node.name,
@@ -419,6 +425,9 @@ class _Walker(ast.NodeVisitor):
     visit_AsyncFunctionDef = _visit_def
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        doc = _docstring_of(node)
+        if doc is not None:
+            self.docstrings.add(doc)
         bases = [ast.unparse(b) for b in node.bases]
         local_id = self._add_definition(
             node, "class", node.name,
@@ -515,7 +524,9 @@ class _Walker(ast.NodeVisitor):
     def visit_Attribute(self, node: ast.Attribute) -> None:
         chain = _dotted_chain(node)
         if chain is not None:
-            self._record_reference(node, ast.unparse(node), chain)
+            # Identical to ast.unparse for a pure dotted chain, without the
+            # cost of re-rendering a node whose parts are already in hand.
+            self._record_reference(node, ".".join(chain), chain)
             return  # whole chain recorded once; do not also record its parts
         self._record_reference(node, ast.unparse(node), None)
         self.visit(node.value)
@@ -577,7 +588,7 @@ def extract_file(path: Path, root: Path) -> dict:
         return record
 
     dunder_all = _extract_dunder_all(tree)
-    walker = _Walker(source.splitlines(), dunder_all, _docstring_nodes(tree))
+    walker = _Walker(source.splitlines(), dunder_all, _docstring_of(tree))
     for statement in tree.body:
         walker.visit(statement)
 
@@ -632,21 +643,57 @@ class CodebaseScan:
         return sum(len(paths) for paths in self.skipped.values())
 
 
+def _count_python_files(directory: str) -> list[str]:
+    """Paths of .py files under a directory that will not be parsed.
+
+    Still counted, because a file the tool declined to read is a gap in its
+    knowledge and the count is what makes that gap visible. Counted with
+    scandir rather than rglob: no Path objects, no per-file relative_to, so
+    the 19,000 files of a virtualenv cost a fraction of what they did.
+    """
+    found: list[str] = []
+    stack = [directory]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as entries:
+                for entry in entries:
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append(entry.path)
+                    elif entry.name.endswith(".py"):
+                        found.append(entry.path)
+        except OSError:
+            continue
+    return found
+
+
 def partition_python_files(root: Path) -> tuple[list[Path], dict[str, list[str]]]:
     """Split every .py file under root into those to parse and those skipped.
 
     Returns the skipped ones grouped by which rule excluded them, so the
-    exclusion can be reported rather than assumed harmless.
+    exclusion can be reported rather than assumed harmless. Skipped
+    directories are pruned before being descended into for parsing; they
+    are only counted.
     """
     keep: list[Path] = []
     skipped: dict[str, list[str]] = {}
-    for path in sorted(root.rglob("*.py")):
-        relative = path.relative_to(root)
-        reason = next((part for part in relative.parts if part in SKIP_DIRS), None)
-        if reason is None:
-            keep.append(path)
-        else:
-            skipped.setdefault(reason, []).append(relative.as_posix())
+    root_str = str(root)
+    prefix = len(root_str) + 1
+
+    for current, dirnames, filenames in os.walk(root_str):
+        pruned = [d for d in dirnames if d in SKIP_DIRS]
+        for name in pruned:
+            full = os.path.join(current, name)
+            skipped.setdefault(name, []).extend(
+                p[prefix:].replace(os.sep, "/") for p in _count_python_files(full))
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
+        for name in filenames:
+            if name.endswith(".py"):
+                keep.append(Path(current) / name)
+
+    keep.sort()
+    for reason in skipped:
+        skipped[reason].sort()
     return keep, skipped
 
 

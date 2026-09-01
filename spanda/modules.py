@@ -49,10 +49,15 @@ class ModuleIndex:
     by_module: dict[str, str] = field(default_factory=dict)
     by_file: dict[str, str] = field(default_factory=dict)
     packages: set[str] = field(default_factory=set)
+    #: Top-level package names present in this codebase. Maintained as
+    #: modules are added rather than rebuilt per lookup: it was being
+    #: recomputed from every module for every one of thousands of imports.
+    roots: set[str] = field(default_factory=set)
 
     def add(self, file_path: str, module: str) -> None:
         self.by_module[module] = file_path
         self.by_file[file_path] = module
+        self.roots.add(module.partition(".")[0])
         if file_path.endswith("__init__.py"):
             self.packages.add(module)
 
@@ -158,8 +163,7 @@ def _edge(record: dict, statement: dict, target: str, index: ModuleIndex,
         # this tool. A root that does not exist here is simply someone else's
         # package, which is not.
         root = target.partition(".")[0]
-        known_roots = {m.partition(".")[0] for m in index.by_module}
-        edge.reason = UNRESOLVED if root in known_roots else EXTERNAL
+        edge.reason = UNRESOLVED if root in index.roots else EXTERNAL
     return edge
 
 
