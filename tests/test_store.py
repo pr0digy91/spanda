@@ -449,6 +449,11 @@ def test_an_older_index_is_brought_forward_not_refused(workspace):
     with Index(target, codebase_root=workspace) as index:
         assert index.migrated_from == 10
         assert index.meta("schema_version") == "11"
+        # The index remembers it was brought forward; a later reader of a
+        # NULL column can find out why without the terminal that saw it.
+        (record,) = index.migrations()
+        assert record["from"] == 10 and record["to"] == 11
+        assert record["when"].startswith("20")
         empty = index.connection.execute(
             "SELECT COUNT(*) FROM symbols WHERE body_hash IS NULL").fetchone()[0]
         assert empty > 0

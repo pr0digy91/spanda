@@ -1,26 +1,29 @@
-"""Command line entry point."""
+"""Command line entry point: parse arguments, run one thing, print.
+
+The scan engine the commands share lives in `spanda.scan`; nothing here
+reads a source file itself."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import platform
-import subprocess
 import sys
 import tempfile
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from spanda.extract import (extract_codebase, extract_file, plan_scan,
-                            stream_records)
+from spanda.drift import compare
+from spanda.extract import extract_codebase
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
 from spanda.guide import render as render_guide
+from spanda.modules import (EXTERNAL, build_import_graph, cycle_groups,
+                            processing_order)
 from spanda.profile import build as build_profile, render as render_profile
-from spanda.modules import (EXTERNAL, ModuleIndex, build_import_graph,
-                            cycle_groups, processing_order, resolve_imports)
-from spanda.resolve import SymbolTable, build_scopes, resolve_record
-from spanda.drift import compare
+from spanda.scan import (changed_python_files, cycles_for, full_scan, git,
+                         git_failure, import_survey, incremental_scan, plan_for,
+                         resolve_codebase, resolve_collected)
 from spanda.store import SCHEMA_VERSION, Index, IndexError_, db_path, prepare_db_path
 
 
@@ -97,6 +100,12 @@ def _summarise(scan) -> None:
         for reason, paths in sorted(scan.skipped.items(),
                                     key=lambda kv: -len(kv[1])):
             print(f"  {len(paths):>6}  {reason}/")
+    if scan.ignored:
+        print(f"\n{len(scan.ignored)} .py files NOT looked at because git ignores them:")
+        for path in scan.ignored[:10]:
+            print(f"  {path}")
+        if len(scan.ignored) > 10:
+            print(f"  ... and {len(scan.ignored) - 10} more")
 
 
 def _dynamic_dispatch_report(records: list[dict]) -> None:
@@ -120,7 +129,7 @@ def cmd_parse(args: argparse.Namespace) -> int:
         print(f"not a directory: {root}", file=sys.stderr)
         return 2
 
-    scan = extract_codebase(root)
+    scan = extract_codebase(root, plan_for(root))
 
     if args.out:
         out_root = Path(args.out).resolve()
@@ -158,7 +167,7 @@ def cmd_gaps(args: argparse.Namespace) -> int:
         print(f"not a directory: {root}", file=sys.stderr)
         return 2
 
-    scan = extract_codebase(root)
+    scan = extract_codebase(root, plan_for(root))
     patterns = load_patterns(Path(args.patterns) if args.patterns else None)
     gaps = find_gaps(scan, patterns)
 
@@ -219,10 +228,8 @@ def cmd_gaps(args: argparse.Namespace) -> int:
     return 0
 
 
-PROGRESS_EVERY = 200
-
-
 def _run_scan(db_path, root, plan, patterns):
+    """Open the index, run one full scan, resolve it, and say what happened."""
     with Index(db_path, codebase_root=root) as index:
         if index.migrated_from:
             print(f"index brought forward from schema {index.migrated_from} "
@@ -231,32 +238,20 @@ def _run_scan(db_path, root, plan, patterns):
         scan_id = index.begin_scan(plan.root, plan.skipped_count)
         print(f"scan {scan_id}: {len(plan.files)} files under {plan.root}")
 
-        symbols = 0
-        module_index, table, collected = ModuleIndex(), SymbolTable(), []
-        # One file in memory at a time. The whole scan is a single
-        # transaction, so an interrupted run leaves the index untouched
-        # rather than half-written — a half-written scan is indistinguishable
-        # from a mass deletion.
-        for number, record in enumerate(stream_records(plan), start=1):
-            symbols += index.write_record(scan_id, record, patterns)
-            module_index.add(record["file"], record["module"])
-            table.add_record(record, patterns)
-            collected.append(_for_resolution(record))
-            if number % PROGRESS_EVERY == 0:
-                print(f"  {number}/{len(plan.files)} files, {symbols} symbols")
-
+        run = full_scan(index, scan_id, plan, patterns,
+                        progress=lambda done, total, symbols: print(
+                            f"  {done}/{total} files, {symbols} symbols"))
         # Resolved from what was just read, not by reading it again.
-        _scopes, references, lost = _resolve_collected(collected, module_index, table)
+        _scopes, references, lost = resolve_collected(
+            run.collected, run.module_index, run.table)
         counts = index.write_references(
             scan_id, references, index.symbol_uuids_by_key())
         index.record_lost_trails(scan_id, lost)
         counts["lost"] = lost
-        index.record_cycles(scan_id, _cycles_from(collected, module_index))
 
         totals = index.finish_scan(scan_id)
         missing = index.gone_since_previous(scan_id)
     return totals, missing, scan_id, counts
-
 
 
 def cmd_index(args: argparse.Namespace) -> int:
@@ -265,7 +260,7 @@ def cmd_index(args: argparse.Namespace) -> int:
         print(f"not a directory: {root}", file=sys.stderr)
         return 2
 
-    plan = _plan(root)
+    plan = plan_for(root)
     patterns = load_patterns(Path(args.patterns) if args.patterns else None)
 
     target = Path(args.db) if args.db else prepare_db_path(root)
@@ -320,6 +315,11 @@ def cmd_scans(args: argparse.Namespace) -> int:
     print(f"index: {target}")
     with Index(target) as index:
         rows = index.scans()
+        history = index.migrations()
+    print(f"schema {SCHEMA_VERSION}"
+          + ("; brought forward " + ", ".join(
+              f"from {m['from']} on {m['when'][:10]}" for m in history)
+             if history else ""))
     if not rows:
         print("no scans in this index yet")
         return 0
@@ -492,102 +492,11 @@ def cmd_drift(args: argparse.Namespace) -> int:
     return 0
 
 
-def changed_python_files(root: Path, since_commit: str,
-                         to_commit: str = "HEAD") -> set[str] | None:
-    """Which .py files differ between two commits, plus uncommitted edits.
-
-    None means "cannot tell" — no git, or a commit this checkout does not
-    have — and the caller must fall back to reading everything. Guessing that
-    nothing changed would be the worst possible answer.
-    """
-    diff = _git(root, "diff", "--name-only", since_commit, to_commit)
-    if diff is None:
-        return None
-    # git reports paths relative to the repository root. The scan root may
-    # sit below it — `spanda backfill ~/repo/services` — and then every
-    # changed path misses the scan's own file list, gets treated as "deleted
-    # or not ours", and is carried forward with stale content. Silently.
-    top = _git(root, "rev-parse", "--show-toplevel")
-    if top is None:
-        return None
-    prefix = Path(root).resolve().relative_to(Path(top).resolve()).as_posix()
-    prefix = "" if prefix == "." else prefix + "/"
-
-    def ours(path: str) -> str | None:
-        if not path.endswith(".py"):
-            return None
-        if prefix and not path.startswith(prefix):
-            return None  # changed, but outside the scan root
-        return path[len(prefix):]
-
-    changed = {p for p in (ours(line) for line in diff.splitlines()) if p}
-
-    # Uncommitted work is a difference too, and git status is the only thing
-    # that sees it.
-    status = _git(root, "status", "--porcelain", "--untracked-files=all",
-                  strip=False)
-    if status:
-        for line in status.splitlines():
-            # "XY path", or "XY old -> new" for a rename.
-            path = ours(line[3:].split(" -> ")[-1].strip())
-            if path:
-                changed.add(path)
-    return changed
-
-
-def _incremental_scan(index, root: Path, scan_id: int, plan, patterns,
-                      changed: set[str]) -> dict:
-    """Re-read only what changed, and carry the rest forward.
-
-    On the target codebase consecutive commits differ by a median of three files out of
-    1,098. Re-reading all of them costs 1.5 seconds a commit and produces
-    identical results for 99.7% of the work.
-    """
-    present = {p.relative_to(plan.root).as_posix(): p for p in plan.files}
-    reparsed, symbols = set(), 0
-
-    for relative in sorted(changed):
-        path = present.get(relative)
-        if path is None:
-            continue  # deleted, or not a file this scan would look at anyway
-        symbols += index.write_record(scan_id, extract_file(path, plan.root), patterns)
-        reparsed.add(relative)
-
-    # A file present now but never indexed before is new to this index, not a
-    # carry-forward, so it has to be read even if git did not name it.
-    known = {r["file_path"] for r in index.connection.execute(
-        "SELECT file_path FROM files")}
-    for relative, path in present.items():
-        if relative not in known and relative not in reparsed:
-            symbols += index.write_record(
-                scan_id, extract_file(path, plan.root), patterns)
-            reparsed.add(relative)
-
-    carried = index.carry_forward(scan_id, set(present), reparsed)
-    return {"reparsed": len(reparsed), "symbols": symbols, **carried}
-
-
-def _git(root: Path, *args: str, strip: bool = True) -> str | None:
-    """Run git and return stdout, or None if it failed.
-
-    `strip=False` matters for `status --porcelain`, whose status field is
-    fixed-width and begins with a space for an unstaged change. Stripping the
-    output eats that space on the first line only, which shifts the path by
-    one character — a bug that hides until the first line happens to be the
-    one you care about.
-    """
-    result = subprocess.run(("git", "-C", str(root)) + args,
-                            capture_output=True, text=True)
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip() if strip else result.stdout
-
-
 def cmd_backfill(args: argparse.Namespace) -> int:
     """Index past commits, so drift can be tested against real history today
     rather than after weeks of accumulating scans."""
     root = Path(args.path).resolve()
-    if _git(root, "rev-parse", "HEAD") is None:
+    if git(root, "rev-parse", "HEAD") is None:
         print(f"{root} is not a git repository; backfill has no history to read",
               file=sys.stderr)
         return 2
@@ -601,7 +510,7 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                   f"re-run, or pass --db to a new file.", file=sys.stderr)
             return 2
 
-    log = _git(root, "log", "-n", str(args.last), "--format=%H %ct %s")
+    log = git(root, "log", "-n", str(args.last), "--format=%H %ct %s")
     commits = [line.split(" ", 2) for line in (log or "").splitlines()]
     commits.reverse()  # oldest first, so scan_id order matches time order
     if not commits:
@@ -617,7 +526,7 @@ def cmd_backfill(args: argparse.Namespace) -> int:
     # handful that differ.
     with tempfile.TemporaryDirectory() as tmp:
         worktree = Path(tmp) / "tree"
-        if _git(root, "worktree", "add", "--detach", str(worktree),
+        if git(root, "worktree", "add", "--detach", str(worktree),
                 commits[0][0]) is None:
             print(f"could not create a worktree", file=sys.stderr)
             return 2
@@ -625,14 +534,14 @@ def cmd_backfill(args: argparse.Namespace) -> int:
             with Index(target, codebase_root=root) as index:
                 previous_commit, previous_scan = None, None
                 for number, (commit, when, subject) in enumerate(commits, start=1):
-                    if _git(worktree, "checkout", "--detach", "--force",
+                    if git(worktree, "checkout", "--detach", "--force",
                             commit) is None:
                         print(f"  ! could not check out {commit[:8]}, skipping",
                               file=sys.stderr)
                         continue
                     committed = datetime.fromtimestamp(
                         int(when), timezone.utc).isoformat(timespec="seconds")
-                    plan = _plan(worktree)
+                    plan = plan_for(worktree)
                     scan_id = index.begin_scan(
                         worktree, plan.skipped_count, record_root=root,
                         commit_override=commit, dirty_override=False,
@@ -640,16 +549,20 @@ def cmd_backfill(args: argparse.Namespace) -> int:
 
                     changed = (changed_python_files(worktree, previous_commit, commit)
                                if previous_commit else None)
+                    if changed is None and previous_commit:
+                        # Falling back is right; doing it quietly is not.
+                        # A run that read everything for a reason nobody
+                        # saw cannot be told from one that worked as meant.
+                        why = git_failure(worktree, "diff", "--name-only",
+                                          previous_commit, commit)
+                        print(f"  ! could not diff {previous_commit[:8]}.."
+                              f"{commit[:8]} ({why}); read every file instead",
+                              file=sys.stderr)
                     if changed is None or previous_scan is None:
-                        full_index, full_records, symbols = ModuleIndex(), [], 0
-                        for record in stream_records(plan):
-                            symbols += index.write_record(scan_id, record, patterns)
-                            full_index.add(record["file"], record["module"])
-                            full_records.append(_for_resolution(record))
-                        index.record_cycles(scan_id, _cycles_from(full_records, full_index))
+                        symbols = full_scan(index, scan_id, plan, patterns).symbols
                         touched = len(plan.files)
                     else:
-                        result = _incremental_scan(
+                        result = incremental_scan(
                             index, worktree, scan_id, plan, patterns, changed)
                         symbols, touched = result["symbols"], result["reparsed"]
 
@@ -657,16 +570,12 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                     # Doing it for all of them would dominate the run for
                     # edges nobody asks about at a historical commit.
                     if number == len(commits):
-                        _p, _t, _s, references, lost = _resolve_codebase(worktree, patterns)
+                        _p, _t, _s, references, lost = resolve_codebase(worktree, patterns)
                         index.write_references(
                             scan_id, references, index.symbol_uuids_by_key())
                         index.record_lost_trails(scan_id, lost)
                         if not index.scan(scan_id)["cycles_recorded"]:
-                            full_index, full_records = ModuleIndex(), []
-                            for record in stream_records(plan):
-                                full_index.add(record["file"], record["module"])
-                                full_records.append(_for_resolution(record))
-                            index.record_cycles(scan_id, _cycles_from(full_records, full_index))
+                            index.record_cycles(scan_id, cycles_for(plan))
 
                     totals = index.finish_scan(scan_id)
                     previous_commit, previous_scan = commit, scan_id
@@ -675,110 +584,10 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                               f"{totals['total_symbols']:>6} symbols  "
                               f"{touched:>4} files re-read  {subject[:36]}")
         finally:
-            _git(root, "worktree", "remove", "--force", str(worktree))
+            git(root, "worktree", "remove", "--force", str(worktree))
 
     print(f"\nDone. Compare any two with:  spanda drift {args.path} A B")
     return 0
-
-
-def _plan(root: Path):
-    """What a scan will read: everything on disk, minus what git ignores.
-
-    A full scan walks the filesystem and a backfill follows git, and they
-    disagree on exactly one thing: a `.py` file that is on disk but ignored.
-    the target codebase had one — a helper script under a gitignored `scripts/` — and
-    the full scan recorded it as *added* in a scan labelled "at commit
-    7e4ae187, clean tree", which that commit does not contain. So a git
-    repository is scanned as git sees it, and the files set aside are
-    counted and reported, not dropped. Outside git nothing changes.
-    """
-    plan = plan_scan(root)
-    listing = _git(root, "ls-files", "--others", "--ignored", "--exclude-standard",
-                   "-z", strip=False)
-    if not listing:
-        return plan
-    ignored = {p for p in listing.split("\0") if p.endswith(".py")}
-    if not ignored:
-        return plan
-    keep = []
-    for path in plan.files:
-        relative = path.relative_to(plan.root).as_posix()
-        if relative in ignored:
-            plan.ignored.append(relative)
-        else:
-            keep.append(path)
-    plan.files = keep
-    return plan
-
-
-def _import_survey(root: Path):
-    """Resolve every import in a codebase. Keeps only what the graph needs,
-    so memory stays flat rather than holding every record."""
-    plan = _plan(root)
-    index, statements = ModuleIndex(), []
-    for record in stream_records(plan):
-        index.add(record["file"], record["module"])
-        statements.append({"file": record["file"], "module": record["module"],
-                           "imports": record["imports"]})
-    edges = []
-    for record in statements:
-        edges.extend(resolve_imports(record, index))
-    return plan, index, edges
-
-
-#: What resolution needs from a record, once the symbol table has been fed.
-#: Keeping this instead of the whole record is what lets the codebase be
-#: parsed once rather than three times: the full records for 1,097 files run
-#: to hundreds of megabytes, this to a few tens.
-def _for_resolution(record: dict) -> dict:
-    return {
-        "file": record["file"],
-        "module": record["module"],
-        "dunder_all": record["dunder_all"],
-        "imports": record["imports"],
-        "references": record["references"],
-        "definitions": [{"local_id": d["local_id"], "name": d["name"],
-                         "qualname": d["qualname"], "kind": d["kind"],
-                         "parent": d["parent"],
-                         "signature": ({"params": [
-                             {"name": p["name"], "annotation": p["annotation"]}
-                             for p in d["signature"]["params"]]}
-                             if d["signature"] else None)}
-                        for d in record["definitions"]],
-    }
-
-
-def _cycles_from(collected, module_index) -> list[list[str]]:
-    """Circular-import groups from records already in hand."""
-    edges = [e for r in collected for e in resolve_imports(r, module_index)]
-    return cycle_groups(build_import_graph(edges, list(module_index.by_file)))
-
-
-def _resolve_collected(collected, module_index, table):
-    """Resolve, given records already gathered by whoever parsed them.
-
-    Still two logical passes — the symbol table has to be complete before any
-    reference is resolved, since a reference can point at a definition in a
-    file read later — but only one pass over the source.
-    """
-    scopes, lost = build_scopes(collected, table, module_index)
-    references = []
-    for record in collected:
-        references.extend(resolve_record(record, table, scopes))
-    return scopes, references, lost
-
-
-def _resolve_codebase(root: Path, patterns):
-    """Parse a codebase and resolve it, for callers that have not already
-    parsed it themselves."""
-    plan = _plan(root)
-    module_index, table, collected = ModuleIndex(), SymbolTable(), []
-    for record in stream_records(plan):
-        module_index.add(record["file"], record["module"])
-        table.add_record(record, patterns)
-        collected.append(_for_resolution(record))
-    scopes, references, lost = _resolve_collected(collected, module_index, table)
-    return plan, table, scopes, references, lost
 
 
 def _report_lost_trails(lost) -> None:
@@ -810,7 +619,7 @@ def cmd_resolve(args: argparse.Namespace) -> int:
         return 2
 
     patterns = load_patterns(Path(args.patterns) if args.patterns else None)
-    plan, table, _scopes, references, lost = _resolve_codebase(root, patterns)
+    plan, table, _scopes, references, lost = resolve_codebase(root, patterns)
 
     resolved = [r for r in references if r.target_symbol]
     unresolved = [r for r in references if not r.target_symbol]
@@ -852,7 +661,7 @@ def cmd_imports(args: argparse.Namespace) -> int:
         print(f"not a directory: {root}", file=sys.stderr)
         return 2
 
-    plan, index, edges = _import_survey(root)
+    plan, index, edges = import_survey(root)
     graph = build_import_graph(edges, list(index.by_file))
     cycles = cycle_groups(graph)
 

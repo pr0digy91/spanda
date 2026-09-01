@@ -113,6 +113,17 @@ CREATE TABLE IF NOT EXISTS scan_problems (
     PRIMARY KEY (scan_id, file_path)
 );
 
+-- What a scan chose not to read, so `skipped_files` on the scans row can be
+-- explained from the index rather than remembered from a terminal. One row
+-- per excluded directory (with a count) and one per git-ignored file.
+CREATE TABLE IF NOT EXISTS scan_unread (
+    scan_id INTEGER NOT NULL,
+    path    TEXT    NOT NULL,   -- a file, or a directory name ending in /
+    reason  TEXT    NOT NULL,   -- directory_excluded | ignored_by_git
+    files   INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (scan_id, path)
+);
+
 -- One row per scan in which a symbol's shape or content actually changed.
 -- The symbols table holds only current values, so without this a second scan
 -- overwrites the first and "did this signature change between scan 3 and scan
@@ -473,6 +484,9 @@ class Index:
                         self.connection.execute(
                             f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
                 self._set_meta("schema_version", str(step))
+                self._set_meta(f"migrated_to_{step}", json.dumps({
+                    "from": step - 1,
+                    "when": datetime.now(timezone.utc).isoformat(timespec="seconds")}))
             self.connection.execute("COMMIT")
         except Exception:
             self.connection.execute("ROLLBACK")
@@ -665,17 +679,29 @@ class Index:
             key = symbol_key(record["file"], definition["qualname"], definition["kind"])
             dynamic = any(is_dynamic_dispatch(d["base"], patterns)
                           for d in definition["decorators"])
-            values = (
-                definition["name"], definition["qualname"], definition["kind"],
-                record["module"], record["file"], definition["lines"][0],
-                definition["lines"][1],
-                json.dumps(definition["signature"]) if definition["signature"] else None,
-                definition["canonical_signature"], definition["docstring"],
-                json.dumps(definition["decorators"]), int(dynamic),
-                definition["definition_count"], int(definition["signature_varies"]),
-                definition["content_hash"], definition["signature_hash"],
-                definition["body_hash"],
-            )
+            # Built by column name and then ordered by SYMBOL_FIELDS, so a
+            # column added to one and not the other fails here, loudly, not
+            # by writing every value one slot to the left.
+            by_field = {
+                "name": definition["name"], "qualname": definition["qualname"],
+                "kind": definition["kind"], "module": record["module"],
+                "file_path": record["file"],
+                "line_start": definition["lines"][0],
+                "line_end": definition["lines"][1],
+                "signature": (json.dumps(definition["signature"])
+                              if definition["signature"] else None),
+                "canonical_signature": definition["canonical_signature"],
+                "docstring": definition["docstring"],
+                "decorators": json.dumps(definition["decorators"]),
+                "has_dynamic_dispatch": int(dynamic),
+                "definition_count": definition["definition_count"],
+                "signature_varies": int(definition["signature_varies"]),
+                "content_hash": definition["content_hash"],
+                "signature_hash": definition["signature_hash"],
+                "body_hash": definition["body_hash"],
+            }
+            assert set(by_field) == set(SYMBOL_FIELDS), "symbols columns drifted"
+            values = tuple(by_field[f] for f in SYMBOL_FIELDS)
 
             existing = self.connection.execute(
                 "SELECT uuid, content_hash, signature_hash FROM symbols"
@@ -973,6 +999,27 @@ class Index:
         return self.connection.execute(
             "SELECT * FROM symbols WHERE last_seen_scan_id < ?"
             " ORDER BY file_path, line_start", (scan_id,)).fetchall()
+
+    def migrations(self) -> list[dict]:
+        """Every time this index was brought forward, oldest first."""
+        rows = self.connection.execute(
+            "SELECT key, value FROM meta WHERE key LIKE 'migrated_to_%'"
+            " ORDER BY CAST(substr(key, 13) AS INTEGER)").fetchall()
+        return [{"to": int(r["key"][12:]), **json.loads(r["value"])} for r in rows]
+
+    def record_unread(self, scan_id: int, plan) -> None:
+        """Write down what this scan is not going to read, before reading."""
+        rows = [(scan_id, f"{name}/", "directory_excluded", len(paths))
+                for name, paths in plan.skipped.items() if paths]
+        rows += [(scan_id, path, "ignored_by_git", 1) for path in plan.ignored]
+        self.connection.executemany(
+            "INSERT OR REPLACE INTO scan_unread (scan_id, path, reason, files)"
+            " VALUES (?, ?, ?, ?)", rows)
+
+    def unread_at(self, scan_id: int) -> list[sqlite3.Row]:
+        return self.connection.execute(
+            "SELECT path, reason, files FROM scan_unread WHERE scan_id = ?"
+            " ORDER BY reason, path", (scan_id,)).fetchall()
 
     def gone_since_previous(self, scan_id: int) -> list[sqlite3.Row]:
         """Symbols present in the completed scan before this one and absent now.

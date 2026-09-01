@@ -23,6 +23,21 @@ M8 complete: drift over reference edges and circular-import groups.
 All eight planned milestones built, plus `gaps` and `profile`, which were not
 in the original plan.
 
+Each module does one thing, and says which in its first line:
+
+| module | role |
+|---|---|
+| `extract.py` | one file to one record: definitions, references, imports, hashes, hints |
+| `modules.py` | dotted names to files; import graph; cycle groups |
+| `resolve.py` | a reference to the definition it means, or a reason it cannot be |
+| `scan.py` | one scan into an open index, full or incremental; all the git calls |
+| `store.py` | the SQLite index: identity across scans, presence, versions, migrations |
+| `drift.py` | two scans compared |
+| `gaps.py` | what the extractor cannot see, made explicit |
+| `profile.py` | what the corpus keeps doing |
+| `guide.py` | the index described from the index |
+| `cli.py` | arguments in, one command run, text out; reads no source itself |
+
 ## Use
 
 Zero dependencies. Needs Python 3.9+, but run it on the newest interpreter you

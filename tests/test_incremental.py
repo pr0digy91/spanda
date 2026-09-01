@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from spanda.cli import _incremental_scan, changed_python_files
+from spanda.scan import changed_python_files, incremental_scan
 from spanda.extract import plan_scan, stream_records
 from spanda.gaps import load_patterns
 from spanda.store import Index, prepare_db_path
@@ -52,7 +52,7 @@ def full_scan(index, root, patterns) -> int:
 def incremental(index, root, patterns, changed) -> int:
     plan = plan_scan(root)
     scan_id = index.begin_scan(plan.root, plan.skipped_count)
-    _incremental_scan(index, root, scan_id, plan, patterns, changed)
+    incremental_scan(index, root, scan_id, plan, patterns, changed)
     index.finish_scan(scan_id)
     return scan_id
 
@@ -290,6 +290,15 @@ def test_a_gitignored_file_is_set_aside_and_named(repo, capsys):
     with Index(db_path(repo)) as index:
         assert index.find("make_code") == []
         assert index.scan(1)["skipped_files"] == 1
+        # The index itself can say what it did not read, not just the terminal.
+        unread = [(r["path"], r["reason"]) for r in index.unread_at(1)]
+        assert ("scripts/totp.py", "ignored_by_git") in unread
+
+    # `parse` reads the same codebase `index` does.
+    assert main(["parse", str(repo)]) == 0
+    report = capsys.readouterr().out
+    assert "1 .py files NOT looked at because git ignores them" in report
+    assert "scripts/totp.py" in report
 
 
 def test_outside_git_everything_on_disk_is_read(tmp_path, capsys):

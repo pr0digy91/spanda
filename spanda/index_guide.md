@@ -65,7 +65,8 @@ you and is the safer route.
 | `file_versions` | scan where a file changed | file history |
 | `scans` | index run | commit, timestamp, counts, fingerprint |
 | `scan_problems` | file a scan could not parse | rare; syntax errors at that commit |
-| `meta` | key | schema version, which codebase this index describes |
+| `scan_unread` | what a scan chose not to read | explains `skipped_files`: excluded directories with counts, and `.py` files git ignores |
+| `meta` | key | schema version, which codebase this index describes, when it was brought forward |
 
 ### `symbols` — the columns that matter
 

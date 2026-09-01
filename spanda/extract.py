@@ -695,6 +695,7 @@ class CodebaseScan:
     root: Path
     records: list[dict]
     skipped: dict[str, list[str]] = field(default_factory=dict)
+    ignored: list[str] = field(default_factory=list)
 
     def __iter__(self):
         return iter(self.records)
@@ -788,12 +789,17 @@ def stream_records(plan: ScanPlan):
         yield extract_file(path, plan.root)
 
 
-def extract_codebase(root: Path) -> CodebaseScan:
+def extract_codebase(root: Path, plan: ScanPlan | None = None) -> CodebaseScan:
     """Materialise every record. Prefer `stream_records` unless the consumer
-    needs a whole-codebase view; see CodebaseScan."""
-    plan = plan_scan(root)
+    needs a whole-codebase view; see CodebaseScan.
+
+    Pass a plan to read exactly what another command would — the CLI hands
+    in one with git-ignored files set aside, so `parse` and `index` never
+    disagree about what the codebase is."""
+    plan = plan or plan_scan(root)
     return CodebaseScan(
         root=plan.root,
         records=list(stream_records(plan)),
         skipped=plan.skipped,
+        ignored=plan.ignored,
     )
