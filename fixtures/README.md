@@ -23,6 +23,7 @@ Both are deliberate.
 | File | Defs | fn | class | method | var |
 |---|---:|---:|---:|---:|---:|
 | `__init__.py` | 2 | 0 | 0 | 0 | 2 |
+| `consumer.py` | 2 | 1 | 0 | 0 | 1 |
 | `a.py` | 3 | 2 | 0 | 0 | 1 |
 | `b.py` | 1 | 1 | 0 | 0 | 0 |
 | `base.py` | 4 | 0 | 1 | 2 | 1 |
@@ -33,17 +34,20 @@ Both are deliberate.
 | `models.py` | 13 | 2 | 2 | 5 | 4 |
 | `nested.py` | 8 | 4 | 2 | 1 | 1 |
 | `recursion.py` | 3 | 3 | 0 | 0 | 0 |
+| `registry/__init__.py` | 1 | 0 | 0 | 0 | 1 |
+| `registry/impl.py` | 1 | 1 | 0 | 0 | 0 |
 | `star.py` | 1 | 1 | 0 | 0 | 0 |
 | `broken.py` | — | unparseable; the reported line and wording vary by interpreter |
-| **Total** | **49** | 21 | 6 | 10 | 12 |
+| **Total** | **53** | 23 | 6 | 10 | 14 |
 
-13 files: 12 parse, 1 does not.
+16 files: 15 parse, 1 does not.
 
 ## What each file proves
 
 | File | The thing it breaks |
 |---|---|
 | `__init__.py` | Re-exports. `Order` is importable here but *defined* in `models.py`. |
+| `registry/` → `consumer.py` | A three-hop re-export: defined in `registry/impl.py`, re-exported by `registry/__init__.py`, re-exported again by the package root, used from `consumer.py`. |
 | `a.py` ↔ `b.py` | A real circular import. Cycle detection must group them, not hang. |
 | `models.py` | The core case: `@event.listens_for` dispatch, plus unresolvable external imports. |
 | `base.py` → `derived.py` | Inheritance across a file boundary. |
@@ -91,6 +95,22 @@ The message and line are the interpreter's, and differ between versions —
 3.9 reports "invalid syntax" at line 10, 3.14 "\'(\' was never closed" at line
 9. Everything else in this answer key is identical across both, hashes
 included, which is what makes an index portable between them.
+
+## The re-export chain, and why it has its own file
+
+`register_node` is defined in `registry/impl.py`, re-exported by
+`registry/__init__.py`, re-exported again by `sample_pkg/__init__.py`, and
+used in `consumer.py`. Four files, three hops.
+
+This shape is here because it broke on real code. A resolver that looks only
+for names a module *defines* — never for names it *imported* — loses the trail
+at the first `__init__.py`, and everything behind that package root reports as
+having no callers. On the target codebase it made 28 of 31 live flow handlers look dead.
+
+The trap is that nothing complains. The tool's own honesty machinery cannot
+help: it is not unsure, it simply never saw the reference. Any change to
+scope building must keep `consumer.py` resolving all the way through to
+`registry/impl.py`.
 
 ## The three symbols that make or break this project
 

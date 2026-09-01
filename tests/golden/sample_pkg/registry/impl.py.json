@@ -1,0 +1,111 @@
+{
+  "file": "sample_pkg/registry/impl.py",
+  "module": "sample_pkg.registry.impl",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:8aaa41f82ccd7c08c15fc79c4c063b67",
+  "module_docstring": "The real definition, three hops from where it is used.",
+  "dunder_all": [],
+  "imports": [],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "function",
+      "name": "register_node",
+      "qualname": "register_node",
+      "parent": null,
+      "lines": [
+        4,
+        6
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "name",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          },
+          {
+            "name": "handler",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": "dict"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Defined here, re-exported twice, called from a fourth file.",
+      "canonical_signature": "(positional:name:str,positional:handler)->dict",
+      "signature_hash": "sha256:fa81884771f47394cc8c5eec82ca95fe",
+      "content_hash": "sha256:7b9379fc2461dcbdd454f23206934197"
+    }
+  ],
+  "references": [
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 4,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "dict",
+      "root": "dict",
+      "chain": [
+        "dict"
+      ],
+      "context": "annotation",
+      "line": 4,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "name",
+      "root": "name",
+      "chain": [
+        "name"
+      ],
+      "context": "name",
+      "line": 6,
+      "enclosing": "d1",
+      "local": true
+    },
+    {
+      "raw": "handler",
+      "root": "handler",
+      "chain": [
+        "handler"
+      ],
+      "context": "name",
+      "line": 6,
+      "enclosing": "d1",
+      "local": true
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "name",
+      "line": 6,
+      "enclosing": "d1"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "handler",
+      "line": 6,
+      "enclosing": "d1"
+    }
+  ]
+}

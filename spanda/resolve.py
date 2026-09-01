@@ -120,10 +120,18 @@ class SymbolTable:
         return None
 
 
-def build_scope(record: dict, table: SymbolTable, index: ModuleIndex) -> dict[str, Target]:
-    """Every name visible at the top of one file, and what it refers to."""
+def build_scope(record: dict, table: SymbolTable, index: ModuleIndex
+                ) -> tuple[dict[str, Target], list[tuple]]:
+    """Every name visible at the top of one file, and what it refers to.
+
+    Returns the scope plus the lookups it could not finish: names imported
+    from a module that does not define them, which means that module imported
+    them from somewhere else in turn. Those are resolved by `build_scopes`
+    once every module has a scope to consult.
+    """
     module = record["module"]
     scope: dict[str, Target] = {}
+    pending: list[tuple] = []
 
     # Names defined in this file.
     for name, key in table.module_names.get(module, {}).items():
@@ -134,18 +142,8 @@ def build_scope(record: dict, table: SymbolTable, index: ModuleIndex) -> dict[st
                          if edge.target_file else None)
 
         if edge.is_star:
-            if target_module is None:
-                continue
-            # `import *` honours __all__ when it is declared; without one,
-            # everything not underscore-prefixed.
-            exported = table.exports.get(target_module)
-            available = table.module_names.get(target_module, {})
-            names = exported if exported is not None else [
-                n for n in available if not n.startswith("_")]
-            for name in names:
-                key = available.get(name)
-                if key is not None:
-                    scope[name] = Target("symbol", symbol=key, via_star=True)
+            if target_module is not None:
+                pending.append(("star", None, target_module, None))
             continue
 
         for name, alias in edge.names:
@@ -155,17 +153,79 @@ def build_scope(record: dict, table: SymbolTable, index: ModuleIndex) -> dict[st
                 continue
             if target_module is None:
                 continue
-            # `from . import handlers` resolved to the submodule itself.
-            if edge.target_module == target_module and name not in \
-                    table.module_names.get(target_module, {}):
+            # `from . import handlers`, where the edge already points at the
+            # submodule the name denotes. Distinguished from a re-export by
+            # the module's own name: `flow_nodes.ai.ai_agent` is not what
+            # `handle_ai_agent` denotes, so that one is a re-export to chase.
+            # Conflating the two makes every symbol behind a package root
+            # look uncalled.
+            if target_module == name or target_module.endswith("." + name):
                 scope[local] = Target("module", module=target_module)
                 continue
             key = table.module_names.get(target_module, {}).get(name)
             if key is not None:
                 scope[local] = Target("symbol", symbol=key)
             else:
+                # The module does not define this name, so it re-exported it.
+                # Following that is what makes a package root usable as an
+                # import surface — and not following it makes every symbol
+                # behind one look uncalled.
                 scope[local] = Target("module", module=target_module)
-    return scope
+                pending.append(("name", local, target_module, name))
+    return scope, pending
+
+
+#: How many times to chase re-exports through further re-exports. Chains
+#: longer than this are vanishingly rare, and a cap is what guarantees
+#: termination when packages import each other in a circle.
+REEXPORT_PASSES = 6
+
+
+def build_scopes(collected, table: SymbolTable, index: ModuleIndex
+                 ) -> dict[str, dict[str, Target]]:
+    """Build every module's scope, then chase re-exports to a fixed point.
+
+    A single pass cannot do this: `from flow_nodes import handle_x` can only
+    be resolved once `flow_nodes`'s own scope exists, and that scope may
+    itself depend on a module not yet built. Iterating until nothing changes
+    handles chains of any length, and circular imports, without recursion.
+    """
+    scopes: dict[str, dict[str, Target]] = {}
+    pending: dict[str, list[tuple]] = {}
+    for record in collected:
+        scope, unfinished = build_scope(record, table, index)
+        scopes[record["module"]] = scope
+        pending[record["module"]] = unfinished
+
+    for _ in range(REEXPORT_PASSES):
+        progressed = False
+        for module, items in pending.items():
+            remaining = []
+            for kind, local, target_module, name in items:
+                source = scopes.get(target_module, {})
+                if kind == "star":
+                    exported = table.exports.get(target_module)
+                    names = (exported if exported is not None
+                             else [n for n in source if not n.startswith("_")])
+                    for exported_name in names:
+                        found = source.get(exported_name)
+                        if found is not None and found.kind == "symbol" \
+                                and exported_name not in scopes[module]:
+                            scopes[module][exported_name] = Target(
+                                "symbol", symbol=found.symbol, via_star=True)
+                            progressed = True
+                    remaining.append((kind, local, target_module, name))
+                    continue
+                found = source.get(name)
+                if found is not None and found.kind == "symbol":
+                    scopes[module][local] = found
+                    progressed = True
+                else:
+                    remaining.append((kind, local, target_module, name))
+            pending[module] = remaining
+        if not progressed:
+            break
+    return scopes
 
 
 @dataclass

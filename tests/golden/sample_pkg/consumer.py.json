@@ -1,0 +1,177 @@
+{
+  "file": "sample_pkg/consumer.py",
+  "module": "sample_pkg.consumer",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:3af6cac9e58cff88d6cbe3ceeecd37e1",
+  "module_docstring": "Uses names the package root only re-exports, never defines.\n\nThis is the shape that made 28 of 31 real handlers look uncalled: a name\ndefined in one file, re-exported by its package, re-exported again by the\npackage above it, and used from a fourth. Every hop is somewhere the trail\ncan be lost, and losing it reports a busy function as dead.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from sample_pkg import Order, format_currency, register_node",
+      "module": "sample_pkg",
+      "names": [
+        {
+          "name": "Order",
+          "alias": null
+        },
+        {
+          "name": "format_currency",
+          "alias": null
+        },
+        {
+          "name": "register_node",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 9,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "variable",
+      "name": "NODES",
+      "qualname": "NODES",
+      "parent": null,
+      "lines": [
+        11,
+        11
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:a7d399f29bfc13731227ead54be87438"
+    },
+    {
+      "local_id": "d2",
+      "kind": "function",
+      "name": "summarise",
+      "qualname": "summarise",
+      "parent": null,
+      "lines": [
+        14,
+        16
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "order_id",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          }
+        ],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Calls two names that arrive here through re-export chains.",
+      "canonical_signature": "(positional:order_id:str)->str",
+      "signature_hash": "sha256:1c71e8766901814c4ca50bcf51fc32fe",
+      "content_hash": "sha256:20c83dada926c7be3eb557a371f12f54"
+    }
+  ],
+  "references": [
+    {
+      "raw": "register_node",
+      "root": "register_node",
+      "chain": [
+        "register_node"
+      ],
+      "context": "call",
+      "line": 11,
+      "enclosing": null,
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 14,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 14,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "format_currency",
+      "root": "format_currency",
+      "chain": [
+        "format_currency"
+      ],
+      "context": "call",
+      "line": 16,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "Order.empty(order_id).total",
+      "root": null,
+      "chain": null,
+      "context": "call",
+      "line": 16,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "Order.empty",
+      "root": "Order",
+      "chain": [
+        "Order",
+        "empty"
+      ],
+      "context": "call",
+      "line": 16,
+      "enclosing": "d2",
+      "local": false
+    },
+    {
+      "raw": "order_id",
+      "root": "order_id",
+      "chain": [
+        "order_id"
+      ],
+      "context": "call",
+      "line": 16,
+      "enclosing": "d2",
+      "local": true
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "summary",
+      "line": 11,
+      "enclosing": null
+    }
+  ]
+}

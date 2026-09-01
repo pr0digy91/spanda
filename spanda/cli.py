@@ -18,7 +18,7 @@ from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
 from spanda.guide import render as render_guide
 from spanda.modules import (EXTERNAL, ModuleIndex, build_import_graph,
                             cycle_groups, processing_order, resolve_imports)
-from spanda.resolve import (SymbolTable, build_scope, resolve_record)
+from spanda.resolve import SymbolTable, build_scopes, resolve_record
 from spanda.drift import compare
 from spanda.store import Index, IndexError_, db_path, prepare_db_path
 
@@ -643,7 +643,7 @@ def _resolve_collected(collected, module_index, table):
     reference is resolved, since a reference can point at a definition in a
     file read later — but only one pass over the source.
     """
-    scopes = {r["module"]: build_scope(r, table, module_index) for r in collected}
+    scopes = build_scopes(collected, table, module_index)
     references = []
     for record in collected:
         references.extend(resolve_record(record, table, scopes))

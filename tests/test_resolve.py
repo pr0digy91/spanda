@@ -15,7 +15,7 @@ from spanda.extract import plan_scan, stream_records
 from spanda.gaps import load_patterns
 from spanda.modules import ModuleIndex
 from spanda.resolve import (R_BUILTIN, R_EXTERNAL, R_UNKNOWN_TYPE, SymbolTable,
-                            build_scope, resolve_record)
+                            build_scopes, resolve_record)
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "fixtures"
@@ -29,7 +29,7 @@ def resolved():
         index.add(record["file"], record["module"])
         table.add_record(record, patterns)
         records.append(record)
-    scopes = {r["module"]: build_scope(r, table, index) for r in records}
+    scopes = build_scopes(records, table, index)
     references = [ref for r in records for ref in resolve_record(r, table, scopes)]
     return table, references
 
@@ -136,3 +136,52 @@ def test_the_runtime_dispatched_hook_has_no_callers_and_is_flagged(resolved):
     key = "sample_pkg.models._apply_rls_context|function"
     assert key in table.dynamic
     assert not [r for r in references if r.target_symbol == key]
+
+
+# -- re-export chains ------------------------------------------------------
+
+def test_a_name_re_exported_twice_still_resolves(resolved):
+    """`register_node` is defined in registry/impl.py, re-exported by
+    registry/__init__.py, re-exported again by the package root, and used in
+    consumer.py. Four files, three hops.
+
+    A resolver that looks only for names a module *defines*, never for names
+    it imported, loses the trail at the first __init__.py. On a real codebase
+    that made 28 of 31 live handlers report as having no callers — and
+    nothing complained, because the tool was not unsure, it simply never saw
+    the reference.
+    """
+    _table, references = resolved
+    found = edges(references)
+    assert ("sample_pkg.consumer.NODES|variable",
+            "sample_pkg.registry.impl.register_node|function") in found or \
+           any(t == "sample_pkg.registry.impl.register_node|function"
+               and s is None for s, t in found), \
+        "the three-hop re-export did not resolve"
+
+
+def test_the_re_exported_symbol_has_a_caller(resolved):
+    """Stated the way the report states it: something references it."""
+    _table, references = resolved
+    targets = {r.target_symbol for r in references if r.target_symbol}
+    assert "sample_pkg.registry.impl.register_node|function" in targets
+
+
+def test_names_re_exported_through_the_package_root_resolve(resolved):
+    """consumer.py imports Order and format_currency from the package root,
+    which defines neither."""
+    _table, references = resolved
+    from_consumer = {(r.raw, r.target_symbol) for r in references
+                     if r.source_file == "sample_pkg/consumer.py" and r.target_symbol}
+    assert ("format_currency", "sample_pkg.helpers.format_currency|function") in from_consumer
+    assert ("Order.empty", "sample_pkg.models.Order.empty|method") in from_consumer
+
+
+def test_a_submodule_import_is_still_a_module_not_a_re_export(resolved):
+    """`from . import handlers` must keep resolving to the submodule. The fix
+    for re-exports has to not break this: both look like 'the target module
+    does not define this name'."""
+    _table, references = resolved
+    reasons = {r.raw: r.reason for r in references
+               if r.source_file == "sample_pkg/dynamic.py"}
+    assert reasons.get("handlers") == "module_reference"

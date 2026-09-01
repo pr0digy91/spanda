@@ -3,12 +3,13 @@
   "module": "sample_pkg",
   "parse_status": "ok",
   "parse_error": null,
-  "file_hash": "sha256:65b0dbc62764edc39efc49aa91a8bce5",
+  "file_hash": "sha256:9831e020f04f2943377ef344a6514b4d",
   "module_docstring": "Sample package root.\n\nExists to test re-export resolution: names below are importable as\n`sample_pkg.Order` even though they are *defined* in submodules. A resolver\nthat only looks at where a name is imported will point here; a correct one\npoints at the real definition in models.py / helpers.py.",
   "dunder_all": [
     "Order",
     "OrderStatus",
-    "format_currency"
+    "format_currency",
+    "register_node"
   ],
   "imports": [
     {
@@ -44,6 +45,20 @@
       "conditional": false
     },
     {
+      "raw": "from .registry import register_node",
+      "module": ".registry",
+      "names": [
+        {
+          "name": "register_node",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 11,
+      "conditional": false
+    },
+    {
       "raw": "from . import a",
       "module": ".",
       "names": [
@@ -54,7 +69,7 @@
       ],
       "level": 1,
       "is_star": false,
-      "line": 11,
+      "line": 12,
       "conditional": false
     }
   ],
@@ -66,8 +81,8 @@
       "qualname": "__all__",
       "parent": null,
       "lines": [
-        13,
-        13
+        14,
+        14
       ],
       "decorator_lines": null,
       "is_async": false,
@@ -80,7 +95,7 @@
       "docstring": null,
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
-      "content_hash": "sha256:c1b3b27ce6074b1f81853ae3c7b37f6f"
+      "content_hash": "sha256:010ca5bf0d812ce85fab3c5014d0d4f3"
     },
     {
       "local_id": "d2",
@@ -89,8 +104,8 @@
       "qualname": "VERSION",
       "parent": null,
       "lines": [
-        15,
-        15
+        16,
+        16
       ],
       "decorator_lines": null,
       "is_async": false,
@@ -111,19 +126,25 @@
     {
       "kind": "identifier_string",
       "value": "Order",
-      "line": 13,
+      "line": 14,
       "enclosing": null
     },
     {
       "kind": "identifier_string",
       "value": "OrderStatus",
-      "line": 13,
+      "line": 14,
       "enclosing": null
     },
     {
       "kind": "identifier_string",
       "value": "format_currency",
-      "line": 13,
+      "line": 14,
+      "enclosing": null
+    },
+    {
+      "kind": "identifier_string",
+      "value": "register_node",
+      "line": 14,
       "enclosing": null
     }
   ]

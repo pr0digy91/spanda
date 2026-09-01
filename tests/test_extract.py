@@ -20,6 +20,9 @@ GOLDEN = ROOT / "tests" / "golden"
 # From fixtures/README.md, "Expected definition counts".
 EXPECTED_COUNTS = {
     "sample_pkg/__init__.py":  (2, 0, 0, 0, 2),
+    "sample_pkg/consumer.py":  (2, 1, 0, 0, 1),
+    "sample_pkg/registry/__init__.py": (1, 0, 0, 0, 1),
+    "sample_pkg/registry/impl.py":     (1, 1, 0, 0, 0),
     "sample_pkg/a.py":         (3, 2, 0, 0, 1),
     "sample_pkg/b.py":         (1, 1, 0, 0, 0),
     "sample_pkg/base.py":      (4, 0, 1, 2, 1),
@@ -66,10 +69,10 @@ def test_definition_counts_match_answer_key(records, path, expected):
 
 
 def test_totals(records):
-    assert len(records) == 13
-    assert sum(len(r["definitions"]) for r in records.values()) == 49
+    assert len(records) == 16
+    assert sum(len(r["definitions"]) for r in records.values()) == 53
     parsed = [r for r in records.values() if r["parse_status"] == "ok"]
-    assert len(parsed) == 12
+    assert len(parsed) == 15
 
 
 # -- the hard edges --------------------------------------------------------

@@ -1,0 +1,61 @@
+{
+  "file": "sample_pkg/registry/__init__.py",
+  "module": "sample_pkg.registry",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:b9bc1e7eb7c1a4d155a2d3669a22da7e",
+  "module_docstring": "First hop: re-exports a name it does not define.",
+  "dunder_all": [
+    "register_node"
+  ],
+  "imports": [
+    {
+      "raw": "from .impl import register_node",
+      "module": ".impl",
+      "names": [
+        {
+          "name": "register_node",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 3,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "variable",
+      "name": "__all__",
+      "qualname": "__all__",
+      "parent": null,
+      "lines": [
+        5,
+        5
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:7e30c3cec7c0d54a5956e78b2b45d73e"
+    }
+  ],
+  "references": [],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "register_node",
+      "line": 5,
+      "enclosing": null
+    }
+  ]
+}
