@@ -16,6 +16,7 @@ from spanda.extract import (extract_codebase, extract_file, plan_scan,
                             stream_records)
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
 from spanda.guide import render as render_guide
+from spanda.profile import build as build_profile, render as render_profile
 from spanda.modules import (EXTERNAL, ModuleIndex, build_import_graph,
                             cycle_groups, processing_order, resolve_imports)
 from spanda.resolve import SymbolTable, build_scopes, resolve_record
@@ -914,6 +915,20 @@ def cmd_callers(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_profile(args: argparse.Namespace) -> int:
+    root = Path(args.path).resolve()
+    target = resolve_db(args)
+    if target is None:
+        print(f"no index yet at {db_path(root)} — run `spanda index` first",
+              file=sys.stderr)
+        return 1
+    with Index(target) as index:
+        profile = build_profile(index, include_tests=args.include_tests,
+                                min_files=args.min_files)
+    print(render_profile(profile, root.name))
+    return 0
+
+
 def cmd_guide(args: argparse.Namespace) -> int:
     root = Path(args.path).resolve()
     target = resolve_db(args)
@@ -989,6 +1004,16 @@ def main(argv: list[str] | None = None) -> int:
     resolve_cmd.add_argument("--reasons", type=int, default=0, metavar="N",
                              help="show N examples of each unresolved reason")
     resolve_cmd.set_defaults(func=cmd_resolve)
+
+    profile_cmd = subparsers.add_parser(
+        "profile", help="what the code keeps doing: reuse, naming, annotations, churn")
+    profile_cmd.add_argument("path", help="root of the indexed codebase")
+    profile_cmd.add_argument("--include-tests", action="store_true",
+                             help="count symbols under tests/ as well")
+    profile_cmd.add_argument("--min-files", type=int, default=3, metavar="N",
+                             help="report a name as reused when defined in N+ files (default 3)")
+    profile_cmd.add_argument("--db", default=None, help="pin a specific index file")
+    profile_cmd.set_defaults(func=cmd_profile)
 
     guide_cmd = subparsers.add_parser(
         "guide", help="a note on reading this index, with its own numbers filled in")

@@ -196,6 +196,14 @@ not an incremental one; only `backfill` re-reads just what git says changed.
 A full pass is a few seconds on a thousand files, quick enough to run before
 asking the index anything.
 
+## What the code keeps doing
+
+`spanda profile {{repo}}` reads this index for repetition rather than gaps:
+the same name defined separately in many files (and whether those are
+verbatim copies), how parameters are named and annotated, docstring
+coverage, decorators, and which symbols' shapes never settle. Descriptive
+only — it says what the corpus does, not whether that is good.
+
 ## What it will not tell you
 
 - **What a function does.** No semantics, no types, no data flow.

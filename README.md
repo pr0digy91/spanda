@@ -20,7 +20,8 @@ M5/M6 complete: reference resolution, edges, and `spanda callers`.
 M7 complete: incremental re-index — 425 commits in 52 seconds, not 12 minutes.
 M8 complete: drift over reference edges and circular-import groups.
 
-All eight planned milestones built.
+All eight planned milestones built, plus `gaps` and `profile`, which were not
+in the original plan.
 
 ## Use
 
@@ -55,6 +56,11 @@ python3.14 -m venv .venv && .venv/bin/pip install -q pytest
 .venv/bin/python -m spanda.cli index <path>
 .venv/bin/python -m spanda.cli scans <path>
 .venv/bin/python -m spanda.cli find <path> "Order*"
+
+# What the code keeps doing: names re-implemented across files (and whether
+# they are verbatim copies), parameter naming and annotation rates, docstrings,
+# decorators, and which symbols never settle
+.venv/bin/python -m spanda.cli profile <path>
 
 # A note on reading the index, with that index's own numbers in it
 .venv/bin/python -m spanda.cli guide <path> --write
