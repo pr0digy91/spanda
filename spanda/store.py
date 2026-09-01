@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import platform
 import sqlite3
 import subprocess
 import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -33,6 +34,10 @@ CREATE TABLE IF NOT EXISTS scans (
     scan_id             INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp           TEXT    NOT NULL,
     root_path           TEXT    NOT NULL,
+    -- Which interpreter read the code. A file that failed to parse because
+    -- the interpreter predates its syntax is a different problem from a file
+    -- with a real syntax error, and this is the only way to tell them apart.
+    python_version      TEXT,
     -- Set only when the working tree is clean. A dirty tree is NOT the commit
     -- it sits on: recording the hash anyway would let a scan of uncommitted
     -- work masquerade as a scan of that commit, and any later comparison
@@ -386,12 +391,13 @@ class Index:
             raise
         self._open_scan = None
         cursor = self.connection.execute(
-            "INSERT INTO scans (timestamp, root_path, git_commit_hash,"
-            " git_base_commit, git_dirty, skipped_files)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO scans (timestamp, root_path, python_version,"
+            " git_commit_hash, git_base_commit, git_dirty, skipped_files)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
             (timestamp_override
              or datetime.now(timezone.utc).isoformat(timespec="seconds"),
              str(Path(record_root or root).resolve()),
+             platform.python_version(),
              # A dirty tree is not the commit it sits on.
              None if dirty else commit,
              commit,

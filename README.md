@@ -19,7 +19,9 @@ Next: evaluate whether the drift reports change a decision worth making.
 
 ## Use
 
-Zero dependencies. Any Python 3.11+.
+Zero dependencies. Needs Python 3.9+, but run it on the newest
+interpreter you have: a parser cannot read syntax newer than itself, and
+the output is identical across versions.
 
 ```sh
 # What is defined in this codebase, file by file

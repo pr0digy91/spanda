@@ -77,8 +77,12 @@ def test_totals(records):
 def test_syntax_error_is_recorded_not_fatal(records):
     broken = records["sample_pkg/broken.py"]
     assert broken["parse_status"] == "syntax_error"
-    assert broken["parse_error"]["line"] == 10
     assert broken["definitions"] == []
+    # The message and the line it blames both vary by interpreter version —
+    # 3.9 says "invalid syntax" at line 10, 3.14 says "'(' was never closed"
+    # at line 9. What must hold is that the failure is recorded and located.
+    assert broken["parse_error"]["message"]
+    assert broken["parse_error"]["line"] in (9, 10)
 
 
 def test_exactly_six_decorated_definitions(records):
@@ -183,11 +187,25 @@ def test_locals_are_resolved_in_stage_one(records):
 
 # -- golden files ----------------------------------------------------------
 
+def _comparable(record: dict) -> dict:
+    """Everything a golden file should pin, minus what the interpreter chooses.
+
+    Syntax error wording and the line it blames differ between Python
+    versions. Every definition, signature and hash does not — verified
+    identical between 3.9 and 3.14 — so those are what the goldens hold.
+    """
+    stripped = dict(record)
+    if stripped.get("parse_error"):
+        stripped["parse_error"] = {"recorded": True}
+    return stripped
+
+
 def test_output_matches_golden(records):
     for path, record in records.items():
         golden_path = GOLDEN / (path + ".json")
         assert golden_path.exists(), f"missing golden file for {path}"
-        assert record == json.loads(golden_path.read_text()), (
+        expected = json.loads(golden_path.read_text())
+        assert _comparable(record) == _comparable(expected), (
             f"{path} differs from its frozen output. If the change is intended, "
             f"regenerate with: python -m spanda.cli parse fixtures --out tests/golden")
 

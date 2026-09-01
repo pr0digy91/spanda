@@ -34,7 +34,7 @@ Both are deliberate.
 | `nested.py` | 8 | 4 | 2 | 1 | 1 |
 | `recursion.py` | 3 | 3 | 0 | 0 | 0 |
 | `star.py` | 1 | 1 | 0 | 0 | 0 |
-| `broken.py` | — | unparseable, `SyntaxError` at line 10 |
+| `broken.py` | — | unparseable; the reported line and wording vary by interpreter |
 | **Total** | **49** | 21 | 6 | 10 | 12 |
 
 13 files: 12 parse, 1 does not.
@@ -85,7 +85,12 @@ positional-only, `*sections` as varargs, `locale` as keyword-only with default
 `handlers.py` that nothing references.
 
 **Unparseable file.** `broken.py` recorded with `parse_status: "syntax_error"`,
-line 10, and zero definitions. The run completes.
+a message, a line, and zero definitions. The run completes.
+
+The message and line are the interpreter's, and differ between versions —
+3.9 reports "invalid syntax" at line 10, 3.14 "\'(\' was never closed" at line
+9. Everything else in this answer key is identical across both, hashes
+included, which is what makes an index portable between them.
 
 ## The three symbols that make or break this project
 

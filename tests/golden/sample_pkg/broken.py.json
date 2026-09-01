@@ -3,8 +3,8 @@
   "module": "sample_pkg.broken",
   "parse_status": "syntax_error",
   "parse_error": {
-    "message": "invalid syntax",
-    "line": 10
+    "message": "'(' was never closed",
+    "line": 9
   },
   "file_hash": "sha256:36d1458c54c6d0c3f99be97f6d86c9bf",
   "module_docstring": null,

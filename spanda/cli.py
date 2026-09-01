@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import subprocess
 import sys
 import tempfile
@@ -74,6 +75,12 @@ def _summarise(scan) -> None:
     print(f"\n{len(records)} files parsed, {len(unparseable)} unparseable")
     for name, line, message in unparseable:
         print(f"  ! {name}:{line}  {message}")
+    if unparseable:
+        # An interpreter older than the code it is reading rejects valid
+        # syntax. Naming it turns a baffling failure into an obvious one.
+        print(f"    (read by Python {platform.python_version()} — a file using "
+              f"newer syntax than this\n     will fail here even though it is "
+              f"valid; run spanda on a newer Python)")
 
     # A skipped file is a gap in what this tool knows. Say so out loud.
     if scan.skipped:
