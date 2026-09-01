@@ -132,10 +132,10 @@ def _caveats(index, a, b) -> list[str]:
     for scan in (a, b):
         if scan["unparseable_files"]:
             unreadable = index.connection.execute(
-                "SELECT file_path, parse_error_line FROM files"
-                " WHERE scan_id = ? AND parse_status != 'ok' ORDER BY file_path",
+                "SELECT file_path, line FROM scan_problems"
+                " WHERE scan_id = ? ORDER BY file_path",
                 (scan["scan_id"],)).fetchall()
-            listed = ", ".join(f"{r['file_path']}:{r['parse_error_line']}"
+            listed = ", ".join(f"{r['file_path']}:{r['line']}"
                                for r in unreadable[:3])
             more = f" and {len(unreadable) - 3} more" if len(unreadable) > 3 else ""
             notes.append(

@@ -21,7 +21,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -57,15 +57,39 @@ CREATE TABLE IF NOT EXISTS scans (
     completed           INTEGER NOT NULL DEFAULT 0
 );
 
+-- One row per file, not per file per scan. Storing the full listing every
+-- scan cost 292,020 rows for 1,097 files across 425 scans — an unchanged
+-- listing re-recorded 425 times. Symbols were already deduped this way; this
+-- brings files into line, and takes the index from 80 MB to a fraction of it.
 CREATE TABLE IF NOT EXISTS files (
-    scan_id             INTEGER NOT NULL,
-    file_path           TEXT    NOT NULL,
+    file_path           TEXT    PRIMARY KEY,
     module              TEXT,
     file_hash           TEXT,
     parse_status        TEXT    NOT NULL,
     parse_error_line    INTEGER,
     parse_error_message TEXT,
     symbol_count        INTEGER DEFAULT 0,
+    first_seen_scan_id  INTEGER NOT NULL,
+    last_seen_scan_id   INTEGER NOT NULL
+);
+
+-- Written only when a file's content or parse status actually changes.
+CREATE TABLE IF NOT EXISTS file_versions (
+    file_path    TEXT    NOT NULL,
+    scan_id      INTEGER NOT NULL,
+    file_hash    TEXT,
+    parse_status TEXT,
+    symbol_count INTEGER,
+    PRIMARY KEY (file_path, scan_id)
+);
+
+-- Files a scan could not read. Rare, and needed exactly as they were at that
+-- scan, so these are recorded per scan rather than deduped.
+CREATE TABLE IF NOT EXISTS scan_problems (
+    scan_id   INTEGER NOT NULL,
+    file_path TEXT    NOT NULL,
+    line      INTEGER,
+    message   TEXT,
     PRIMARY KEY (scan_id, file_path)
 );
 
@@ -123,6 +147,7 @@ CREATE TABLE IF NOT EXISTS symbol_spans (
 );
 
 CREATE INDEX IF NOT EXISTS idx_spans_range ON symbol_spans (from_scan, to_scan);
+CREATE INDEX IF NOT EXISTS idx_file_versions_scan ON file_versions (scan_id);
 CREATE INDEX IF NOT EXISTS idx_versions_scan ON symbol_versions (scan_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols (file_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols (name);
@@ -295,6 +320,7 @@ class Index:
         self.connection = sqlite3.connect(self.path, isolation_level=None, timeout=15)
         self.connection.row_factory = sqlite3.Row
         self._open_scan: int | None = None
+        self._tally: dict | None = None
 
         if fresh:
             self.connection.executescript(SCHEMA)
@@ -404,6 +430,11 @@ class Index:
              None if dirty is None else int(dirty),
              skipped_files))
         self._open_scan = cursor.lastrowid
+        # Accumulated as files stream past, rather than read back afterwards.
+        # The fingerprint depends on every file in the scan, which is exactly
+        # what deduped storage no longer holds per scan.
+        self._tally = {"digest": hashlib.sha256(), "files": 0, "parsed": 0,
+                       "unparseable": 0, "symbols": 0}
         return self._open_scan
 
     def abort_scan(self) -> None:
@@ -412,32 +443,23 @@ class Index:
         self._open_scan = None
 
     def finish_scan(self, scan_id: int) -> dict:
-        totals = self.connection.execute(
-            "SELECT COUNT(*) AS files,"
-            "       SUM(parse_status = 'ok') AS parsed,"
-            "       SUM(parse_status != 'ok') AS unparseable,"
-            "       COALESCE(SUM(symbol_count), 0) AS symbols"
-            " FROM files WHERE scan_id = ?", (scan_id,)).fetchone()
+        tally = self._tally or {"digest": hashlib.sha256(), "files": 0,
+                                "parsed": 0, "unparseable": 0, "symbols": 0}
         ambiguous = self.connection.execute(
             "SELECT COUNT(*) FROM symbols"
             " WHERE last_seen_scan_id = ? AND definition_count > 1",
             (scan_id,)).fetchone()[0]
 
-        digest = hashlib.sha256()
-        for row in self.connection.execute(
-                "SELECT file_path, file_hash FROM files WHERE scan_id = ?"
-                " ORDER BY file_path", (scan_id,)):
-            digest.update(f"{row['file_path']}:{row['file_hash']}\n".encode())
-
         self.connection.execute(
             "UPDATE scans SET total_files = ?, parsed_files = ?,"
             " unparseable_files = ?, total_symbols = ?, ambiguous_symbols = ?,"
             " content_fingerprint = ?, completed = 1 WHERE scan_id = ?",
-            (totals["files"], totals["parsed"] or 0, totals["unparseable"] or 0,
-             totals["symbols"], ambiguous, "sha256:" + digest.hexdigest()[:32],
-             scan_id))
+            (tally["files"], tally["parsed"], tally["unparseable"],
+             tally["symbols"], ambiguous,
+             "sha256:" + tally["digest"].hexdigest()[:32], scan_id))
         self.connection.execute("COMMIT")
         self._open_scan = None
+        self._tally = None
         return dict(self.scan(scan_id))
 
     def scan(self, scan_id: int) -> sqlite3.Row:
@@ -473,14 +495,51 @@ class Index:
 
         definitions = merge_duplicate_definitions(record["definitions"])
         error = record.get("parse_error") or {}
+        path, status = record["file"], record["parse_status"]
 
-        self.connection.execute(
-            "INSERT OR REPLACE INTO files (scan_id, file_path, module, file_hash,"
-            " parse_status, parse_error_line, parse_error_message, symbol_count)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (scan_id, record["file"], record["module"], record["file_hash"],
-             record["parse_status"], error.get("line"), error.get("message"),
-             len(definitions)))
+        if self._tally is not None:
+            self._tally["files"] += 1
+            self._tally["parsed"] += status == "ok"
+            self._tally["unparseable"] += status != "ok"
+            self._tally["symbols"] += len(definitions)
+            self._tally["digest"].update(
+                f"{path}:{record['file_hash']}\n".encode())
+
+        known = self.connection.execute(
+            "SELECT file_hash, parse_status FROM files WHERE file_path = ?",
+            (path,)).fetchone()
+        if known is None:
+            self.connection.execute(
+                "INSERT INTO files (file_path, module, file_hash, parse_status,"
+                " parse_error_line, parse_error_message, symbol_count,"
+                " first_seen_scan_id, last_seen_scan_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (path, record["module"], record["file_hash"], status,
+                 error.get("line"), error.get("message"), len(definitions),
+                 scan_id, scan_id))
+            file_changed = True
+        else:
+            file_changed = (known["file_hash"] != record["file_hash"]
+                            or known["parse_status"] != status)
+            self.connection.execute(
+                "UPDATE files SET module = ?, file_hash = ?, parse_status = ?,"
+                " parse_error_line = ?, parse_error_message = ?,"
+                " symbol_count = ?, last_seen_scan_id = ? WHERE file_path = ?",
+                (record["module"], record["file_hash"], status,
+                 error.get("line"), error.get("message"), len(definitions),
+                 scan_id, path))
+
+        if file_changed:
+            self.connection.execute(
+                "INSERT OR REPLACE INTO file_versions (file_path, scan_id,"
+                " file_hash, parse_status, symbol_count) VALUES (?, ?, ?, ?, ?)",
+                (path, scan_id, record["file_hash"], status, len(definitions)))
+
+        if status != "ok":
+            self.connection.execute(
+                "INSERT OR REPLACE INTO scan_problems (scan_id, file_path, line,"
+                " message) VALUES (?, ?, ?, ?)",
+                (scan_id, path, error.get("line"), error.get("message")))
 
         for definition in definitions:
             key = symbol_key(record["file"], definition["qualname"], definition["kind"])

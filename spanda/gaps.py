@@ -99,9 +99,16 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
     #    This stays a heuristic and is labelled as one: a name match is not a
     #    call, and it must never be turned into an edge.
     referenced = referenced_names(scan)
+    # Only things that can be *called*. A string matching a variable name is
+    # not a hidden call site: a Pydantic field named `to`, or a dict key
+    # spelling a model attribute, has no callers to be unable to find. On
+    # the target codebase that distinction removes 451 findings of pure noise, all of
+    # them class attributes, without losing a single real one.
     defined: dict[str, list[str]] = defaultdict(list)
     for record in scan.records:
         for definition in record["definitions"]:
+            if definition["kind"] not in ("function", "method", "class"):
+                continue
             defined[definition["name"]].append(
                 f"{record['file']}:{definition['lines'][0]}")
 

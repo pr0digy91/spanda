@@ -216,11 +216,50 @@ def test_unparseable_file_is_recorded_in_the_index(workspace):
     with Index(db) as index:
         row = index.connection.execute(
             "SELECT * FROM files WHERE file_path LIKE '%broken.py'").fetchone()
+        problem = index.connection.execute(
+            "SELECT * FROM scan_problems WHERE scan_id = 1").fetchone()
         scan = index.scan(1)
     assert row["parse_status"] == "syntax_error"
-    assert row["parse_error_line"] in (9, 10)  # varies by interpreter version
+    assert problem["line"] in (9, 10)  # varies by interpreter version
     assert scan["unparseable_files"] == 1
     assert scan["completed"] == 1
+
+
+def test_unchanged_files_do_not_write_a_row_every_scan(tmp_path):
+    """Storing the full file listing per scan cost 292,020 rows for 1,097
+    files across 425 scans. Only changes are recorded now."""
+    source = tmp_path / "code"
+    fresh_copy(source)
+    db = prepare_db_path(source)
+    index_once(db, source)
+    index_once(db, source)
+    index_once(db, source)
+
+    with Index(db) as index:
+        files = index.connection.execute("SELECT COUNT(*) c FROM files").fetchone()["c"]
+        versions = index.connection.execute(
+            "SELECT COUNT(*) c FROM file_versions").fetchone()["c"]
+        later = index.connection.execute(
+            "SELECT COUNT(*) c FROM file_versions WHERE scan_id > 1").fetchone()["c"]
+
+    assert files == 13, "one row per file, not per file per scan"
+    assert versions == 13, "every file recorded once, at the scan that found it"
+    assert later == 0, "three scans of unchanged code add nothing"
+
+
+def test_a_changed_file_writes_one_new_version(tmp_path):
+    source = tmp_path / "code"
+    fresh_copy(source)
+    db = prepare_db_path(source)
+    index_once(db, source)
+    helpers = source / "sample_pkg" / "helpers.py"
+    helpers.write_text(helpers.read_text() + "\n\ndef added():\n    return 1\n")
+    index_once(db, source)
+
+    with Index(db) as index:
+        changed = index.connection.execute(
+            "SELECT file_path FROM file_versions WHERE scan_id = 2").fetchall()
+    assert [r["file_path"] for r in changed] == ["sample_pkg/helpers.py"]
 
 
 # -- where the index lives -------------------------------------------------
