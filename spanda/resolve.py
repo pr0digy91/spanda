@@ -17,7 +17,7 @@ import builtins
 from dataclasses import dataclass, field
 
 from spanda.modules import EXTERNAL, ModuleIndex, resolve_imports
-from spanda.store import path_module, symbol_key
+from spanda.store import symbol_key
 
 BUILTIN_NAMES = frozenset(dir(builtins))
 
@@ -42,6 +42,26 @@ class Target:
     symbol: str | None = None
     module: str | None = None
     via_star: bool = False
+
+
+@dataclass(frozen=True)
+class LostTrail:
+    """A name the code imports from this codebase whose definition the
+    resolver could not find.
+
+    An import is proof of intent: someone wanted this symbol. Failing to place
+    it is not an unused import, it is the resolver losing the trail — and
+    unlike an ordinary unresolved reference, nothing downstream would flag
+    it, because no reference is ever produced. Counted per run so a
+    systematic blindness shows up as a number rather than as symbols that
+    quietly look dead.
+    """
+
+    source_file: str
+    line: int
+    raw: str
+    target_module: str
+    name: str
 
 
 @dataclass
@@ -109,7 +129,7 @@ class SymbolTable:
         _kind, file_path, _qualname = self.symbols.get(class_key, (None, None, None))
         if file_path is None or scopes is None:
             return None
-        scope = scopes.get(path_module(file_path), {})
+        scope = scopes.get(file_path, {})
         for base in self.class_bases.get(class_key, []):
             root = base.partition("(")[0].partition("[")[0].strip()
             target = scope.get(root.rpartition(".")[2] if "." in root else root)
@@ -143,7 +163,7 @@ def build_scope(record: dict, table: SymbolTable, index: ModuleIndex
 
         if edge.is_star:
             if target_module is not None:
-                pending.append(("star", None, target_module, None))
+                pending.append(("star", None, target_module, None, edge))
             continue
 
         for name, alias in edge.names:
@@ -171,7 +191,7 @@ def build_scope(record: dict, table: SymbolTable, index: ModuleIndex
                 # import surface — and not following it makes every symbol
                 # behind one look uncalled.
                 scope[local] = Target("module", module=target_module)
-                pending.append(("name", local, target_module, name))
+                pending.append(("name", local, target_module, name, edge))
     return scope, pending
 
 
@@ -182,7 +202,7 @@ REEXPORT_PASSES = 6
 
 
 def build_scopes(collected, table: SymbolTable, index: ModuleIndex
-                 ) -> dict[str, dict[str, Target]]:
+                 ) -> tuple[dict[str, dict[str, Target]], list[LostTrail]]:
     """Build every module's scope, then chase re-exports to a fixed point.
 
     A single pass cannot do this: `from flow_nodes import handle_x` can only
@@ -190,19 +210,23 @@ def build_scopes(collected, table: SymbolTable, index: ModuleIndex
     itself depend on a module not yet built. Iterating until nothing changes
     handles chains of any length, and circular imports, without recursion.
     """
+    # Keyed by file path, never by module name. Twenty-six conftest.py files
+    # in test directories without __init__.py all share the module name
+    # "conftest"; keyed by name they overwrite each other, and every one of
+    # them then resolves against whichever scope happened to be built last.
     scopes: dict[str, dict[str, Target]] = {}
     pending: dict[str, list[tuple]] = {}
     for record in collected:
         scope, unfinished = build_scope(record, table, index)
-        scopes[record["module"]] = scope
-        pending[record["module"]] = unfinished
+        scopes[record["file"]] = scope
+        pending[record["file"]] = unfinished
 
     for _ in range(REEXPORT_PASSES):
         progressed = False
-        for module, items in pending.items():
+        for file_path, items in pending.items():
             remaining = []
-            for kind, local, target_module, name in items:
-                source = scopes.get(target_module, {})
+            for kind, local, target_module, name, edge in items:
+                source = scopes.get(index.file_for(target_module) or "", {})
                 if kind == "star":
                     exported = table.exports.get(target_module)
                     names = (exported if exported is not None
@@ -210,22 +234,62 @@ def build_scopes(collected, table: SymbolTable, index: ModuleIndex
                     for exported_name in names:
                         found = source.get(exported_name)
                         if found is not None and found.kind == "symbol" \
-                                and exported_name not in scopes[module]:
-                            scopes[module][exported_name] = Target(
+                                and exported_name not in scopes[file_path]:
+                            scopes[file_path][exported_name] = Target(
                                 "symbol", symbol=found.symbol, via_star=True)
                             progressed = True
-                    remaining.append((kind, local, target_module, name))
+                    remaining.append((kind, local, target_module, name, edge))
                     continue
                 found = source.get(name)
-                if found is not None and found.kind == "symbol":
-                    scopes[module][local] = found
+                # A re-export of something in this codebase is followed to
+                # it; a re-export of an external name is external here too.
+                # Both are answers. Only "still a module" is unfinished.
+                if found is not None and found.kind in ("symbol", "external"):
+                    scopes[file_path][local] = found
                     progressed = True
                 else:
-                    remaining.append((kind, local, target_module, name))
-            pending[module] = remaining
+                    remaining.append((kind, local, target_module, name, edge))
+            pending[file_path] = remaining
         if not progressed:
             break
-    return scopes
+
+    return scopes, audit_lost_trails(collected, scopes, table, index)
+
+
+def audit_lost_trails(collected, scopes: dict[str, dict[str, Target]],
+                      table: SymbolTable, index: ModuleIndex) -> list[LostTrail]:
+    """Check the finished scopes against what the code imported.
+
+    Deliberately independent of how the scopes were built. A first version
+    read the scope-builder's own unfinished-work list, and so inherited its
+    blind spots: the branch that caused the original re-export bug skipped
+    that list entirely, and the audit stayed silent on the exact failure it
+    existed to catch. This version asks only the question that matters —
+    for every `from X import name` where X is in this codebase and `X.name`
+    is not itself a module, did `name` end up as something real?
+    """
+    lost: list[LostTrail] = []
+    for record in collected:
+        scope = scopes.get(record["file"], {})
+        for edge in resolve_imports(record, index):
+            if edge.is_star or edge.target_file is None:
+                continue
+            target_module = index.by_file.get(edge.target_file)
+            if target_module is None:
+                continue
+            for name, alias in edge.names:
+                # `from . import db` names a module, and that is its answer.
+                joined = f"{target_module}.{name}" if target_module else name
+                if index.file_for(joined) is not None or target_module == name \
+                        or target_module.endswith("." + name):
+                    continue
+                local = alias or name
+                final = scope.get(local)
+                if final is None or final.kind == "module":
+                    lost.append(LostTrail(
+                        source_file=edge.source_file, line=edge.line,
+                        raw=edge.raw, target_module=target_module, name=name))
+    return lost
 
 
 def _annotation_name(annotation: str) -> str | None:
@@ -298,7 +362,7 @@ def _edge_type(context: str) -> str:
 def resolve_record(record: dict, table: SymbolTable,
                    scopes: dict[str, dict[str, Target]]) -> list[Reference]:
     """Resolve every reference in one file against the whole-codebase table."""
-    scope = scopes.get(record["module"], {})
+    scope = scopes.get(record["file"], {})
     enclosing_class: dict[str, str] = {}
     owner: dict[str, str] = {}
 

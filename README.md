@@ -61,7 +61,8 @@ python3.14 -m venv .venv && .venv/bin/pip install -q pytest
 # What calls this symbol, and what might but cannot be proven to
 .venv/bin/python -m spanda.cli callers <path> create_goods_receipt
 
-# Link every reference to a definition, with reasons for the ones that fail
+# Link every reference to a definition, with reasons for the ones that fail.
+# Ends with a self-audit: imports the resolver could not place. Expect zero.
 .venv/bin/python -m spanda.cli resolve <path> --reasons 3
 
 # Which file does each import point at, and what imports circularly

@@ -73,7 +73,9 @@ def module_name_for(path: Path, root: Path) -> str:
     parts.reverse()
     if stem != "__init__":
         parts.append(stem)
-    return ".".join(parts) if parts else stem
+    # A bare __init__.py at the scan root is the root package itself, whose
+    # name is the empty string — not a module called "__init__".
+    return ".".join(parts)
 
 
 # --------------------------------------------------------------------------

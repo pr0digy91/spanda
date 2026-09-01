@@ -21,7 +21,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -54,6 +54,11 @@ CREATE TABLE IF NOT EXISTS scans (
     skipped_files       INTEGER DEFAULT 0,
     total_symbols       INTEGER DEFAULT 0,
     ambiguous_symbols   INTEGER DEFAULT 0,
+    -- The resolver's self-audit: imported names whose definition it could
+    -- not find. Expected to be zero. Stored per scan so a rise between two
+    -- commits is itself a drift signal — someone added a pattern the tool
+    -- cannot follow.
+    lost_trails         INTEGER DEFAULT 0,
     completed           INTEGER NOT NULL DEFAULT 0
 );
 
@@ -176,6 +181,16 @@ CREATE TABLE IF NOT EXISTS unresolved_refs (
     attr_name          TEXT,
     line               INTEGER,
     reason             TEXT    NOT NULL
+);
+
+-- The trails themselves, for the current scan, so the cause can be found.
+CREATE TABLE IF NOT EXISTS lost_trails (
+    scan_id       INTEGER NOT NULL,
+    source_file   TEXT    NOT NULL,
+    line          INTEGER,
+    raw           TEXT,
+    target_module TEXT,
+    name          TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_edges_target ON edges (target_symbol_uuid);
@@ -775,6 +790,18 @@ class Index:
                      reference.line, reference.reason))
                 counts["unresolved"] += 1
         return counts
+
+    def record_lost_trails(self, scan_id: int, lost) -> None:
+        self.connection.execute(
+            "DELETE FROM lost_trails WHERE scan_id != ?", (scan_id,))
+        self.connection.executemany(
+            "INSERT INTO lost_trails (scan_id, source_file, line, raw,"
+            " target_module, name) VALUES (?, ?, ?, ?, ?, ?)",
+            [(scan_id, t.source_file, t.line, t.raw, t.target_module, t.name)
+             for t in lost])
+        self.connection.execute(
+            "UPDATE scans SET lost_trails = ? WHERE scan_id = ?",
+            (len(lost), scan_id))
 
     def symbol_uuids_by_key(self) -> dict[str, str]:
         return {r["symbol_key"]: r["uuid"] for r in

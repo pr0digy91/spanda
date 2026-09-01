@@ -29,7 +29,7 @@ def resolved():
         index.add(record["file"], record["module"])
         table.add_record(record, patterns)
         records.append(record)
-    scopes = build_scopes(records, table, index)
+    scopes, _lost = build_scopes(records, table, index)
     references = [ref for r in records for ref in resolve_record(r, table, scopes)]
     return table, references
 
@@ -247,3 +247,131 @@ def test_a_generic_annotation_is_not_guessed_at():
     assert _annotation_name("list[PaymentMethod]") is None
     assert _annotation_name("Dict[str, Any]") is None
     assert _annotation_name("int | str") is None
+
+
+# -- the self-audit --------------------------------------------------------
+
+def test_a_clean_fixture_loses_no_trails(resolved):
+    """Zero is the expected reading. The fixture imports through re-export
+    chains three deep and every one must be traced."""
+    from spanda.extract import plan_scan, stream_records
+    from spanda.modules import ModuleIndex
+    plan, patterns = plan_scan(FIXTURES), load_patterns()
+    index, table, records = ModuleIndex(), SymbolTable(), []
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        records.append(record)
+    _scopes, lost = build_scopes(records, table, index)
+    assert lost == []
+
+
+def test_an_import_the_resolver_cannot_place_is_counted_not_dropped(tmp_path):
+    """`from pkg import thing` where pkg neither defines nor imports `thing`.
+
+    Nothing downstream would ever flag this: no reference is produced, so no
+    reason code is attached. The audit is the only thing that says it.
+    """
+    from spanda.extract import plan_scan, stream_records
+    from spanda.modules import ModuleIndex
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text("VERSION = 1\n")
+    (tmp_path / "user.py").write_text(
+        "from pkg import thing\n\n\ndef go():\n    return thing()\n")
+    plan, patterns = plan_scan(tmp_path), load_patterns()
+    index, table, records = ModuleIndex(), SymbolTable(), []
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        records.append(record)
+    _scopes, lost = build_scopes(records, table, index)
+    assert len(lost) == 1
+    assert lost[0].name == "thing"
+    assert lost[0].source_file == "user.py"
+    assert lost[0].target_module == "pkg"
+
+
+def test_a_re_exported_external_name_is_not_a_lost_trail(tmp_path):
+    """orm/base.py does `from sqlalchemy import UUID as PGUUID`; every model
+    then does `from .base import PGUUID`. The trail is not lost — it leads
+    outside the codebase, and the audit must say external, not missing."""
+    from spanda.extract import plan_scan, stream_records
+    from spanda.modules import ModuleIndex
+    (tmp_path / "orm").mkdir()
+    (tmp_path / "orm" / "__init__.py").write_text("")
+    (tmp_path / "orm" / "base.py").write_text(
+        "from sqlalchemy.dialects.postgresql import UUID as PGUUID\n")
+    (tmp_path / "orm" / "user.py").write_text(
+        "from .base import PGUUID\n\nclass User:\n    id = PGUUID\n")
+    plan, patterns = plan_scan(tmp_path), load_patterns()
+    index, table, records = ModuleIndex(), SymbolTable(), []
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        records.append(record)
+    scopes, lost = build_scopes(records, table, index)
+    assert lost == []
+    assert scopes["orm/user.py"]["PGUUID"].kind == "external"  # keyed by file
+
+
+def test_the_audit_does_not_share_the_scope_builders_blind_spots(monkeypatch):
+    """Reintroduce the original re-export bug and the audit must fire.
+
+    The first audit read the scope builder's own unfinished-work list and
+    inherited its blindness — the buggy branch skipped that list, so the
+    audit stayed silent on the exact failure it was built for.
+    """
+    import spanda.resolve as resolve_module
+    from spanda.extract import plan_scan, stream_records
+    from spanda.modules import ModuleIndex
+
+    original = resolve_module.build_scope
+
+    def buggy_build_scope(record, table, index):
+        scope, pending = original(record, table, index)
+        # The bug: names imported from a package that only re-exports them
+        # are left as module targets and never chased.
+        for kind, local, target_module, name, edge in list(pending):
+            if kind == "name":
+                scope[local] = resolve_module.Target("module", module=target_module)
+        return scope, [p for p in pending if p[0] != "name"]
+
+    monkeypatch.setattr(resolve_module, "build_scope", buggy_build_scope)
+    plan, patterns = plan_scan(FIXTURES), load_patterns()
+    index, table, records = ModuleIndex(), SymbolTable(), []
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        records.append(record)
+    _scopes, lost = resolve_module.build_scopes(records, table, index)
+    assert {t.name for t in lost} >= {"register_node", "Order", "format_currency"}
+
+
+def test_files_sharing_a_module_name_get_their_own_scopes(tmp_path):
+    """Two conftest.py files in test directories without __init__.py both have
+    the module name "conftest". Keyed by name, one scope overwrites the
+    other and both files resolve against whichever was built last."""
+    from spanda.extract import plan_scan, stream_records
+    from spanda.modules import ModuleIndex
+    (tmp_path / "lib").mkdir()
+    (tmp_path / "lib" / "__init__.py").write_text("")
+    (tmp_path / "lib" / "alpha.py").write_text("def a():\n    return 1\n")
+    (tmp_path / "lib" / "beta.py").write_text("def b():\n    return 2\n")
+    for sub, mod, fn in (("t1", "alpha", "a"), ("t2", "beta", "b")):
+        (tmp_path / sub).mkdir()
+        (tmp_path / sub / "conftest.py").write_text(
+            f"from lib.{mod} import {fn}\n\n\ndef use():\n    return {fn}()\n")
+    plan, patterns = plan_scan(tmp_path), load_patterns()
+    index, table, records = ModuleIndex(), SymbolTable(), []
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        records.append(record)
+    assert [r["module"] for r in records if r["file"].endswith("conftest.py")] == ["conftest", "conftest"]
+    scopes, lost = build_scopes(records, table, index)
+    assert lost == []
+    calls = {(r.source_file, r.target_symbol) for r in
+             (ref for rec in records for ref in resolve_record(rec, table, scopes))
+             if r.edge_type == "calls" and r.target_symbol}
+    assert ("t1/conftest.py", "lib.alpha.a|function") in calls
+    assert ("t2/conftest.py", "lib.beta.b|function") in calls

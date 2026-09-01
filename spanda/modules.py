@@ -89,7 +89,9 @@ def absolute_module(importing_module: str, is_package: bool,
         return None
     if module:
         return f"{base}.{module}" if base else module
-    return base or None
+    # "" is a real answer: the root package itself, when the scan root has
+    # its own __init__.py and something in it writes `from . import x`.
+    return base
 
 
 def resolve_imports(record: dict, index: ModuleIndex) -> list[ImportEdge]:
@@ -128,11 +130,12 @@ def resolve_imports(record: dict, index: ModuleIndex) -> list[ImportEdge]:
         # loses it in exactly the place the dependency order matters most.
         submodules = [(n, a) for n, a in names
                       if not statement["is_star"]
-                      and index.file_for(f"{target}.{n}") is not None]
+                      and index.file_for(f"{target}.{n}" if target else n) is not None]
         plain = [(n, a) for n, a in names if (n, a) not in submodules]
 
         for name, alias in submodules:
-            edges.append(_edge(record, statement, f"{target}.{name}", index,
+            edges.append(_edge(record, statement,
+                               f"{target}.{name}" if target else name, index,
                                names=[(name, alias)]))
         if plain or not submodules:
             edges.append(_edge(record, statement, target, index, names=plain))
@@ -150,10 +153,11 @@ def _edge(record: dict, statement: dict, target: str, index: ModuleIndex,
     if resolved is None and names and not statement["is_star"]:
         # `from pkg import submodule` names a module, not a symbol in one.
         for name, _alias in names:
-            candidate = index.file_for(f"{target}.{name}")
+            joined = f"{target}.{name}" if target else name
+            candidate = index.file_for(joined)
             if candidate is not None:
                 resolved = candidate
-                edge.target_module = f"{target}.{name}"
+                edge.target_module = joined
                 break
 
     if resolved is not None:

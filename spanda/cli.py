@@ -238,9 +238,11 @@ def _run_scan(db_path, root, plan, patterns):
                 print(f"  {number}/{len(plan.files)} files, {symbols} symbols")
 
         # Resolved from what was just read, not by reading it again.
-        _scopes, references = _resolve_collected(collected, module_index, table)
+        _scopes, references, lost = _resolve_collected(collected, module_index, table)
         counts = index.write_references(
             scan_id, references, index.symbol_uuids_by_key())
+        index.record_lost_trails(scan_id, lost)
+        counts["lost"] = lost
 
         totals = index.finish_scan(scan_id)
         missing = index.missing_at(scan_id)
@@ -270,6 +272,7 @@ def cmd_index(args: argparse.Namespace) -> int:
           f"({totals['ambiguous_symbols']} defined more than once in their file)")
     print(f"  {counts['edges']} references resolved to a definition, "
           f"{counts['unresolved']} could not be")
+    _report_lost_trails(counts.get("lost", []))
     print(f"  content fingerprint {totals['content_fingerprint']}")
     if totals["git_commit_hash"]:
         print(f"  at commit {totals['git_commit_hash'][:12]} (clean tree)")
@@ -587,9 +590,10 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                     # Doing it for all of them would dominate the run for
                     # edges nobody asks about at a historical commit.
                     if number == len(commits):
-                        _p, _t, _s, references = _resolve_codebase(worktree, patterns)
+                        _p, _t, _s, references, lost = _resolve_codebase(worktree, patterns)
                         index.write_references(
                             scan_id, references, index.symbol_uuids_by_key())
+                        index.record_lost_trails(scan_id, lost)
 
                     totals = index.finish_scan(scan_id)
                     previous_commit, previous_scan = commit, scan_id
@@ -648,11 +652,11 @@ def _resolve_collected(collected, module_index, table):
     reference is resolved, since a reference can point at a definition in a
     file read later — but only one pass over the source.
     """
-    scopes = build_scopes(collected, table, module_index)
+    scopes, lost = build_scopes(collected, table, module_index)
     references = []
     for record in collected:
         references.extend(resolve_record(record, table, scopes))
-    return scopes, references
+    return scopes, references, lost
 
 
 def _resolve_codebase(root: Path, patterns):
@@ -664,8 +668,28 @@ def _resolve_codebase(root: Path, patterns):
         module_index.add(record["file"], record["module"])
         table.add_record(record, patterns)
         collected.append(_for_resolution(record))
-    scopes, references = _resolve_collected(collected, module_index, table)
-    return plan, table, scopes, references
+    scopes, references, lost = _resolve_collected(collected, module_index, table)
+    return plan, table, scopes, references, lost
+
+
+def _report_lost_trails(lost) -> None:
+    """The resolver's self-audit, printed where it cannot be missed.
+
+    Zero is the expected reading. Anything else means the tool imported a
+    name and then could not say what it was — and every "no callers" answer
+    from this run deserves suspicion until the cause is found.
+    """
+    if not lost:
+        print("  self-audit: every imported name was traced to its definition")
+        return
+    print(f"\n  SELF-AUDIT: {len(lost)} imported name(s) whose definition could "
+          f"not be found.")
+    print("  These are trails the resolver lost, not unused imports. Symbols "
+          "behind them\n  will wrongly look uncalled until this is fixed:")
+    for trail in lost[:8]:
+        print(f"      {trail.source_file}:{trail.line}  {trail.raw}")
+    if len(lost) > 8:
+        print(f"      ... and {len(lost) - 8} more")
 
 
 def cmd_resolve(args: argparse.Namespace) -> int:
@@ -675,7 +699,7 @@ def cmd_resolve(args: argparse.Namespace) -> int:
         return 2
 
     patterns = load_patterns(Path(args.patterns) if args.patterns else None)
-    plan, table, _scopes, references = _resolve_codebase(root, patterns)
+    plan, table, _scopes, references, lost = _resolve_codebase(root, patterns)
 
     resolved = [r for r in references if r.target_symbol]
     unresolved = [r for r in references if not r.target_symbol]
@@ -698,6 +722,8 @@ def cmd_resolve(args: argparse.Namespace) -> int:
     print(f"\n  edges by type:")
     for kind, count in edges.most_common():
         print(f"      {count:>7}  {kind}")
+    print()
+    _report_lost_trails(lost)
 
     if args.reasons:
         print()

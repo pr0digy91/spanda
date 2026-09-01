@@ -93,6 +93,9 @@ def render(index, root: Path) -> str:
             reasons.items(), key=lambda kv: -kv[1]))
         lines.append(f"unresolved_refs  {unresolved_total:>7,}   ({detail})")
     lines.append(f"symbol_versions  {_count(connection, 'symbol_versions'):>7,}")
+    lost = latest_row["lost_trails"] if "lost_trails" in latest_row.keys() else 0
+    lines.append(f"lost trails      {lost or 0:>7,}   imports the resolver could not place"
+                 + ("" if not lost else " — DISTRUST 'no callers' UNTIL FIXED"))
     lines.append(f"dynamic dispatch {dynamic:>7,}   live symbols whose callers are not in the source")
 
     if edge_total:
