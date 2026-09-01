@@ -184,3 +184,21 @@ def test_no_git_means_no_incremental_rather_than_a_guess(tmp_path):
     """'Cannot tell' has to be distinguishable from 'nothing changed'."""
     (tmp_path / "a.py").write_text("def f(): pass\n")
     assert changed_python_files(tmp_path, "HEAD~1") is None
+
+
+def test_the_index_command_resolves_references_end_to_end(repo):
+    """Through the CLI, not the resolver directly.
+
+    The index path hands resolution a slimmed record; the resolver tests hand
+    it a full one. A field the resolver needs but the slimming drops passes
+    every resolver test and breaks `spanda index` — which is what happened.
+    """
+    from spanda.cli import main
+    assert main(["index", str(repo)]) == 0
+    with Index(prepare_db_path(repo)) as index:
+        edges = index.connection.execute("SELECT COUNT(*) FROM edges").fetchone()[0]
+        closure = index.connection.execute(
+            "SELECT COUNT(*) FROM edges e JOIN symbols s ON s.uuid = e.target_symbol_uuid"
+            " WHERE s.qualname = 'make_multiplier.multiply'").fetchone()[0]
+    assert edges > 0
+    assert closure == 1, "the closure edge must survive the slimmed record"

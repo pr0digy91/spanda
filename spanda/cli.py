@@ -630,8 +630,9 @@ def _for_resolution(record: dict) -> dict:
         "dunder_all": record["dunder_all"],
         "imports": record["imports"],
         "references": record["references"],
-        "definitions": [{"local_id": d["local_id"], "qualname": d["qualname"],
-                         "kind": d["kind"], "parent": d["parent"]}
+        "definitions": [{"local_id": d["local_id"], "name": d["name"],
+                         "qualname": d["qualname"], "kind": d["kind"],
+                         "parent": d["parent"]}
                         for d in record["definitions"]],
     }
 
