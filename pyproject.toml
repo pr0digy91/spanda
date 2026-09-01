@@ -27,6 +27,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["spanda"]
 
+[tool.setuptools.package-data]
+spanda = ["*.txt", "*.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # fixtures/ is parsed, never imported or collected: it contains a deliberate

@@ -15,6 +15,7 @@ from pathlib import Path
 from spanda.extract import (extract_codebase, extract_file, plan_scan,
                             stream_records)
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
+from spanda.guide import render as render_guide
 from spanda.modules import (EXTERNAL, ModuleIndex, build_import_graph,
                             cycle_groups, processing_order, resolve_imports)
 from spanda.resolve import (SymbolTable, build_scope, resolve_record)
@@ -797,6 +798,26 @@ def cmd_callers(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_guide(args: argparse.Namespace) -> int:
+    root = Path(args.path).resolve()
+    target = resolve_db(args)
+    if target is None:
+        print(f"no index yet at {db_path(root)} — run `spanda index` first",
+              file=sys.stderr)
+        return 1
+
+    with Index(target) as index:
+        text = render_guide(index, root)
+
+    if args.write:
+        destination = target.parent / "README.md"
+        destination.write_text(text)
+        print(f"wrote {destination}")
+    else:
+        print(text)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="spanda",
@@ -852,6 +873,14 @@ def main(argv: list[str] | None = None) -> int:
     resolve_cmd.add_argument("--reasons", type=int, default=0, metavar="N",
                              help="show N examples of each unresolved reason")
     resolve_cmd.set_defaults(func=cmd_resolve)
+
+    guide_cmd = subparsers.add_parser(
+        "guide", help="a note on reading this index, with its own numbers filled in")
+    guide_cmd.add_argument("path", help="root of the indexed codebase")
+    guide_cmd.add_argument("--write", action="store_true",
+                           help="write it to .spanda/README.md beside the index")
+    guide_cmd.add_argument("--db", default=None, help="pin a specific index file")
+    guide_cmd.set_defaults(func=cmd_guide)
 
     callers_cmd = subparsers.add_parser(
         "callers", help="what calls a symbol, and what might but cannot be proven to")

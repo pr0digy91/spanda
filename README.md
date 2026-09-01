@@ -55,6 +55,9 @@ python3.14 -m venv .venv && .venv/bin/pip install -q pytest
 .venv/bin/python -m spanda.cli scans <path>
 .venv/bin/python -m spanda.cli find <path> "Order*"
 
+# A note on reading the index, with that index's own numbers in it
+.venv/bin/python -m spanda.cli guide <path> --write
+
 # What calls this symbol, and what might but cannot be proven to
 .venv/bin/python -m spanda.cli callers <path> create_goods_receipt
 
