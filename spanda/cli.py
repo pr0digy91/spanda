@@ -811,14 +811,26 @@ def cmd_callers(args: argparse.Namespace) -> int:
         if not matches:
             print(f"no symbol named {args.name!r} in this index")
             return 1
+        latest = max((s["scan_id"] for s in index.scans(complete_only=True)),
+                     default=0)
 
         for symbol in matches:
-            callers = index.callers_of(symbol["uuid"])
-            maybe = index.possible_callers_of(symbol["name"])
-
             print(f"\n{symbol['file_path']}:{symbol['line_start']}  "
                   f"{symbol['kind']} {symbol['qualname']}")
             print(f"    {symbol['canonical_signature']}")
+
+            # A symbol the newest scan did not see is gone, not unused. Saying
+            # "nothing references it" about a deleted function invites exactly
+            # the wrong conclusion.
+            if symbol["last_seen_scan_id"] < latest:
+                print(f"\n  This symbol no longer exists: last seen in scan "
+                      f"{symbol['last_seen_scan_id']}, the newest is {latest}.\n"
+                      f"  Nothing can call it now. To see what called it while it "
+                      f"existed, compare\n  scans with `spanda drift`.")
+                continue
+
+            callers = index.callers_of(symbol["uuid"])
+            maybe = index.possible_callers_of(symbol["name"])
 
             if callers:
                 print(f"\n  {len(callers)} static caller(s):")

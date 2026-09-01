@@ -32,6 +32,10 @@ R_DYNAMIC = "dynamic_dispatch"          # the target is chosen at runtime
 #: Not a failure: the name refers to a module in this codebase rather than to
 #: a symbol in one. Counting it as unresolved would understate the resolver.
 R_MODULE = "module_reference"
+#: `self.status = x` — the thing being written, not read. Never a call, so it
+#: must not be stored as a place that "might be calling" a symbol named
+#: `status`. Kept as its own reason so it is counted, not silently dropped.
+R_ASSIGNMENT = "assignment_target"
 
 
 @dataclass(frozen=True)
@@ -414,7 +418,12 @@ def resolve_record(record: dict, table: SymbolTable,
         source = owner.get(reference["enclosing"])
         edge_type = _edge_type(reference["context"])
 
+        is_store = reference["context"] == "assign_target"
+
         def emit(target: str | None, reason: str | None = None) -> None:
+            # An unresolved *write* is not a possible caller of anything.
+            if target is None and is_store and reason == R_UNKNOWN_TYPE:
+                reason = R_ASSIGNMENT
             out.append(Reference(
                 source_file=record["file"], source_symbol=source,
                 target_symbol=target, edge_type=edge_type,

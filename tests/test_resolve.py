@@ -424,3 +424,20 @@ def test_same_named_modules_do_not_share_definitions(tmp_path):
                  if r.edge_type == "calls" and r.target_symbol]
         own = record["file"].split("/")[0]
         assert calls == [f"{own}.conftest.client|function"], record["file"]
+
+
+def test_an_assignment_target_is_not_a_possible_caller(resolved):
+    """`self.order_id = order_id` writes an attribute. It can never be a call,
+    so it must not be stored as a place that might be calling a symbol named
+    order_id. Its own reason, so it is counted rather than dropped."""
+    from spanda.resolve import R_ASSIGNMENT
+    from spanda.store import KEEPABLE_REASONS
+    _table, references = resolved
+    # Only the writes in __init__ (lines 32-35); `self.items` is also *read*
+    # later in the file, and a read is legitimately an unknown-type reference.
+    stores = [r for r in references
+              if r.raw in ("self.order_id", "self.items", "self.status")
+              and r.source_file == "sample_pkg/models.py" and r.line <= 35]
+    assert stores, "the fixture's __init__ writes these"
+    assert all(r.reason == R_ASSIGNMENT for r in stores)
+    assert R_ASSIGNMENT not in KEEPABLE_REASONS

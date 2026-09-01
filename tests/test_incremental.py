@@ -224,3 +224,20 @@ def test_changed_files_are_relative_to_the_scan_root_not_the_git_root(repo):
 
     changed = changed_python_files(services, before)
     assert changed == {"billing.py"}, "relative to services/, and only what is under it"
+
+
+def test_callers_on_a_deleted_symbol_says_gone_not_unused(repo, capsys):
+    """Rename a function, re-index, ask about the old name. "Nothing
+    references it — possibly unused" would be the wrong conclusion offered
+    with confidence. The honest answer is that it no longer exists."""
+    from spanda.cli import main
+    assert main(["index", str(repo)]) == 0
+    helpers = repo / "sample_pkg" / "helpers.py"
+    helpers.write_text(helpers.read_text().replace("def slugify(", "def slug_of("))
+    assert main(["index", str(repo)]) == 0
+    capsys.readouterr()
+
+    assert main(["callers", str(repo), "slugify"]) == 0
+    out = capsys.readouterr().out
+    assert "no longer exists" in out
+    assert "possibly unused" not in out.lower()
