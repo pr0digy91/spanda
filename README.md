@@ -18,8 +18,10 @@ M3 complete: drift reporting and backfill of past commits.
 M4 complete: import resolution, processing order, circular import groups.
 M5/M6 complete: reference resolution, edges, and `spanda callers`.
 M7 complete: incremental re-index — 425 commits in 52 seconds, not 12 minutes.
+M8 in progress: drift over edges and circular-import groups. Symbol drift is
+built; edge and cycle drift are not yet.
 
-All seven milestones built.
+Seven of the eight planned milestones built.
 
 ## Use
 

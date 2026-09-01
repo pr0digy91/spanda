@@ -374,7 +374,6 @@ class Index:
         self.connection = sqlite3.connect(self.path, isolation_level=None, timeout=15)
         self.connection.row_factory = sqlite3.Row
         self._open_scan: int | None = None
-        self._tally: dict | None = None
 
         if fresh:
             self.connection.executescript(SCHEMA)
@@ -484,11 +483,6 @@ class Index:
              None if dirty is None else int(dirty),
              skipped_files))
         self._open_scan = cursor.lastrowid
-        # Accumulated as files stream past, rather than read back afterwards.
-        # The fingerprint depends on every file in the scan, which is exactly
-        # what deduped storage no longer holds per scan.
-        self._tally = {"digest": hashlib.sha256(), "files": 0, "parsed": 0,
-                       "unparseable": 0, "symbols": 0}
         return self._open_scan
 
     def abort_scan(self) -> None:
@@ -527,7 +521,6 @@ class Index:
              "sha256:" + digest.hexdigest()[:32], scan_id))
         self.connection.execute("COMMIT")
         self._open_scan = None
-        self._tally = None
         return dict(self.scan(scan_id))
 
     def scan(self, scan_id: int) -> sqlite3.Row:
@@ -564,14 +557,6 @@ class Index:
         definitions = merge_duplicate_definitions(record["definitions"])
         error = record.get("parse_error") or {}
         path, status = record["file"], record["parse_status"]
-
-        if self._tally is not None:
-            self._tally["files"] += 1
-            self._tally["parsed"] += status == "ok"
-            self._tally["unparseable"] += status != "ok"
-            self._tally["symbols"] += len(definitions)
-            self._tally["digest"].update(
-                f"{path}:{record['file_hash']}\n".encode())
 
         known = self.connection.execute(
             "SELECT file_hash, parse_status FROM files WHERE file_path = ?",

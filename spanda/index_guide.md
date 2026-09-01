@@ -191,8 +191,10 @@ run and nothing since. Check before trusting it:
 SELECT timestamp, git_commit_hash FROM scans ORDER BY scan_id DESC LIMIT 1;
 ```
 
-Refresh with `spanda index {{repo}}` — it re-reads only what git says
-changed, so it is quick enough to run before asking the index anything.
+Refresh with `spanda index {{repo}}`. It re-reads every file — a full pass,
+not an incremental one; only `backfill` re-reads just what git says changed.
+A full pass is a few seconds on a thousand files, quick enough to run before
+asking the index anything.
 
 ## What it will not tell you
 
