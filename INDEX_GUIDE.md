@@ -1,0 +1,209 @@
+# Reading a spanda index
+
+A spanda index is a plain SQLite database at `<repo>/.spanda/index.db`. This
+is the note for anyone — human or agent — querying it directly.
+
+Read the two rules below before anything else. Both are ways to get a
+confidently wrong answer from correct data.
+
+---
+
+## Rule 1: filter by the current scan, or you are querying the dead
+
+The index never deletes anything. A function removed six months ago still has
+a row. What marks it dead is that its `last_seen_scan_id` stopped advancing.
+
+So **`SELECT * FROM symbols` returns the living and the dead together.** Every
+query about the code as it is now needs:
+
+```sql
+WHERE last_seen_scan_id = (SELECT MAX(scan_id) FROM scans WHERE completed = 1)
+```
+
+Without that filter, `ri-be-test` returns 17,774 symbols. With it, 16,252 —
+the other 1,522 were deleted at some point in the indexed history.
+
+There is deliberately no `is_deleted` column. A stored flag has to be
+maintained by every write path, and once incremental indexing stops re-reading
+unchanged files it would be maintained wrongly. A column that is always false
+is worse than no column, because queries come to trust it.
+
+## Rule 2: an edge count is never the whole answer
+
+`edges` holds references that were **proven**. It is a floor, not a total.
+
+Three things are missing from it, by design rather than by oversight:
+
+- **Runtime dispatch.** A FastAPI route handler is called by the framework.
+  Nothing in the codebase names it. `has_dynamic_dispatch = 1` marks these —
+  1,200 of them in `ri-be-test`.
+- **Attribute access on an unknown type.** `obj.method()` where nothing says
+  what `obj` is. 33,141 such references. Each *might* be a call to something
+  in the codebase; none can be proven.
+- **Anything outside this repository.** Other services, scripts, notebooks.
+
+So: **zero callers never means unused.** Check `has_dynamic_dispatch` and
+`unresolved_refs` before concluding anything. `spanda callers` does this for
+you and is the safer route.
+
+---
+
+## The tables
+
+| Table | One row per | Holds |
+|---|---|---|
+| `symbols` | symbol ever seen | current state of every function, class, method, module variable |
+| `symbol_versions` | scan where a hash **changed** | history — unchanged symbols write nothing |
+| `symbol_spans` | unbroken run of presence | which scans a symbol actually existed in |
+| `edges` | proven reference | who calls, inherits from, or uses what |
+| `unresolved_refs` | reference that could not be proven | **current scan only** |
+| `files` | file | current state, first and last seen |
+| `file_versions` | scan where a file changed | file history |
+| `scans` | index run | commit, timestamp, counts, fingerprint |
+| `scan_problems` | file a scan could not parse | rare; syntax errors at that commit |
+| `meta` | key | schema version, which codebase this index describes |
+
+### `symbols` — the columns that matter
+
+- `uuid` — stable identity. Assigned once, never changes. Not a hash.
+- `symbol_key` — `path.to.module.QualName|kind`. Stable across edits; changes
+  if the symbol is renamed or moved to another file.
+- `qualname` — `Outer.Inner.method`, not just `method`.
+- `kind` — `function` | `method` | `class` | `variable`.
+- `canonical_signature` — normalised shape, e.g.
+  `[async](positional:session,keyword_only:tax=1.05)->Decimal`. Reformatting
+  does not change it; adding a parameter does.
+- `signature_hash` — hash of the above. **Moves only when callers could
+  break.**
+- `content_hash` — hash of the whole symbol. Moves on any edit at all.
+- `has_dynamic_dispatch` — 1 means something calls it that the source does not
+  show.
+- `definition_count` — >1 means the same name is defined several times in one
+  file, usually one branch per platform. Which one runs is not knowable.
+- `first_seen_scan_id` / `last_seen_scan_id` — see Rule 1.
+
+### `edges`
+
+`source_symbol_uuid` is NULL when the reference is in module-level code rather
+than inside a function; `source_file` is always set. `edge_type` is `calls`,
+`inherits` or `uses`.
+
+### `unresolved_refs`
+
+Only the most recent scan's, on purpose — this describes the code as it is,
+not a drift signal, and 34,000 rows per scan would dwarf everything else.
+
+`attr_name` is the member being reached for. It is what makes "who else might
+be calling this" answerable when the object's type is unknown.
+
+---
+
+## Queries worth having
+
+**Where is a symbol defined**
+
+```sql
+SELECT qualname, kind, file_path, line_start, canonical_signature
+FROM symbols
+WHERE name = 'create_goods_receipt'
+  AND last_seen_scan_id = (SELECT MAX(scan_id) FROM scans WHERE completed = 1);
+```
+
+**Who calls it — the proven part**
+
+```sql
+SELECT e.edge_type, s.qualname, s.file_path, s.line_start
+FROM edges e
+LEFT JOIN symbols s ON s.uuid = e.source_symbol_uuid
+WHERE e.target_symbol_uuid = :uuid
+  AND e.last_seen_scan_id = (SELECT MAX(scan_id) FROM scans WHERE completed = 1);
+```
+
+**...and the part that cannot be proven** — run both, always
+
+```sql
+SELECT source_file, line, raw FROM unresolved_refs WHERE attr_name = 'create_goods_receipt';
+```
+
+**What changed shape between two commits** — the question nothing else answers
+
+```sql
+SELECT s.qualname, s.file_path, v1.canonical_signature AS was,
+       v2.canonical_signature AS now
+FROM symbols s
+JOIN symbol_versions v1 ON v1.symbol_uuid = s.uuid AND v1.scan_id <= :older
+JOIN symbol_versions v2 ON v2.symbol_uuid = s.uuid AND v2.scan_id <= :newer
+WHERE v1.scan_id = (SELECT MAX(scan_id) FROM symbol_versions
+                    WHERE symbol_uuid = s.uuid AND scan_id <= :older)
+  AND v2.scan_id = (SELECT MAX(scan_id) FROM symbol_versions
+                    WHERE symbol_uuid = s.uuid AND scan_id <= :newer)
+  AND v1.signature_hash != v2.signature_hash;
+```
+
+**Which symbols has nobody touched, and which churn**
+
+```sql
+SELECT s.qualname, s.file_path, COUNT(DISTINCT v.signature_hash) AS shapes
+FROM symbols s JOIN symbol_versions v ON v.symbol_uuid = s.uuid
+GROUP BY s.uuid HAVING shapes > 1 ORDER BY shapes DESC;
+```
+
+**Symbols whose callers cannot be determined** — do not delete these
+
+```sql
+SELECT qualname, file_path, line_start, decorators
+FROM symbols
+WHERE has_dynamic_dispatch = 1
+  AND last_seen_scan_id = (SELECT MAX(scan_id) FROM scans WHERE completed = 1);
+```
+
+**Which commit is a scan** — to line the index up against git
+
+```sql
+SELECT scan_id, timestamp, git_commit_hash, total_files, total_symbols
+FROM scans WHERE completed = 1 ORDER BY scan_id DESC LIMIT 10;
+```
+
+`git_commit_hash` is NULL when the tree was dirty; `git_base_commit` then says
+what it was sitting on. A dirty scan is not that commit, and conflating them
+would corrupt any comparison across the two.
+
+---
+
+## What is in the ri-be-test index today
+
+```
+425 scans      2026-05-04 → 2026-08-30      1,097 files at HEAD
+
+symbols          17,774   (16,252 alive, 1,522 removed during the window)
+edges            17,079   (9,748 calls, 6,827 uses, 504 inherits)
+unresolved_refs  34,433   (33,141 unknown type, 910 no such attribute, 382 not found)
+symbol_versions  19,985
+dynamic dispatch  1,200 live symbols
+```
+
+Roughly 20,000 of 104,000 references resolved. The rest are external
+libraries, builtins, or attribute access on unknown types. That is the ceiling
+of static analysis without type inference, and it is reported rather than
+hidden — a call graph missing a third of the codebase while looking complete
+is worse than one that admits it.
+
+## Keeping it current
+
+The index is a snapshot, not a daemon. It reflects the last `spanda index`
+run and nothing since. Check before trusting it:
+
+```sql
+SELECT timestamp, git_commit_hash FROM scans ORDER BY scan_id DESC LIMIT 1;
+```
+
+Refresh with `spanda index <path>` — about 3 seconds for 1,098 files, and
+faster still when git can name what changed.
+
+## What it will not tell you
+
+- **What a function does.** No semantics, no types, no data flow.
+- **Runtime behaviour.** Only what is written in the source.
+- **Anything outside Python.** Frontends and mobile apps are invisible.
+- **Whether a rename happened.** A renamed function reads as one removal and
+  one addition, because proving otherwise would be a guess.
