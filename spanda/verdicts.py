@@ -68,12 +68,14 @@ def parse(text: str) -> tuple[list[Verdict], list[ParseProblem]]:
         if parts[0] == "?":
             continue  # a candidate nobody decided on; not an error, not a verdict
         if len(parts) < 3:
-            problems.append(ParseProblem(number, raw, "expected: verdict  file::qualname  date  note"))
+            problems.append(ParseProblem(
+                number, raw, "expected: verdict  file::qualname  date  note"))
             continue
         verdict, target, when = parts[0].lower(), parts[1], parts[2]
         note = parts[3] if len(parts) > 3 else ""
         if verdict not in ("alive", "dead"):
-            problems.append(ParseProblem(number, raw, f"verdict must be alive or dead, not {parts[0]!r}"))
+            problems.append(ParseProblem(
+                number, raw, f"verdict must be alive or dead, not {parts[0]!r}"))
             continue
         parsed = parse_target(target)
         if parsed is None:
@@ -243,12 +245,13 @@ def render(report: VetReport, repo: str) -> str:
         p("")
 
     p(f"TO VET — {report.candidates_total} symbol(s) with no caller, no hint, no verdict"
-      + (f"; first {len(report.candidates)}" if report.candidates_total > len(report.candidates) else ""))
+      + (f"; first {len(report.candidates)}"
+         if report.candidates_total > len(report.candidates) else ""))
     p(f"  Record a decision with  spanda vet {repo} --dead <target>  or  --alive <target>")
-    p(f"  --note \"what calls it\";  or save these lines to a file, replace each ? with")
+    p("  --note \"what calls it\";  or save these lines to a file, replace each ? with")
     p(f"  alive or dead, add the date and a note, and run  spanda vet {repo} --from <file>.")
-    p(f"  A line still marked ? is skipped: no decision, no record.")
-    for file_path, qualname, line in report.candidates:
+    p("  A line still marked ? is skipped: no decision, no record.")
+    for file_path, qualname, _line in report.candidates:
         p(f"    ?      {file_path}::{qualname}")
     if not report.candidates:
         p("    nothing left to vet")

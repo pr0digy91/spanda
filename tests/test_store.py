@@ -153,7 +153,8 @@ def test_shape_change_is_distinguishable_from_internal_change(workspace):
     helpers = source / "sample_pkg" / "helpers.py"
     text = helpers.read_text()
     text = text.replace('def format_currency(amount, currency: str = "INR") -> str:',
-                        'def format_currency(amount, currency: str = "INR", *, pad: bool = False) -> str:')
+                        'def format_currency(amount, currency: str = "INR", '
+                        '*, pad: bool = False) -> str:')
     text = text.replace('return text.strip().lower().replace(" ", "-")',
                         'return text.strip().casefold().replace(" ", "-")')
     helpers.write_text(text)
@@ -336,13 +337,12 @@ def test_an_interrupted_scan_leaves_no_trace(tmp_path):
     index_once(db, source)
 
     plan, patterns = plan_scan(source), load_patterns()
-    with pytest.raises(RuntimeError):
-        with Index(db, codebase_root=source) as index:
-            scan_id = index.begin_scan(plan.root, plan.skipped_count)
-            for number, record in enumerate(stream_records(plan)):
-                if number == 3:
-                    raise RuntimeError("simulated crash")
-                index.write_record(scan_id, record, patterns)
+    with pytest.raises(RuntimeError), Index(db, codebase_root=source) as index:
+        scan_id = index.begin_scan(plan.root, plan.skipped_count)
+        for number, record in enumerate(stream_records(plan)):
+            if number == 3:
+                raise RuntimeError("simulated crash")
+            index.write_record(scan_id, record, patterns)
 
     with Index(db) as index:
         assert len(index.scans()) == 1, "the dead scan must not survive"
@@ -499,7 +499,8 @@ def test_scan_report_names_only_what_went_missing_this_time(workspace, capsys):
     workspace, _ = workspace
     helpers = workspace / "sample_pkg" / "helpers.py"
     original = helpers.read_text()
-    helpers.write_text(original + "\ndef first_extra():\n    return 1\n\n\ndef second_extra():\n    return 2\n")
+    helpers.write_text(original + "\ndef first_extra():\n    return 1\n\n\n"
+                       "def second_extra():\n    return 2\n")
     assert main(["index", str(workspace)]) == 0
 
     helpers.write_text(original + "\ndef second_extra():\n    return 2\n")

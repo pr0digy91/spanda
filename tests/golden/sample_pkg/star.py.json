@@ -61,7 +61,7 @@
       "canonical_signature": "(positional:item_name:str,positional:price)->str",
       "signature_hash": "sha256:335d27a764afe846179cca0d500ada6a",
       "content_hash": "sha256:3bda062fbfe8cce377009c8dc61a5b25",
-      "body_hash": "sha256:637a66e988cbd73c8ca1a99297a9522e",
+      "body_hash": "sha256:46c5d210f32c522006561572eae079d0",
       "loop_depth": 0,
       "instance_attributes": []
     }

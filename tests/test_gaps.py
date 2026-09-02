@@ -136,12 +136,12 @@ def test_imports_count_as_references(scan):
 def test_the_three_untraceable_symbols_are_never_reported_as_unused(scan, gaps):
     """The whole point. Each is unreferenced *and* carries a reason why."""
     orphans = {qualname for _, _, qualname in unreferenced_symbols(scan)}
-    assert MAKE_OR_BREAK <= orphans, "these genuinely have no static references"
+    assert orphans >= MAKE_OR_BREAK, "these genuinely have no static references"
 
     explained = {g.symbol for g in gaps if g.kind == "dynamic_dispatch_decorator"}
     explained |= {g.detail.split('"')[1] for g in gaps
                   if g.kind == "name_in_string_literal"}
-    assert MAKE_OR_BREAK <= explained, (
+    assert explained >= MAKE_OR_BREAK, (
         "every symbol with no static callers must carry an explicit reason; "
         "silence without a reason is the CodeGraph failure")
 

@@ -55,7 +55,7 @@
       "canonical_signature": "(positional:factor:int)->",
       "signature_hash": "sha256:b1996aa4290575733ac6adec58d9edeb",
       "content_hash": "sha256:f91d9a089f765bafcbc3c00c9e1efc30",
-      "body_hash": "sha256:d1b69b146700422904c60eaea431a656",
+      "body_hash": "sha256:558757c4ecdd2756ec18a9d54a903a8e",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -91,7 +91,7 @@
       "canonical_signature": "(positional:value:int)->int",
       "signature_hash": "sha256:6cc194678076b385e8e986380d1060bd",
       "content_hash": "sha256:a38776afe8922e0c2b39a6079f4fe0ca",
-      "body_hash": "sha256:da19f0761add9dc71d8c519ad200896c",
+      "body_hash": "sha256:a2bcc18d9b8a0f07fbde775a9a4933bf",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -135,7 +135,7 @@
       "canonical_signature": "(positional:key:str)->str",
       "signature_hash": "sha256:958b88299ad4633cd6d18076cf277dbb",
       "content_hash": "sha256:aba676d1cc4a2a773f37b92566c9fd1c",
-      "body_hash": "sha256:fd7fdae72ed25a2e413116921cf5c637",
+      "body_hash": "sha256:f97028babadff83919dfac64907e29f8",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -189,7 +189,7 @@
       "canonical_signature": "[async](positional_only:restaurant_id:str,vararg:sections:str,keyword_only:locale:str='en',kwarg:options)->dict",
       "signature_hash": "sha256:9c59f6a081879019a9a766abfc5d50cd",
       "content_hash": "sha256:43f975f29caf24d1c7a4a5f1b1feffc2",
-      "body_hash": "sha256:528db40683d8b01a0774613acaa7427b",
+      "body_hash": "sha256:9f2803dc36e7e173da03c1ab0851e603",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -215,7 +215,7 @@
       "canonical_signature": "bases()",
       "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
       "content_hash": "sha256:8b12d42b521c77f3613470dd5665478f",
-      "body_hash": "sha256:0ff58b970bad5b7572b55dfcc9a7f951",
+      "body_hash": "sha256:83af5027e9b23d61ee8e6972084c68fb",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -241,7 +241,7 @@
       "canonical_signature": "bases()",
       "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
       "content_hash": "sha256:ed37dad8a472c115003d99aea416e1ab",
-      "body_hash": "sha256:6e83b3bbe2458d5196c315f854c4782d",
+      "body_hash": "sha256:0691ff273db7227cc318913b01f81bbd",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -303,7 +303,7 @@
       "canonical_signature": "(positional:self)->str",
       "signature_hash": "sha256:241662efb905849dbd20926af7de972d",
       "content_hash": "sha256:3859ad71301990cd55f16ea6874632c9",
-      "body_hash": "sha256:a184910ac5f9e31850ab9cc24706e329",
+      "body_hash": "sha256:292c71a89e7623211cb1466d7aaf466b",
       "loop_depth": 0,
       "instance_attributes": []
     }

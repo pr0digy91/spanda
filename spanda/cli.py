@@ -584,7 +584,7 @@ def cmd_backfill(args: argparse.Namespace) -> int:
         worktree = Path(tmp) / "tree"
         if git(root, "worktree", "add", "--detach", str(worktree),
                 commits[0][0]) is None:
-            print(f"could not create a worktree", file=sys.stderr)
+            print("could not create a worktree", file=sys.stderr)
             return 2
         try:
             with Index(target, codebase_root=root) as index:
@@ -615,12 +615,12 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                               f"{commit[:8]} ({why}); read every file instead",
                               file=sys.stderr)
                     if changed is None or previous_scan is None:
-                        symbols = full_scan(index, scan_id, plan, patterns).symbols
+                        full_scan(index, scan_id, plan, patterns)
                         touched = len(plan.files)
                     else:
                         result = incremental_scan(
                             index, worktree, scan_id, plan, patterns, changed)
-                        symbols, touched = result["symbols"], result["reparsed"]
+                        touched = result["reparsed"]
 
                     # Only the newest commit gets its references resolved.
                     # Doing it for all of them would dominate the run for
@@ -695,10 +695,10 @@ def cmd_resolve(args: argparse.Namespace) -> int:
         by_reason[x] for x in EXTERNAL_REASONS), 1)
     print(f"\n  Of references that could point at this codebase, "
           f"{share:.0%} were resolved.")
-    print(f"  The rest are listed above with a reason — none are dropped.")
+    print("  The rest are listed above with a reason — none are dropped.")
 
     edges = Counter(r.edge_type for r in resolved)
-    print(f"\n  edges by type:")
+    print("\n  edges by type:")
     for kind, count in edges.most_common():
         print(f"      {count:>7}  {kind}")
     print()
@@ -803,7 +803,8 @@ def cmd_callers(args: argparse.Namespace) -> int:
                 print("\n  ...but this symbol is dispatched at runtime. Whatever "
                       "calls it is not\n     visible in the source, so the count "
                       "above is not the whole story.")
-            elif symbol["dispatch_hint"] and symbol["dispatch_hint"].startswith("unknown_decorator:"):
+            elif symbol["dispatch_hint"] \
+                    and symbol["dispatch_hint"].startswith("unknown_decorator:"):
                 print(f"\n  ...but it is decorated with @{symbol['dispatch_hint'][18:]}, "
                       f"which spanda does not know.\n     A framework may call it. "
                       f"Vet it, then add the decorator to dynamic_dispatch.txt\n"

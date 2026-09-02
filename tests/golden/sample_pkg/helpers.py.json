@@ -75,7 +75,7 @@
       "canonical_signature": "(positional:amount,positional:currency:str='INR')->str",
       "signature_hash": "sha256:77d504c435f8742e74142211330fa1e9",
       "content_hash": "sha256:3bf91163ea648bbe5c0ab98acecd11cd",
-      "body_hash": "sha256:e6167b6f656826a126255f2d7a3b3564",
+      "body_hash": "sha256:c9289213d68d4f68cf38bc9b51fa2081",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -111,7 +111,7 @@
       "canonical_signature": "(positional:text:str)->str",
       "signature_hash": "sha256:58a1c6d4511b7d2e974d7e36463adb43",
       "content_hash": "sha256:710b8b1f835ebeeea8260f70300948eb",
-      "body_hash": "sha256:786383870e04d94d2689a04b3a1c88eb",
+      "body_hash": "sha256:42d26719d69b0b40c4b25becac6c9af0",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -147,7 +147,7 @@
       "canonical_signature": "(positional:value)->",
       "signature_hash": "sha256:742962210558424e50b134d0c028f6e4",
       "content_hash": "sha256:7e7eba137ebd4554391bc62cd0b30a13",
-      "body_hash": "sha256:550683ca5c020e28247f2208f27bfaf9",
+      "body_hash": "sha256:747f05a3a0e73d3fd2773548fd86a185",
       "loop_depth": 0,
       "instance_attributes": []
     }

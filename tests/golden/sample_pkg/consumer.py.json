@@ -89,7 +89,7 @@
       "canonical_signature": "(positional:order_id:str)->str",
       "signature_hash": "sha256:1c71e8766901814c4ca50bcf51fc32fe",
       "content_hash": "sha256:20c83dada926c7be3eb557a371f12f54",
-      "body_hash": "sha256:cbc4872c3c343f703fb26a318bb29280",
+      "body_hash": "sha256:fbfdc5a1c5509d5cf2177981ebee1c4e",
       "loop_depth": 0,
       "instance_attributes": []
     }

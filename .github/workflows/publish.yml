@@ -1,0 +1,42 @@
+name: Publish to PyPI
+
+# Runs when a GitHub release is published. Nothing is uploaded on a plain
+# push or tag, so cutting a tag is reversible right up until the release is.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v9.0.0
+      - run: uv build
+      # Catch a malformed README or bad metadata here rather than after the
+      # upload, which cannot be undone: a version number on PyPI is spent.
+      - run: uvx twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Trusted publishing: PyPI verifies this workflow's identity through
+    # OIDC, so there is no API token to store or leak. Configure it once at
+    # https://pypi.org/manage/account/publishing/ — repository pr0digy91/spanda,
+    # workflow publish.yml, environment pypi.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/spanda-graph
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

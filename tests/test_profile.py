@@ -131,7 +131,8 @@ def test_churn_appears_only_with_history(indexed):
     for sig in ("def slugify(text: str, a=1) -> str:", "def slugify(text: str, a=1, b=2) -> str:"):
         helpers.write_text(helpers.read_text().replace(
             helpers.read_text().split("\n")[helpers.read_text().split("\n").index(
-                next(l for l in helpers.read_text().split("\n") if l.startswith("def slugify")))],
+                next(line for line in helpers.read_text().split("\n")
+                     if line.startswith("def slugify")))],
             sig))
         assert main(["index", str(indexed)]) == 0
     with Index(prepare_db_path(indexed)) as index:

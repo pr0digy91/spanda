@@ -109,12 +109,16 @@ def render(index, root: Path) -> str:
             reasons.items(), key=lambda kv: -kv[1]))
         lines.append(f"unresolved_refs  {unresolved_total:>7,}   ({detail})")
     lines.append(f"symbol_versions  {_count(connection, 'symbol_versions'):>7,}")
-    lost = latest_row["lost_trails"] if "lost_trails" in latest_row.keys() else 0
+    # `.keys()` is not redundant here and `.get()` does not exist: this is a
+    # sqlite3.Row, where `in` tests the values, not the column names.
+    lost = latest_row["lost_trails"] if "lost_trails" in latest_row.keys() else 0  # noqa: SIM118
     lines.append(f"lost trails      {lost or 0:>7,}   imports the resolver could not place"
                  + ("" if not lost else " — DISTRUST 'no callers' UNTIL FIXED"))
-    lines.append(f"dynamic dispatch {dynamic:>7,}   live symbols whose callers are not in the source")
-    lines.append(f"unrecognised     {hint_unknown + hint_external:>7,}   live symbols the tool declines "
-                 f"to call dead ({hint_unknown:,} unknown decorator, {hint_external:,} external base)")
+    lines.append(f"dynamic dispatch {dynamic:>7,}   live symbols whose callers are not in "
+                 f"the source")
+    lines.append(f"unrecognised     {hint_unknown + hint_external:>7,}   live symbols the tool "
+                 f"declines to call dead ({hint_unknown:,} unknown decorator, "
+                 f"{hint_external:,} external base)")
     lines.append(f"verdicts         {verdicts:>7,}   human decisions on record")
 
     if edge_total:
@@ -182,7 +186,7 @@ def render(index, root: Path) -> str:
     }
 
     text = TEMPLATE.read_text()
-    missing = {m for m in PLACEHOLDER.findall(text)} - set(values)
+    missing = set(PLACEHOLDER.findall(text)) - set(values)
     if missing:
         raise ValueError(f"template has placeholders nothing fills: {sorted(missing)}")
     return PLACEHOLDER.sub(lambda m: values[m.group(1)], text)

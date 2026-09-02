@@ -55,7 +55,7 @@
       "canonical_signature": "(positional:text:str)->str",
       "signature_hash": "sha256:58a1c6d4511b7d2e974d7e36463adb43",
       "content_hash": "sha256:e5886aa088df38c95d34e478f5a8ef89",
-      "body_hash": "sha256:4a62a2648890ddd5a1df51d1ab2d1900",
+      "body_hash": "sha256:f76216d8f8385b92d5e44bc902bf4ffe",
       "loop_depth": 0,
       "instance_attributes": []
     }

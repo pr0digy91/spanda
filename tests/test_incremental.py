@@ -160,8 +160,8 @@ def test_a_symbol_deleted_earlier_is_not_resurrected(repo):
         helpers.write_text('__all__ = ["slugify"]\n\n\ndef slugify(t):\n    return t\n')
         git(repo, "add", "-A")
         git(repo, "commit", "-qm", "drop format_currency")
-        second = incremental(index, repo, patterns,
-                             changed_python_files(repo, before))
+        incremental(index, repo, patterns,
+                    changed_python_files(repo, before))
 
         git(repo, "commit", "-q", "--allow-empty", "-m", "nothing")
         third = incremental(index, repo, patterns, set())
@@ -173,7 +173,6 @@ def test_a_symbol_deleted_earlier_is_not_resurrected(repo):
 
 
 def test_changed_files_includes_uncommitted_work(repo):
-    patterns = load_patterns()
     before = git(repo, "rev-parse", "HEAD")
     (repo / "sample_pkg" / "helpers.py").write_text("def only():\n    return 1\n")
     changed = changed_python_files(repo, before)
@@ -251,9 +250,11 @@ def test_backfill_end_to_end_matches_a_full_scan_of_head(repo, tmp_path):
     from spanda.cli import main
     helpers = repo / "sample_pkg" / "helpers.py"
     helpers.write_text(helpers.read_text() + "\n\ndef second():\n    return 2\n")
-    git(repo, "add", "-A"); git(repo, "commit", "-qm", "second")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "second")
     (repo / "sample_pkg" / "handlers.py").unlink()
-    git(repo, "add", "-A"); git(repo, "commit", "-qm", "third: drop handlers")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "third: drop handlers")
 
     assert main(["backfill", str(repo), "--last", "3"]) == 0
     with Index(prepare_db_path(repo)) as index:

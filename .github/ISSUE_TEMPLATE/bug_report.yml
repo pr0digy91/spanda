@@ -1,0 +1,78 @@
+name: Bug report
+description: Something doesn't work
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **A symbol reported with no callers that you know is called?** That is
+        the failure this tool exists to prevent, and it is the most valuable
+        bug report you can file. Please include the symbol and how it is
+        actually reached — a decorator, `getattr`, a string in a registry, a
+        framework hook — so the gap can be made visible rather than silent.
+
+        **A syntax error on a file that is valid?** Check the Python version
+        below first: a parser cannot read syntax newer than its own release.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you expected, and what spanda reported instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: The command you ran
+      description: Including the path argument, and the output if it is short.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: The smallest code that shows it
+      description: >
+        A few lines that reproduce the wrong answer are worth more than a
+        description of the codebase. `fixtures/sample_pkg/` is the shape to
+        aim for — one file that breaks one specific thing.
+      render: python
+
+  - type: input
+    id: version
+    attributes:
+      label: Python version
+      description: 'Run: python3 --version'
+      placeholder: "3.14.6"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: command-name
+    attributes:
+      label: Which command?
+      options:
+        - parse
+        - index
+        - resolve
+        - callers
+        - gaps
+        - drift
+        - imports
+        - backfill
+        - profile
+        - loops
+        - vet
+        - guide
+        - scans / find
+        - Not applicable
+
+  - type: input
+    id: size
+    attributes:
+      label: Codebase size
+      description: Roughly how many Python files, if the problem depends on it.
+      placeholder: "about 700 files"

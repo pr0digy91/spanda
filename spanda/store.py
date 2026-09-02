@@ -604,7 +604,7 @@ class Index:
             self.abort_scan()
         self.connection.close()
 
-    def __enter__(self) -> "Index":
+    def __enter__(self) -> Index:
         return self
 
     def __exit__(self, exc_type, *_) -> None:

@@ -8,11 +8,11 @@
 #
 # Every entry below was added from the decorator census printed by
 # `spanda parse`, which lists what a codebase actually uses. Grow this file
-# from that census rather than guessing; the count beside each group is what
-# it matched on the target codebase when the entry was added.
+# from that census rather than guessing.
 
 # HTTP route handlers. The web framework calls these when a request arrives;
-# nothing in the codebase calls them by name. (~2,100 on the target codebase)
+# nothing in the codebase calls them by name. In a web application these are
+# by far the largest population of untraceable callers.
 *.get
 *.post
 *.put

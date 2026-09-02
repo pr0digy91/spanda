@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest something the tool should do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Deliberately absent, and unlikely to change:
+
+        - **LLM calls of any kind.** This is the deterministic layer. A
+          description or summarisation layer would consume its output, not
+          live inside it.
+        - **Languages other than Python.**
+        - **Framework-specific parsing** — no route extraction, no URL maps.
+          What *is* welcome is a new pattern in `spanda/dynamic_dispatch.txt`,
+          which is configuration rather than code.
+        - **A guess where the tool currently says it cannot see.** Reporting a
+          confident wrong answer is the one outcome this project treats as a
+          bug rather than a limitation.
+
+        Say so if you have a strong case for one of them anyway.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to find out about a codebase?
+      description: The question you could not answer, not the feature you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do?
+
+  - type: textarea
+    id: certainty
+    attributes:
+      label: Could the answer ever be wrong?
+      description: >
+        If the proposal involves inferring something the source does not state
+        outright, say how a reader would tell a certain answer from a guess.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you tried instead?
+      description: Other tools, and where they fell short.

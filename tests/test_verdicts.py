@@ -64,8 +64,10 @@ def test_a_verdict_is_recorded_in_the_index_and_survives_a_scan(indexed, capsys)
 def test_an_alive_verdict_on_an_unknown_shape_becomes_a_pattern_line(indexed):
     with Index(prepare_db_path(indexed)) as index:
         index.record_verdict("sample_pkg/middleware.py", "nightly_cleanup", "alive", "apscheduler")
-        index.record_verdict("sample_pkg/middleware.py", "Auditor.on_validate", "alive", "pydantic hook")
-        index.record_verdict("sample_pkg/middleware.py", "RequestLogger.dispatch", "alive", "already a pattern")
+        index.record_verdict("sample_pkg/middleware.py", "Auditor.on_validate",
+                             "alive", "pydantic hook")
+        index.record_verdict("sample_pkg/middleware.py", "RequestLogger.dispatch",
+                             "alive", "already a pattern")
         report = vet(index)
     assert [s.line for s in report.suggestions] == [
         "method:BaseModel.on_validate", "scheduler.scheduled_job"]
@@ -111,8 +113,8 @@ def test_export_and_import_round_trip(indexed, tmp_path, capsys):
     capsys.readouterr()
     assert main(["vet", str(indexed), "--export"]) == 0
     exported = capsys.readouterr().out
-    lines = [l for l in exported.splitlines() if l.startswith(("alive", "dead"))]
-    assert len(lines) == 2 and any("on_paid" in l and "by name" in l for l in lines)
+    lines = [line for line in exported.splitlines() if line.startswith(("alive", "dead"))]
+    assert len(lines) == 2 and any("on_paid" in line and "by name" in line for line in lines)
 
     fresh = tmp_path / "again"
     shutil.copytree(FIXTURES, fresh, ignore=shutil.ignore_patterns(".spanda"))

@@ -115,7 +115,7 @@ used in `consumer.py`. Four files, three hops.
 This shape is here because it broke on real code. A resolver that looks only
 for names a module *defines* — never for names it *imported* — loses the trail
 at the first `__init__.py`, and everything behind that package root reports as
-having no callers. On the target codebase it made 28 of 31 live flow handlers look dead.
+having no callers.
 
 The trap is that nothing complains. The tool's own honesty machinery cannot
 help: it is not unsure, it simply never saw the reference. Any change to

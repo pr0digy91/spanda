@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        # 3.9 is the floor, 3.14 the version to actually run on, and 3.11/3.12
+        # sit either side of the release that added `type_params` to the AST —
+        # the one place where a hash could quietly stop being portable.
+        python: ["3.9", "3.11", "3.12", "3.14"]
+
+    # Set on the job, not per-step: `uv run` re-syncs to .python-version
+    # otherwise, which would quietly test 3.14 four times over.
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-extras
+
+      # The suite builds real git repositories in temporary directories and
+      # commits to them. Each test sets its own author, so nothing is needed
+      # here beyond git itself, which every runner has.
+      - name: Run tests
+        run: uv run --frozen python -m pytest tests/ -q
+
+      # The claim that an index is portable between interpreters is only worth
+      # anything if something checks it. Extract the fixture corpus and compare
+      # against the committed golden output, which was generated on 3.14.
+      - name: Check extractor output matches the goldens byte for byte
+        run: |
+          uv run --frozen python -m spanda.cli parse fixtures --out /tmp/golden
+          diff -r tests/golden /tmp/golden
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --all-extras
+      - run: uv run --frozen ruff check --output-format=github .
+
+  build:
+    name: Build the distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+      - run: uv build
+      # A wheel that installs but whose entry point does not run is a wheel
+      # nobody can use. Install it clean, out of the source tree, and call it.
+      - run: uv run --no-project --isolated --with dist/*.whl spanda --help

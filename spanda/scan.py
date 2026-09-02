@@ -67,10 +67,10 @@ def plan_for(root: Path) -> ScanPlan:
 
     A full scan walks the filesystem and a backfill follows git, and they
     disagree on exactly one thing: a `.py` file that is on disk but ignored.
-    the target codebase had one — a helper script under a gitignored `scripts/` — and
-    the full scan recorded it as *added* in a scan labelled "at commit
-    7e4ae187, clean tree", which that commit does not contain. So a git
-    repository is scanned as git sees it, and the files set aside are
+    A helper script under a gitignored `scripts/` is enough: the full scan
+    records it as *added* in a scan labelled "at commit 7e4ae187, clean
+    tree", which that commit does not contain. So a git repository is
+    scanned as git sees it, and the files set aside are
     counted and reported, not dropped. Outside git nothing changes.
 
     git is asked about the planned files and only those — `check-ignore`
@@ -280,9 +280,10 @@ def incremental_scan(index, root: Path, scan_id: int, plan: ScanPlan, patterns,
                      changed: set[str]) -> dict:
     """Re-read only what changed, and carry the rest forward.
 
-    On the target codebase consecutive commits differ by a median of three files out of
-    1,098. Re-reading all of them costs 1.5 seconds a commit and produces
-    identical results for 99.7% of the work.
+    Consecutive commits in a large repository differ by a handful of files
+    out of a thousand. Re-reading all of them produces identical records for
+    almost all of the work, at a cost that grows with the size of the
+    codebase rather than with the size of the change.
     """
     index.record_unread(scan_id, plan)
     present = {p.relative_to(plan.root).as_posix(): p for p in plan.files}

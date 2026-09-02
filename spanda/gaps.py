@@ -323,9 +323,9 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
     referenced = referenced_names(scan)
     # Only things that can be *called*. A string matching a variable name is
     # not a hidden call site: a Pydantic field named `to`, or a dict key
-    # spelling a model attribute, has no callers to be unable to find. On
-    # the target codebase that distinction removes 451 findings of pure noise, all of
-    # them class attributes, without losing a single real one.
+    # spelling a model attribute, has no callers to be unable to find. That
+    # distinction removes a large body of pure noise, all of it class
+    # attributes, without losing a single real finding.
     defined: dict[str, list[str]] = defaultdict(list)
     for record in scan.records:
         for definition in record["definitions"]:

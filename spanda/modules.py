@@ -13,7 +13,6 @@ truncates. Cycles are found and reported, not worked around.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 
 #: Why an import could not be pointed at a file in this codebase.
 EXTERNAL = "external"          # stdlib or an installed package
@@ -259,7 +258,7 @@ def processing_order(graph: dict[str, set[str]]) -> list[list[str]]:
 
     # Condense to a DAG of components, then Kahn's algorithm over that.
     outgoing: dict[int, set[int]] = {n: set() for n in range(len(components))}
-    indegree: dict[int, int] = {n: 0 for n in range(len(components))}
+    indegree: dict[int, int] = dict.fromkeys(range(len(components)), 0)
     for source, targets in graph.items():
         for target in targets:
             a, b = where[source], where[target]

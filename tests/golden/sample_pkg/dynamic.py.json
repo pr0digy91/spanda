@@ -129,7 +129,7 @@
       "canonical_signature": "(positional:event_name:str,positional:payload)->",
       "signature_hash": "sha256:cd5e2c64ece98839abc6b1206c2542b7",
       "content_hash": "sha256:3783ef1caee799207061d528b21649cd",
-      "body_hash": "sha256:b49d05fff3196b83305aeb0069342a90",
+      "body_hash": "sha256:4e941d47e988f34920681923c51ed4dd",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -171,7 +171,7 @@
       "canonical_signature": "(positional:target,positional:method_name:str='on_paid')->",
       "signature_hash": "sha256:d51a731dee1a22590c42627838935e6a",
       "content_hash": "sha256:0a6842b0c18300c74d96b05b2a1c6f99",
-      "body_hash": "sha256:5d25418bc3e8aa904909b68cbf8ddc99",
+      "body_hash": "sha256:67cbbb0c1e87720312134d5ea521c3e3",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -207,7 +207,7 @@
       "canonical_signature": "(positional:payload)->str",
       "signature_hash": "sha256:3aff5f971370b6d8475d37a83e3c4cee",
       "content_hash": "sha256:ce9c337dede3868fb9a8c8955bc424d8",
-      "body_hash": "sha256:1443d79cf8f1da92dc2133a9ae5be86f",
+      "body_hash": "sha256:af3568a37097064ae4e7adf64eea682e",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -243,7 +243,7 @@
       "canonical_signature": "(positional:name:str)->",
       "signature_hash": "sha256:3a67b0f78da23c942ce68a99a337d838",
       "content_hash": "sha256:c59f1d6e452598515a2d877526b57a4f",
-      "body_hash": "sha256:825ab006c68a007af5f2f468a103aa80",
+      "body_hash": "sha256:ba5e273bb7080689f4d787558ab1958e",
       "loop_depth": 0,
       "instance_attributes": []
     }

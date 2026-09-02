@@ -182,9 +182,8 @@ def test_refuses_to_compare_scans_in_the_wrong_order(project):
     source, db = project
     index_once(db, source)
     index_once(db, source)
-    with Index(db) as index:
-        with pytest.raises(ValueError, match="not earlier"):
-            compare(index, 2, 1)
+    with Index(db) as index, pytest.raises(ValueError, match="not earlier"):
+        compare(index, 2, 1)
 
 
 def test_refuses_to_compare_against_an_incomplete_scan(project):
@@ -292,7 +291,8 @@ def test_a_loop_added_inside_a_loop_reads_as_deeper(project):
         "    return str(total(order.items, 1.05))\n")
     index_once(db, source)
     report = drift_between(db, 2, 3)
-    assert [(c.qualname, c.before, c.after) for c in report.loops_shallower] == [("total", "2", "0")]
+    assert [(c.qualname, c.before, c.after) for c in report.loops_shallower] \
+        == [("total", "2", "0")]
 
 
 def test_a_version_without_loop_depth_is_a_caveat_not_a_zero(project):

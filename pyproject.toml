@@ -1,27 +1,63 @@
 [project]
-name = "spanda"
+# The import package and the command are both `spanda`; only the published
+# distribution carries the suffix, because `spanda` on PyPI is an unrelated
+# soil-spectroscopy library that got there first.
+name = "spanda-graph"
 version = "0.1.0"
 description = "Deterministic static-analysis indexing engine for Python codebases"
+readme = "README.md"
 requires-python = ">=3.9"
-# Deliberately zero runtime dependencies through M3, so the tool runs
-# anywhere with a bare python3. networkx arrives at M6, when there is
-# actually a graph to traverse.
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "garunya" }]
+keywords = [
+    "static-analysis",
+    "ast",
+    "code-index",
+    "call-graph",
+    "dead-code",
+    "refactoring",
+    "codebase",
+]
+# Deliberately zero runtime dependencies, so the tool runs anywhere with a
+# bare python3. Anything that would add one has to earn it first.
 #
 # 3.9 is the floor the code needs, but that is not the version to run it on.
 # A parser only understands syntax from its own release or earlier, so spanda
 # must run on a Python at least as new as the newest syntax in the codebase it
 # reads. Run it on the newest interpreter available; the output is identical
-# across versions (verified on 3.9 and 3.14), so nothing else is affected.
+# across versions, which the CI matrix checks on every commit.
 dependencies = []
 
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/pr0digy91/spanda"
+Issues = "https://github.com/pr0digy91/spanda/issues"
 
 [project.scripts]
 spanda = "spanda.cli:main"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -35,3 +71,20 @@ testpaths = ["tests"]
 # fixtures/ is parsed, never imported or collected: it contains a deliberate
 # syntax error and a genuine circular import.
 norecursedirs = ["fixtures"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+# fixtures/ is deliberately broken code. Linting it is meaningless — one file
+# does not even parse, which is the point of it.
+exclude = ["fixtures"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# `emit` is defined inside the reference loop and called only from within the
+# same iteration, so the late binding B023 warns about cannot occur. Closing
+# over seven variables explicitly would make the loop harder to read for a
+# hazard that is not reachable here.
+"spanda/resolve.py" = ["B023"]

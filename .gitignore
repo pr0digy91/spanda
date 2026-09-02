@@ -1,12 +1,34 @@
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
 .venv/
 venv/
-*.egg-info/
-.pytest_cache/
+
+# Indexes are derived data and belong to whoever built them, never to a
+# commit. `.spanda/` also ignores itself from the inside, so this is a
+# belt-and-braces entry for indexes built over this repo.
+.spanda/
 *.sqlite
 *.db
 out/
 
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
 # Working notes, kept local rather than committed.
 project-documents/
+PROJECT_INSTRUCTIONS.md
+
+# Local Claude Code configuration and skills.
+.claude/

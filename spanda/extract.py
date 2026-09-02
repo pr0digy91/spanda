@@ -320,6 +320,14 @@ def _body_hash(node) -> str:
             for field, child in ast.iter_fields(value):
                 if drop_name and field == "name":
                     continue
+                # `type_params` (PEP 695) is a field only from 3.12. Hashing
+                # it when empty makes every function and class hash
+                # differently either side of that release, which would break
+                # the one promise this hash makes. A file that actually uses
+                # a type parameter does not parse on 3.11 at all, so there is
+                # nothing to lose by skipping the field only when it is empty.
+                if field == "type_params" and not child:
+                    continue
                 if field == "body" and isinstance(child, list) \
                         and _docstring_of(value) is not None:
                     child = child[1:]  # a lambda's body is one expression
@@ -743,8 +751,8 @@ class _Walker(ast.NodeVisitor):
         self._in_context("call", lambda: self.visit(node.func))
         # An argument is read, not called. Without this, everything inside
         # `select(X).where(X.col == v)` inherits the outer "call" context —
-        # the function of `.where` is itself a call — and 2,739 column
-        # reads on the target codebase became "calls" edges to columns.
+        # the function of `.where` is itself a call — and every column read
+        # in a query becomes a "calls" edge to a column.
         argument_context = self.context if self.context in self.STRUCTURAL else "name"
         self._in_context(argument_context, lambda: [
             self.visit(a) for a in node.args] + [self.visit(k.value) for k in node.keywords])

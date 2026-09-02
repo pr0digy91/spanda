@@ -46,7 +46,7 @@
       "canonical_signature": "(positional:name:str,positional:handler)->dict",
       "signature_hash": "sha256:fa81884771f47394cc8c5eec82ca95fe",
       "content_hash": "sha256:7b9379fc2461dcbdd454f23206934197",
-      "body_hash": "sha256:cda6303eafc1646aab1ab91280e97e7c",
+      "body_hash": "sha256:976f52a093aaab9b24969829d9080ac8",
       "loop_depth": 0,
       "instance_attributes": []
     }

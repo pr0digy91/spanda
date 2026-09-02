@@ -131,7 +131,8 @@ def test_every_parameter_kind_survives(records):
 def test_signature_hash_ignores_formatting(records):
     """The shape signal must survive a reformat, or it is noise."""
     from spanda.extract import extract_file
-    import tempfile, textwrap
+    import tempfile
+    import textwrap
 
     def hash_of(source: str) -> str:
         with tempfile.TemporaryDirectory() as tmp:
@@ -252,7 +253,8 @@ def test_skipped_files_are_reported_not_silent():
 
 def _signature_hash(source: str, name: str = "total") -> tuple[str, str]:
     from spanda.extract import extract_file
-    import tempfile, textwrap
+    import tempfile
+    import textwrap
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "m.py"
         path.write_text(textwrap.dedent(source))
@@ -283,7 +285,8 @@ INTERNAL_CHANGES = {
     "docstring added":    'def total(items, tax):\n    """Doc."""\n    return 1\n',
     "comment added":      "def total(items, tax):\n    # note\n    return 1\n",
     "reformatted":        "def total(\n    items,\n    tax,\n):\n    return 1\n",
-    "unrelated decorator": "import functools\n@functools.lru_cache(maxsize=128)\ndef total(items, tax):\n    return 1\n",
+    "unrelated decorator": "import functools\n@functools.lru_cache(maxsize=128)\n"
+                           "def total(items, tax):\n    return 1\n",
 }
 
 
@@ -338,7 +341,8 @@ def _hashes(source: str) -> dict:
                 "signature": d["signature_hash"]}
 
 
-GATE = 'def gate(role):\n    if role != "Admin":\n        raise PermissionError("no")\n    return True\n'
+GATE = ('def gate(role):\n    if role != "Admin":\n'
+        '        raise PermissionError("no")\n    return True\n')
 
 
 def test_a_docstring_moves_content_but_not_body():

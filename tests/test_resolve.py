@@ -338,7 +338,7 @@ def test_the_audit_does_not_share_the_scope_builders_blind_spots(monkeypatch):
         scope, pending = original(record, table, index)
         # The bug: names imported from a package that only re-exports them
         # are left as module targets and never chased.
-        for kind, local, target_module, name, edge in list(pending):
+        for kind, local, target_module, _name, _edge in list(pending):
             if kind == "name":
                 scope[local] = resolve_module.Target("module", module=target_module)
         return scope, [p for p in pending if p[0] != "name"]
@@ -374,7 +374,8 @@ def test_files_sharing_a_module_name_get_their_own_scopes(tmp_path):
         index.add(record["file"], record["module"])
         table.add_record(record, patterns)
         records.append(record)
-    assert [r["module"] for r in records if r["file"].endswith("conftest.py")] == ["conftest", "conftest"]
+    assert [r["module"] for r in records if r["file"].endswith("conftest.py")] \
+        == ["conftest", "conftest"]
     scopes, lost = build_scopes(records, table, index)
     assert lost == []
     calls = {(r.source_file, r.target_symbol) for r in

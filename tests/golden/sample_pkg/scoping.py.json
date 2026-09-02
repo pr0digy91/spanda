@@ -113,7 +113,7 @@
       "canonical_signature": "bases()",
       "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
       "content_hash": "sha256:aa84bd9983e39d7ecd01147425c8c6ac",
-      "body_hash": "sha256:0fbcdf9893e11e117d5cd91e415bd6c1",
+      "body_hash": "sha256:1ddf19b6467d0a589955303c3aa3268e",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -201,7 +201,7 @@
       "canonical_signature": "(positional:items)->",
       "signature_hash": "sha256:697306a9e2f930e41b2a5e4e53ab36f3",
       "content_hash": "sha256:242cc809849ad5864cf3e18ee6631076",
-      "body_hash": "sha256:e626d310e007d6b27cd87c1725a53328",
+      "body_hash": "sha256:9ee59143a826e8f624493284d75e7601",
       "loop_depth": 1,
       "instance_attributes": []
     },
@@ -237,7 +237,7 @@
       "canonical_signature": "(positional:a:Auditor)->",
       "signature_hash": "sha256:6bcd6df4e92043af82e428a2c8ccb0f6",
       "content_hash": "sha256:1063141e7cfc65a36922e9536eec0866",
-      "body_hash": "sha256:70fb41ed6151c0e66a62860f74f094ad",
+      "body_hash": "sha256:af838c9f2664b21b361e6cd5400087d2",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -273,7 +273,7 @@
       "canonical_signature": "(positional:text)->",
       "signature_hash": "sha256:8172805e319aaf00971d4025a5c7724c",
       "content_hash": "sha256:23667beb9e31891f1738666b876359bf",
-      "body_hash": "sha256:9ff857492a3492baf6d7ba7b2005a0b2",
+      "body_hash": "sha256:e50a553e27411594c0721c66a8ea7aca",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -309,7 +309,7 @@
       "canonical_signature": "(positional:query)->",
       "signature_hash": "sha256:01092e35c213afe45d0e6f37c6384279",
       "content_hash": "sha256:bf6fb606f10ba908f92e65347758930f",
-      "body_hash": "sha256:dcc59adb154db6d15606805299553d64",
+      "body_hash": "sha256:6845ad4aad0d4ad488e533927f7a5728",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -338,7 +338,7 @@
       "canonical_signature": "()->str",
       "signature_hash": "sha256:fcc4c0c5b51213b840ff1e53f352585c",
       "content_hash": "sha256:83dbdf55323e8bcf7e21a66003b95920",
-      "body_hash": "sha256:f596b498ede4442db352c9f729bb885e",
+      "body_hash": "sha256:1b72ccdac4f2b861afc0364fa0eb6739",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -468,7 +468,7 @@
       "canonical_signature": "bases()",
       "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
       "content_hash": "sha256:9dec380db4c056088b1b711b3e434ddb",
-      "body_hash": "sha256:ae3b9d20d075ede38885cea2efc00644",
+      "body_hash": "sha256:c6ccdd4d663bd0513412d40a13439434",
       "loop_depth": 0,
       "instance_attributes": [
         "seconds"
@@ -512,7 +512,7 @@
       "canonical_signature": "(positional:self,positional:seconds:int)->",
       "signature_hash": "sha256:0c5d0b036777c766d97dec12df25a167",
       "content_hash": "sha256:9e5cae4a2350141a2e2267699c5dfcd1",
-      "body_hash": "sha256:b41f88f2468dd7158d1ff5675e0efb19",
+      "body_hash": "sha256:14d720b77145ecc2b21ab3de276bd061",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -554,7 +554,7 @@
       "canonical_signature": "(positional:self,positional:now:float)->float",
       "signature_hash": "sha256:f24b741f5f47bdb1bc193145e0dcf41a",
       "content_hash": "sha256:d13c115f0f9c60a8606ee50f32abf560",
-      "body_hash": "sha256:3baf757cf67203f1b05f3208685fce96",
+      "body_hash": "sha256:8d33b57b31587d6dfab35c92820c8e2a",
       "loop_depth": 0,
       "instance_attributes": []
     },
@@ -590,7 +590,7 @@
       "canonical_signature": "(positional:text)->",
       "signature_hash": "sha256:8172805e319aaf00971d4025a5c7724c",
       "content_hash": "sha256:05146ae00dff502aa52108a8ee0b1908",
-      "body_hash": "sha256:23f7e3874a081e629dbf60784d46f96a",
+      "body_hash": "sha256:e77995bae58f196b303ba1fd2e8b66d9",
       "loop_depth": 0,
       "instance_attributes": []
     },

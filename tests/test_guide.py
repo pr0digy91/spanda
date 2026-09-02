@@ -67,9 +67,9 @@ def test_the_example_symbol_exists_in_this_codebase(indexed):
 
 def test_it_refuses_to_describe_an_index_with_no_completed_scan(tmp_path):
     (tmp_path / "a.py").write_text("def f(): pass\n")
-    with Index(prepare_db_path(tmp_path)) as index:
-        with pytest.raises(ValueError, match="no completed scan"):
-            render(index, tmp_path)
+    with Index(prepare_db_path(tmp_path)) as index, \
+            pytest.raises(ValueError, match="no completed scan"):
+        render(index, tmp_path)
 
 
 def test_an_index_without_edges_says_so_rather_than_claiming_none_exist(indexed):

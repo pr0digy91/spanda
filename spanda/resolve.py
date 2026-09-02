@@ -16,7 +16,7 @@ from __future__ import annotations
 import builtins
 from dataclasses import dataclass, field
 
-from spanda.modules import EXTERNAL, ModuleIndex, resolve_imports
+from spanda.modules import ModuleIndex, resolve_imports
 from spanda.store import symbol_key
 
 BUILTIN_NAMES = frozenset(dir(builtins)) | frozenset({
@@ -452,8 +452,8 @@ def resolve_record(record: dict, table: SymbolTable,
     by_local = {d["local_id"]: d for d in record["definitions"]}
     # Annotated parameters, per definition: the type the code itself declares
     # for a name, which is the single largest source of otherwise-unknowable
-    # attribute access. On the target codebase 85% of `param.method()` references sit
-    # under an annotation the resolver was ignoring.
+    # attribute access. Most `param.method()` references sit under an
+    # annotation, and a resolver that ignores it loses every one of them.
     annotated: dict[str, dict[str, str]] = {}
     for definition in record["definitions"]:
         signature = definition.get("signature")
@@ -509,8 +509,8 @@ def resolve_record(record: dict, table: SymbolTable,
                 reason = R_ASSIGNMENT
             # A call is a call *on the thing resolved*. `Booking.deleted_at
             # .is_(None)` resolves `deleted_at` one link in and calls `is_`
-            # two links in: the column is read, not called. 994 "calls"
-            # edges to columns on the target codebase were this shape.
+            # two links in: the column is read, not called. Without this,
+            # every such chain records a "calls" edge to a column.
             edge_type = context_type
             if target is not None and edge_type == "calls" and depth != len(chain) - 1:
                 edge_type = "uses"
