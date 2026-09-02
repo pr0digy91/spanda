@@ -38,16 +38,15 @@ jobs:
       # The suite builds real git repositories in temporary directories and
       # commits to them. Each test sets its own author, so nothing is needed
       # here beyond git itself, which every runner has.
+      # The claim that an index is portable between interpreters is only worth
+      # anything if something checks it, which is what running the whole suite
+      # on each version does: `test_output_matches_golden` compares extraction
+      # against output frozen on 3.14. It is not a byte comparison, and must
+      # not become one — a syntax error's wording and line number are the
+      # interpreter's own and differ between releases, which is why that test
+      # normalises `parse_error` and pins everything else.
       - name: Run tests
         run: uv run --frozen python -m pytest tests/ -q
-
-      # The claim that an index is portable between interpreters is only worth
-      # anything if something checks it. Extract the fixture corpus and compare
-      # against the committed golden output, which was generated on 3.14.
-      - name: Check extractor output matches the goldens byte for byte
-        run: |
-          uv run --frozen python -m spanda.cli parse fixtures --out /tmp/golden
-          diff -r tests/golden /tmp/golden
 
   lint:
     runs-on: ubuntu-latest
