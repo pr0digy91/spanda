@@ -79,3 +79,28 @@ def test_an_index_without_edges_says_so_rather_than_claiming_none_exist(indexed)
         index.connection.execute("DELETE FROM edges")
         text = render(index, indexed)
     assert "no reference edges yet" in text
+
+
+
+def test_the_guide_lists_candidates_but_decides_nothing(indexed):
+    """The candidates come from the index; the verdict never does. Every
+    line is a suggestion in the file's format, and a recorded verdict
+    removes its symbol from the list."""
+    from spanda.verdicts import verdicts_path
+    with Index(prepare_db_path(indexed)) as index:
+        text = render(index, indexed)
+    assert "0 verdict(s) on record — no `.spanda/verdicts.txt` yet" in text
+    block = text.split("Waiting for a verdict", 1)[1]
+    assert "dead   sample_pkg/handlers.py::on_paid" not in block, \
+        "on_paid is named in a string literal: reachable through unresolved_refs? no — " \
+        "it is on the candidate list only if nothing explains it"
+    first = next(line for line in block.splitlines() if line.startswith("dead   "))
+    target = first.split()[1]
+    file_path, qualname = target.split("::")
+
+    verdicts_path(indexed).write_text(f"alive  {target}  2026-09-02  checked by hand\n")
+    with Index(prepare_db_path(indexed)) as index:
+        text = render(index, indexed)
+    assert "1 verdict(s) on record (1 alive, 0 dead)" in text
+    assert target not in text.split("Waiting for a verdict", 1)[1]
+    assert "1 alive verdict(s) with nothing to explain them" in text

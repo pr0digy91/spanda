@@ -13,6 +13,11 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from spanda import verdicts as verdicts_module
+
+#: Candidates the guide lists before pointing at `spanda vet` for the rest.
+CANDIDATE_LIMIT = 20
+
 TEMPLATE = Path(__file__).with_name("index_guide.md")
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 
@@ -125,6 +130,38 @@ def render(index, root: Path) -> str:
         note = ("This index holds no reference edges yet. `spanda backfill` resolves "
                 "them only\nfor the newest commit; run `spanda index` to fill them in.")
 
+    # The verdicts loop, as it stands: read from the repo's file, checked
+    # against this scan. Generated, like everything else here; the one thing
+    # it never generates is the verdict itself.
+    known, problems, exists = verdicts_module.load(root)
+    vetting = verdicts_module.vet(index, known, problems, exists, limit=CANDIDATE_LIMIT)
+    verdict_lines = [
+        f"{len(known)} verdict(s) on record"
+        + (f" ({sum(1 for v in known if v.verdict == 'alive')} alive, "
+           f"{sum(1 for v in known if v.verdict == 'dead')} dead)" if known else "")
+        + ("" if exists else " — no `.spanda/verdicts.txt` yet")]
+    if problems:
+        verdict_lines.append(f"{len(problems)} line(s) in the file could not be read; "
+                             f"`spanda vet` says which")
+    if vetting.suggestions:
+        verdict_lines.append(f"{len(vetting.suggestions)} pattern line(s) waiting to be "
+                             f"added — alive verdicts on shapes the tool did not recognise")
+    if vetting.contradicted:
+        verdict_lines.append(f"{len(vetting.contradicted)} verdict(s) the code now "
+                             f"contradicts")
+    if vetting.blind_spots:
+        verdict_lines.append(f"{len(vetting.blind_spots)} alive verdict(s) with nothing "
+                             f"to explain them — blind spots to report")
+    today = datetime.now(timezone.utc).date().isoformat()
+    if vetting.candidates:
+        candidate_lines = [f"dead   {f}::{q}  {today}  " for f, q, _l in vetting.candidates]
+        if vetting.candidates_total > len(vetting.candidates):
+            candidate_lines.append(
+                f"# ... and {vetting.candidates_total - len(vetting.candidates)} more: "
+                f"`spanda vet {root.name} --limit {vetting.candidates_total}`")
+    else:
+        candidate_lines = ["# nothing left to vet outside tests"]
+
     commit = latest_row["git_commit_hash"] or latest_row["git_base_commit"]
     values = {
         "repo": root.name,
@@ -139,6 +176,9 @@ def render(index, root: Path) -> str:
         "hint_unknown": f"{hint_unknown:,}",
         "hint_external": f"{hint_external:,}",
         "verdicts": f"{verdicts:,}",
+        "verdict_summary": "\n".join(f"- {line}" for line in verdict_lines),
+        "candidates_total": f"{vetting.candidates_total:,}",
+        "candidates_block": "\n".join(candidate_lines),
         "schema": str(schema),
         "unknown_type": f"{reasons.get('attribute_on_unknown_type', 0):,}",
         "example_symbol": _example_symbol(index, latest),

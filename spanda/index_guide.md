@@ -7,8 +7,8 @@ A spanda index is a plain SQLite database at `<repo>/.spanda/index.db`. This
 is the note for anyone — human or agent — querying it directly, or deciding
 which `spanda` command to run instead.
 
-Read the two rules below before anything else. Both are ways to get a
-confidently wrong answer from correct data.
+Read the three rules below before anything else. The first two are ways to get a
+confidently wrong answer from correct data; the third is where the answer stops being the tool's to give.
 
 ---
 
@@ -77,8 +77,21 @@ dead   services/legacy.py::old_helper                2026-09-02  removed in PR 4
 verdicts into the `verdicts` table, turns every *alive* verdict on an
 unrecognised shape into the pattern line that would have recognised it,
 reports verdicts the code has since contradicted, and prints the next
-candidates as lines ready to paste back. {{verdicts}} verdict(s) are recorded
-here today.
+candidates as lines ready to paste back. As of this scan:
+
+{{verdict_summary}}
+
+### Waiting for a verdict — {{candidates_total}} symbols, no caller, no hint, no decision
+
+Each line below is a candidate, formatted as a verdict. Nothing about it has
+been decided: the tool found no static caller and nothing that explains the
+silence, and that is all it knows. A person who looks and agrees pastes the
+line into `.spanda/verdicts.txt` as it is; one who finds it alive changes
+the word and writes down what calls it. Tests are left out.
+
+```
+{{candidates_block}}
+```
 
 ---
 
