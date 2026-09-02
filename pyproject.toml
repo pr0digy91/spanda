@@ -2,7 +2,6 @@
 # The import package and the command are both `spanda`; only the published
 # distribution carries the suffix, because `spanda` on PyPI was already taken.
 name = "spanda-graph"
-version = "0.1.0"
 description = "Deterministic static-analysis indexing engine for Python codebases"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -27,6 +26,9 @@ keywords = [
 # reads. Run it on the newest interpreter available; the output is identical
 # across versions, which the CI matrix checks on every commit.
 dependencies = []
+# One version number, and it lives in the package so that `spanda --version`
+# is right whether the tool was installed or is being run from a clone.
+dynamic = ["version"]
 
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -61,6 +63,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["spanda"]
+
+[tool.setuptools.dynamic]
+version = { attr = "spanda.__version__" }
 
 [tool.setuptools.package-data]
 spanda = ["*.txt", "*.md"]

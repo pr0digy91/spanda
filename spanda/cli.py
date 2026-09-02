@@ -22,6 +22,7 @@ from spanda.loops import build as build_loops, render as render_loops
 from spanda.modules import (EXTERNAL, build_import_graph, cycle_groups,
                             processing_order)
 from spanda.profile import build as build_profile, render as render_profile
+from spanda import __version__
 from spanda import verdicts as verdicts_module
 from spanda.scan import (changed_python_files, cycles_for, full_scan, git,
                          git_failure, import_survey, incremental_scan,
@@ -955,6 +956,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="spanda",
         description="Deterministic static-analysis indexing engine for Python.")
+    # The interpreter goes in the version string because it is the first thing
+    # worth knowing about a wrong answer: a parser cannot read syntax newer
+    # than its own release, so an old Python reports valid files as broken.
+    parser.add_argument(
+        "-V", "--version", action="version",
+        version=f"spanda {__version__} (Python {platform.python_version()})")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     parse = subparsers.add_parser(

@@ -44,9 +44,9 @@ body:
   - type: input
     id: version
     attributes:
-      label: Python version
-      description: 'Run: python3 --version'
-      placeholder: "3.14.6"
+      label: Version
+      description: 'Run: spanda --version'
+      placeholder: "spanda 0.1.0 (Python 3.14.6)"
     validations:
       required: true
 
