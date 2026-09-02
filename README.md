@@ -63,6 +63,35 @@ Ask an agent instead, and it reads fifteen files to answer one question, spends
 the context you needed for the real work, and still finishes with "it appears
 to be unused."
 
+### The answer that made this necessary
+
+An existing code-graph tool, evaluated on a production FastAPI and SQLAlchemy
+backend. Asked what would break if `_apply_rls_context` changed, it reported:
+
+> affects 1 symbols
+
+That function has zero static callers *by design*. It is registered with
+`@event.listens_for(...)` and fires on every transaction begin in the system.
+No call edges became no impact — on one of the highest-blast-radius functions
+in the codebase.
+
+`grep` finds nothing there either. The difference is that an empty grep result
+makes you open the file and see the decorator, whereas a formatted impact
+report reads like finished analysis. It converts *"I found nothing"* into
+*"there is nothing"* — and it was blindest exactly where that stack is most
+load-bearing: decorators, dependency injection, event hooks.
+
+In fairness, that tool's caller lookup was substantially accurate, and mapping
+symbols to the tests that cover them was genuinely useful. The problem was not
+accuracy in the ordinary case. It was silence formatted as an answer in the
+case that mattered.
+
+spanda exists to make that substitution impossible. Same function, same absence
+of edges, opposite conclusion invited — the output at the top of this page is
+that function. It is now one of the fixtures spanda is measured against, in
+[`fixtures/README.md`](fixtures/README.md), alongside two other symbols that
+are called at runtime and named by nothing.
+
 ## What changes, measured
 
 Both charts below are real measurements, taken with Claude Code working on a
@@ -76,6 +105,20 @@ An index answers from a table rather than from the source. The agent stops
 opening files to work out what calls what, and the context it saves goes to the
 work you actually wanted done. Reading the index's own guide costs about 2,400
 tokens once, and pays for itself by the second question.
+
+### What that saving is, and is not
+
+<img src="https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/saving-scope.png" alt="Table of realistic saving by task shape: pure investigation 90 to 97 percent, investigate then edit one file 50 to 65 percent, editing something whose location is already known 0 percent. Below it, a note that reading a file is permanent: once 25,000 tokens of a route file are in the window they stay for the rest of the session." width="100%">
+
+A 97% figure is true of one task shape and dishonest as a headline. If you
+already know which file to edit, an index saves you nothing at all.
+
+The effect that never appears as a percentage is the one that matters most:
+reading a file is *permanent*. Those 25,000 tokens sit in the window for the
+rest of the session, crowding out everything after them. A 640-token answer
+does not. The practical result is not that each question is cheaper — it is
+that the session stays coherent roughly three times longer, which is what
+decides whether a long refactor finishes or dies halfway.
 
 ### The "probably dead" list actually resolves
 
@@ -92,6 +135,22 @@ deleted.
 That distinction is the entire point. A tool that had simply reported 246 dead
 symbols on day one would have been wrong about most of them, and confidently
 so.
+
+### What that day actually shipped
+
+<img src="https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/what-changed.png" alt="One working day, five commits: 379 net lines removed, 30 functions deleted on the index's evidence, 21 verbatim copies of one helper collapsed to 1, 2,618 tests passing with zero failures throughout, one import cycle of six dissolved, and one production bug found." width="100%">
+
+Five commits, one working day, the suite green at every step. The line that
+matters is the last one.
+
+An internal admin endpoint had been raising `NameError` on its first line for
+nearly four months. A file split moved the code but not one of its imports. It
+survived the linter, 2,612 passing tests and continuous deployment, because no
+test covered the route and it was gated to a role nobody had exercised.
+
+Nothing *found* that bug. It fell out by elimination: once the index's
+reference classification was corrected, it was the only genuinely undefined
+name left in the codebase.
 
 ## Install
 
