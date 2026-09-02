@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/banner.png" alt="An arc drawn between two posts, with the shorter dashed paths that were not taken shown beneath it" width="100%">
+<img src="https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/banner.png" alt="A waveform running the width of the image, gathering into a single bright pulse at its centre with concentric rings spreading from it" width="100%">
 
 # spanda
 
