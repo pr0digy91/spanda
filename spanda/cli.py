@@ -22,6 +22,7 @@ from spanda.loops import build as build_loops, render as render_loops
 from spanda.modules import (EXTERNAL, build_import_graph, cycle_groups,
                             processing_order)
 from spanda.profile import build as build_profile, render as render_profile
+from spanda import verdicts as verdicts_module
 from spanda.scan import (changed_python_files, cycles_for, full_scan, git,
                          git_failure, import_survey, incremental_scan,
                          override_hints, plan_for, resolve_codebase,
@@ -264,6 +265,10 @@ def _run_scan(db_path, root, plan, patterns):
         counts["lost"] = lost
         index.set_external_base_hints(
             scan_id, override_hints(run.collected, run.module_index))
+        known, problems, _exists = verdicts_module.load(root)
+        index.load_verdicts(known)
+        for problem in problems:
+            print(f"  ! verdicts.txt line {problem.line}: {problem.why}", file=sys.stderr)
 
         totals = index.finish_scan(scan_id)
         missing = index.gone_since_previous(scan_id)
@@ -819,11 +824,44 @@ def cmd_callers(args: argparse.Namespace) -> int:
                 if len(maybe) > args.limit:
                     print(f"      ... and {len(maybe) - args.limit} more")
 
-            if not callers and not symbol["has_dynamic_dispatch"] and not maybe \
+            verdict = index.verdict_for(symbol["file_path"], symbol["qualname"])
+            if verdict:
+                print(f"\n  Vetted {verdict['verdict'].upper()} by a person on "
+                      f"{verdict['date']}" + (f": {verdict['note']}" if verdict["note"] else "")
+                      + "\n     (from .spanda/verdicts.txt; `spanda vet` checks it "
+                        "against each scan)")
+            elif not callers and not symbol["has_dynamic_dispatch"] and not maybe \
                     and not symbol["dispatch_hint"]:
                 print("\n  Nothing references it, and nothing explains the "
                       "silence. Possibly unused —\n     though entry points and "
-                      "callers outside this codebase are invisible here.")
+                      "callers outside this codebase are invisible here. If a "
+                      "person\n     decides, record it: `spanda vet` prints the line.")
+    return 0
+
+
+def cmd_vet(args: argparse.Namespace) -> int:
+    root = Path(args.path).resolve()
+    target = resolve_db(args)
+    if target is None:
+        print(f"no index yet at {db_path(root)} — run `spanda index` first",
+              file=sys.stderr)
+        return 1
+    known, problems, exists = verdicts_module.load(root)
+    with Index(target) as index:
+        report = verdicts_module.vet(index, known, problems, exists,
+                                     include_tests=args.include_tests, limit=args.limit)
+    print(verdicts_module.render(report, root.name, verdicts_module.verdicts_path(root)))
+    if args.append_to and report.suggestions:
+        destination = Path(args.append_to)
+        existing = destination.read_text() if destination.exists() else ""
+        new = [s for s in report.suggestions if s.line not in existing.splitlines()]
+        if new:
+            with destination.open("a") as handle:
+                handle.write(f"\n# From `spanda vet {root.name}` on "
+                             f"{datetime.now(timezone.utc).date().isoformat()}:\n")
+                for s in new:
+                    handle.write(f"# {s.because}\n{s.line}\n")
+        print(f"appended {len(new)} pattern line(s) to {destination}")
     return 0
 
 
@@ -950,6 +988,19 @@ def main(argv: list[str] | None = None) -> int:
                            help="rows per section (default 15)")
     loops_cmd.add_argument("--db", default=None, help="pin a specific index file")
     loops_cmd.set_defaults(func=cmd_loops)
+
+    vet_cmd = subparsers.add_parser(
+        "vet", help="the verdicts loop: read .spanda/verdicts.txt against the index, "
+                    "print pattern lines to add and the next candidates to vet")
+    vet_cmd.add_argument("path", help="root of the indexed codebase")
+    vet_cmd.add_argument("--include-tests", action="store_true",
+                         help="list candidates under tests/ too")
+    vet_cmd.add_argument("--limit", type=int, default=30, metavar="N",
+                         help="candidates to print (default 30)")
+    vet_cmd.add_argument("--append-to", metavar="FILE",
+                         help="append the suggested pattern lines to this pattern file")
+    vet_cmd.add_argument("--db", default=None, help="pin a specific index file")
+    vet_cmd.set_defaults(func=cmd_vet)
 
     guide_cmd = subparsers.add_parser(
         "guide", help="a note on reading this index, with its own numbers filled in")

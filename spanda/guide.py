@@ -61,6 +61,17 @@ def render(index, root: Path) -> str:
         " WHERE last_seen_scan_id = ? AND has_dynamic_dispatch = 1",
         (latest,)).fetchone()[0]
 
+    hint_unknown = connection.execute(
+        "SELECT COUNT(*) FROM symbols WHERE last_seen_scan_id = ?"
+        " AND dispatch_hint LIKE 'unknown\\_decorator:%' ESCAPE '\\'",
+        (latest,)).fetchone()[0]
+    hint_external = connection.execute(
+        "SELECT COUNT(*) FROM symbols WHERE last_seen_scan_id = ?"
+        " AND dispatch_hint LIKE 'external\\_base:%' ESCAPE '\\'",
+        (latest,)).fetchone()[0]
+    verdicts = _count(connection, "verdicts")
+    schema = index.meta("schema_version") or "?"
+
     edges = {r["edge_type"]: r["c"] for r in connection.execute(
         "SELECT edge_type, COUNT(*) c FROM edges WHERE last_seen_scan_id = ?"
         " GROUP BY edge_type", (latest,))}
@@ -97,6 +108,9 @@ def render(index, root: Path) -> str:
     lines.append(f"lost trails      {lost or 0:>7,}   imports the resolver could not place"
                  + ("" if not lost else " — DISTRUST 'no callers' UNTIL FIXED"))
     lines.append(f"dynamic dispatch {dynamic:>7,}   live symbols whose callers are not in the source")
+    lines.append(f"unrecognised     {hint_unknown + hint_external:>7,}   live symbols the tool declines "
+                 f"to call dead ({hint_unknown:,} unknown decorator, {hint_external:,} external base)")
+    lines.append(f"verdicts         {verdicts:>7,}   human decisions on record")
 
     if edge_total:
         considered = edge_total + unresolved_total
@@ -122,6 +136,10 @@ def render(index, root: Path) -> str:
         "symbols_alive": f"{alive:,}",
         "symbols_dead": f"{total - alive:,}",
         "dynamic": f"{dynamic:,}",
+        "hint_unknown": f"{hint_unknown:,}",
+        "hint_external": f"{hint_external:,}",
+        "verdicts": f"{verdicts:,}",
+        "schema": str(schema),
         "unknown_type": f"{reasons.get('attribute_on_unknown_type', 0):,}",
         "example_symbol": _example_symbol(index, latest),
         "stats_block": "\n".join(lines),

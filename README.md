@@ -37,6 +37,7 @@ Each module does one thing, and says which in its first line:
 | `gaps.py` | what the extractor cannot see, made explicit |
 | `profile.py` | what the corpus keeps doing |
 | `loops.py` | where the loops are, and what runs inside them |
+| `verdicts.py` | human decisions kept in `.spanda/verdicts.txt`, and the loop that turns a miss into a pattern line |
 | `guide.py` | the index described from the index |
 | `cli.py` | arguments in, one command run, text out; reads no source itself |
 
@@ -82,6 +83,11 @@ python3.14 -m venv .venv && .venv/bin/pip install -q pytest
 # Where the loops are: nested in one body, nested across calls, recursive,
 # and database calls inside them. Places to look, never a complexity.
 .venv/bin/python -m spanda.cli loops <path>
+
+# The verdicts loop: read <path>/.spanda/verdicts.txt against the index,
+# print the pattern lines that alive verdicts imply, the verdicts the code
+# now contradicts, and the next candidates to vet as paste-ready lines.
+.venv/bin/python -m spanda.cli vet <path>
 
 # A note on reading the index, with that index's own numbers in it
 .venv/bin/python -m spanda.cli guide <path> --write

@@ -241,6 +241,17 @@ CREATE TABLE IF NOT EXISTS scan_decorators (
     PRIMARY KEY (scan_id, base)
 );
 
+-- Human verdicts, loaded from `.spanda/verdicts.txt` so queries can join on
+-- them. The file is the source of truth; this table is its current reading.
+CREATE TABLE IF NOT EXISTS verdicts (
+    file_path TEXT NOT NULL,
+    qualname  TEXT NOT NULL,
+    verdict   TEXT NOT NULL,   -- alive | dead
+    date      TEXT NOT NULL,
+    note      TEXT,
+    PRIMARY KEY (file_path, qualname)
+);
+
 -- Calls inside loops that the resolver could not follow — a database session
 -- is an external type, so `session.execute` in a loop never becomes an edge,
 -- and without this row the loop body would read as empty. Current scan only.
@@ -328,12 +339,25 @@ def index_dir(root: Path) -> Path:
 #: inside whichever one you happened to open.
 DB_FILENAME = "index.db"
 
-GITIGNORE_BODY = """# Spanda index files.
+OLD_GITIGNORE_BODY = """# Spanda index files.
 #
 # Derived data: everything here is rebuildable from the source it describes,
 # and the files are large and binary. Ignoring the whole directory, including
 # this file, keeps generated indexes out of the repository's history.
 *
+"""
+
+GITIGNORE_BODY = """# Spanda index files.
+#
+# Derived data: everything here is rebuildable from the source it describes,
+# and the files are large and binary. Ignoring the directory keeps generated
+# indexes out of the repository's history.
+#
+# verdicts.txt is the exception: human decisions about symbols the tool cannot
+# see callers for. Those are not derivable from anything and belong in git.
+# This file stays ignored too; spanda writes it again wherever it runs.
+*
+!verdicts.txt
 """
 
 
@@ -347,7 +371,9 @@ def ensure_index_dir(root: Path) -> Path:
     directory = index_dir(root)
     directory.mkdir(parents=True, exist_ok=True)
     gitignore = directory / ".gitignore"
-    if not gitignore.exists():
+    # Rewritten only when it is verbatim the file an earlier spanda wrote;
+    # anything a person edited is theirs and is left alone.
+    if not gitignore.exists() or gitignore.read_text() == OLD_GITIGNORE_BODY:
         gitignore.write_text(GITIGNORE_BODY)
     return directory
 
@@ -632,6 +658,19 @@ class Index:
             "UPDATE symbols SET dispatch_hint = ? WHERE symbol_key = ?"
             " AND dispatch_hint IS NULL",
             [(f"external_base:{base}", key) for key, base in hints.items()])
+
+    def load_verdicts(self, verdicts) -> None:
+        """Replace the table with the file's current contents."""
+        self.connection.execute("DELETE FROM verdicts")
+        self.connection.executemany(
+            "INSERT OR REPLACE INTO verdicts (file_path, qualname, verdict, date, note)"
+            " VALUES (?, ?, ?, ?, ?)",
+            [(v.file_path, v.qualname, v.verdict, v.date, v.note) for v in verdicts])
+
+    def verdict_for(self, file_path: str, qualname: str) -> sqlite3.Row | None:
+        return self.connection.execute(
+            "SELECT * FROM verdicts WHERE file_path = ? AND qualname = ?",
+            (file_path, qualname)).fetchone()
 
     def record_decorator_census(self, scan_id: int) -> None:
         """Every decorator base in use at this scan, counted."""
