@@ -1,13 +1,26 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/banner.png" alt="spanda" width="100%">
+
 # spanda
 
-![A thin arc of light and its reflection meeting at two points on still water](https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/banner.png)
+### Find out who calls a function — and be told, plainly, when nobody can know.
+
+**Deterministic static analysis for Python that reports its own blind spot, instead of reporting zero.**
 
 [![CI](https://github.com/pr0digy91/spanda/actions/workflows/ci.yml/badge.svg)](https://github.com/pr0digy91/spanda/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/spanda-graph?color=blue)](https://pypi.org/project/spanda-graph/)
+[![Python](https://img.shields.io/pypi/pyversions/spanda-graph)](https://pypi.org/project/spanda-graph/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)](pyproject.toml)
 
-**Find out who calls a function — and be told, plainly, when nobody can know.**
+```sh
+uv tool install spanda-graph
+```
+
+</div>
+
+---
 
 Every static analyser has a blind spot. Ask most of them who calls an event
 hook, a route handler, or anything reached through `getattr`, and you get
