@@ -27,6 +27,32 @@ than that codebase's syntax will record files as syntax errors that are
 perfectly valid. `.python-version` pins 3.14 for that reason. 3.9 is the
 supported floor, not the recommended version.
 
+## Layout
+
+Each module does one thing, and says which in its first line. If a change
+blurs two of these together, say why in the PR.
+
+| module | role |
+|---|---|
+| `extract.py` | one file to one record: definitions, references, imports, hashes, hints |
+| `modules.py` | dotted names to files; import graph; cycle groups |
+| `resolve.py` | a reference to the definition it means, or a reason it cannot be |
+| `scan.py` | one scan into an open index, full or incremental; all the git calls |
+| `store.py` | the SQLite index: identity across scans, presence, versions, migrations |
+| `drift.py` | two scans compared |
+| `gaps.py` | what the extractor cannot see, made explicit |
+| `profile.py` | what the corpus keeps doing |
+| `loops.py` | where the loops are, and what runs inside them |
+| `verdicts.py` | human decisions kept in the index, and the loop that turns a miss into a pattern line |
+| `guide.py` | the index described from the index |
+| `cli.py` | arguments in, one command run, text out; reads no source itself |
+
+Two files are data rather than code, and are meant to be extended by anyone
+who runs the tool on a codebase spanda does not yet understand:
+`dynamic_dispatch.txt` (decorators that make callers unknowable) and
+`database_calls.txt` (method names that mean a query). Grow the first from the
+decorator census that `spanda parse` prints, not from memory.
+
 ## Tests
 
 ```sh
