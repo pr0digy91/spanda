@@ -27,6 +27,7 @@ Both are deliberate.
 | `lazy.py` | 1 | 1 | 0 | 0 | 0 |
 | `batch.py` | 5 | 4 | 0 | 0 | 1 |
 | `middleware.py` | 15 | 3 | 3 | 4 | 5 |
+| `scoping.py` | 19 | 6 | 2 | 2 | 9 |
 | `a.py` | 3 | 2 | 0 | 0 | 1 |
 | `b.py` | 1 | 1 | 0 | 0 | 0 |
 | `checkout.py` | 4 | 4 | 0 | 0 | 0 |
@@ -42,9 +43,9 @@ Both are deliberate.
 | `registry/impl.py` | 1 | 1 | 0 | 0 | 0 |
 | `star.py` | 1 | 1 | 0 | 0 | 0 |
 | `broken.py` | — | unparseable; the reported line and wording vary by interpreter |
-| **Total** | **79** | 36 | 9 | 14 | 20 |
+| **Total** | **98** | 42 | 11 | 16 | 29 |
 
-20 files: 19 parse, 1 does not.
+21 files: 20 parse, 1 does not.
 
 ## What each file proves
 
@@ -63,6 +64,7 @@ Both are deliberate.
 | `recursion.py` | Self- and mutual recursion. The graph is not a DAG. |
 | `lazy.py` | An import inside a function body, called through. The import audit passes on it; the call must still become an edge. |
 | `batch.py` | Loops: two nested in one body, one calling a two-loop function (three deep across the call), and a database call inside a loop. |
+| `scoping.py` | Labels: a member inherited from an external base is *maybe inherited*, not absent; lambda, comprehension and class-body names are bound; a module alias reaches re-exports and submodules; a member read inside a call is a use, not a call; a call further along the chain is not a call on the member; module-level loop targets are module names; an attribute set on self is an instance attribute, not absent. |
 | `middleware.py` | Framework-called with no caller in the code: `@app.middleware`, `@server.list_tools()`, a `dispatch` override on an external base that no decorator marks, a decorator on neither list (`@scheduler.scheduled_job`), a public method on a Pydantic model that nothing names, and a SQLAlchemy model owned by its `Base`. |
 | `nested.py` | Nested function, nested class, async, and every parameter kind. |
 | `broken.py` | A syntax error must be recorded, not fatal. |

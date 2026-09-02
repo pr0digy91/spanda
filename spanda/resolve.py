@@ -19,7 +19,12 @@ from dataclasses import dataclass, field
 from spanda.modules import EXTERNAL, ModuleIndex, resolve_imports
 from spanda.store import symbol_key
 
-BUILTIN_NAMES = frozenset(dir(builtins))
+BUILTIN_NAMES = frozenset(dir(builtins)) | frozenset({
+    # Every module has these without defining them. Sixty-six `__file__`
+    # references were "not found" before they were listed.
+    "__file__", "__name__", "__doc__", "__spec__", "__loader__", "__package__",
+    "__path__", "__builtins__", "__debug__", "__annotations__", "__dict__",
+})
 
 # Why a reference could not be linked to a definition.
 R_EXTERNAL = "external_module"          # lives in a library, not this codebase
@@ -27,6 +32,14 @@ R_BUILTIN = "builtin"                   # print, len, dict...
 R_UNKNOWN_TYPE = "attribute_on_unknown_type"   # obj.method() on an unknown obj
 R_NOT_FOUND = "not_found"               # a bare name nothing here defines
 R_NO_SUCH_ATTR = "no_such_attribute"    # module or class known, member is not
+#: The class is known but inherits from something outside this codebase, so
+#: the member may well exist — `model_dump` on a Pydantic model. Reported
+#: as "no such attribute" this was wrong 112 times out of 112.
+R_INHERITED = "attribute_maybe_inherited"
+#: `self.window_seconds` where `__init__` assigned it: a value on every
+#: instance, not a symbol and not absent. Sixty-three "no such attribute"
+#: rows were this.
+R_INSTANCE = "instance_attribute"
 R_STAR = "star_import_ambiguous"        # arrived via `import *`, source unclear
 R_DYNAMIC = "dynamic_dispatch"          # the target is chosen at runtime
 #: Not a failure: the name refers to a module in this codebase rather than to
@@ -82,6 +95,10 @@ class SymbolTable:
     class_members: dict[str, dict[str, str]] = field(default_factory=dict)
     #: module -> __all__, when declared
     exports: dict[str, list[str]] = field(default_factory=dict)
+    #: module -> the file it was read from, for reaching a module's scope
+    module_files: dict[str, str] = field(default_factory=dict)
+    #: class symbol_key -> names its methods assign on self
+    instance_attrs: dict[str, set[str]] = field(default_factory=dict)
     #: symbol_keys whose callers cannot be determined by reading the code
     dynamic: set[str] = field(default_factory=set)
 
@@ -90,6 +107,7 @@ class SymbolTable:
 
         module, file_path = record["module"], record["file"]
         self.module_names.setdefault(module, {})
+        self.module_files[module] = file_path
         if record["dunder_all"]:
             self.exports[module] = record["dunder_all"]
 
@@ -102,6 +120,8 @@ class SymbolTable:
 
             if is_framework_called(definition, bases_by_local, patterns):
                 self.dynamic.add(key)
+            if definition["kind"] == "class" and definition.get("instance_attributes"):
+                self.instance_attrs[key] = set(definition["instance_attributes"])
 
             parent = definition["parent"]
             if parent is None:
@@ -142,6 +162,56 @@ class SymbolTable:
                 if found is not None:
                     return found
         return None
+
+    def has_instance_attr(self, class_key: str, name: str,
+                          scopes: dict[str, dict[str, Target]] | None,
+                          seen: set[str] | None = None) -> bool:
+        """True if the class or an ancestor assigns `self.<name>` somewhere."""
+        seen = seen if seen is not None else set()
+        if class_key in seen:
+            return False
+        seen.add(class_key)
+        if name in self.instance_attrs.get(class_key, ()):
+            return True
+        _kind, file_path, _qualname = self.symbols.get(class_key, (None, None, None))
+        if file_path is None or scopes is None:
+            return False
+        scope = scopes.get(file_path, {})
+        for base in self.class_bases.get(class_key, []):
+            root = base.partition("(")[0].partition("[")[0].strip()
+            target = scope.get(root.rpartition(".")[2] if "." in root else root)
+            if target and target.kind == "symbol" \
+                    and self.has_instance_attr(target.symbol, name, scopes, seen):
+                return True
+        return False
+
+    def has_opaque_base(self, class_key: str,
+                        scopes: dict[str, dict[str, Target]] | None,
+                        seen: set[str] | None = None) -> bool:
+        """True if anything in the class's ancestry is not a class this
+        codebase defines: an external base, a base that is a variable
+        (`Base = declarative_base()`), a base nothing resolves. Then a
+        missing member is *unknown*, not absent."""
+        seen = seen if seen is not None else set()
+        if class_key in seen:
+            return False
+        seen.add(class_key)
+        _kind, file_path, _qualname = self.symbols.get(class_key, (None, None, None))
+        if file_path is None or scopes is None:
+            return True
+        scope = scopes.get(file_path, {})
+        for base in self.class_bases.get(class_key, []):
+            root = base.partition("(")[0].partition("[")[0].strip()
+            head = root.partition(".")[0]
+            target = scope.get(root.rpartition(".")[2] if "." in root else root) \
+                or scope.get(head)
+            if target is None or target.kind != "symbol":
+                return True
+            if self.symbols.get(target.symbol, (None,))[0] != "class":
+                return True
+            if self.has_opaque_base(target.symbol, scopes, seen):
+                return True
+        return False
 
 
 def build_scope(record: dict, table: SymbolTable, index: ModuleIndex
@@ -398,7 +468,9 @@ def resolve_record(record: dict, table: SymbolTable,
     nested: dict[tuple[str, str], str] = {}
     for definition in record["definitions"]:
         parent = definition["parent"]
-        if parent is not None and by_local.get(parent, {}).get("kind") != "class":
+        if parent is not None:
+            # Inside a function: a closure. Directly in a class body: an
+            # attribute the body reads further down (`double = rate * 2`).
             nested[(parent, definition["name"])] = symbol_key(
                 record["file"], definition["qualname"], definition["kind"])
 
@@ -412,20 +484,36 @@ def resolve_record(record: dict, table: SymbolTable,
             enclosing_class[definition["local_id"]] = symbol_key(
                 record["file"], by_local[parent]["qualname"], "class")
 
+    def missing_member(class_key: str, name: str) -> str:
+        if name.startswith("__") and name.endswith("__"):
+            return R_BUILTIN  # `__name__`, `__doc__`: every class has them
+        if table.has_instance_attr(class_key, name, scopes):
+            return R_INSTANCE
+        return R_INHERITED if table.has_opaque_base(class_key, scopes) else R_NO_SUCH_ATTR
+
     out: list[Reference] = []
     for reference in record["references"]:
         chain = reference["chain"]
         if not chain:
             continue
         source = owner.get(reference["enclosing"])
-        edge_type = _edge_type(reference["context"])
+        context_type = _edge_type(reference["context"])
 
         is_store = reference["context"] == "assign_target"
 
-        def emit(target: str | None, reason: str | None = None) -> None:
-            # An unresolved *write* is not a possible caller of anything.
-            if target is None and is_store and reason == R_UNKNOWN_TYPE:
+        def emit(target: str | None, reason: str | None = None, depth: int = 0) -> None:
+            # An unresolved *write* is not a possible caller of anything —
+            # whatever the reason the target could not be found.
+            if target is None and is_store and reason in (
+                    R_UNKNOWN_TYPE, R_INHERITED, R_NO_SUCH_ATTR, R_INSTANCE):
                 reason = R_ASSIGNMENT
+            # A call is a call *on the thing resolved*. `Booking.deleted_at
+            # .is_(None)` resolves `deleted_at` one link in and calls `is_`
+            # two links in: the column is read, not called. 994 "calls"
+            # edges to columns on the target codebase were this shape.
+            edge_type = context_type
+            if target is not None and edge_type == "calls" and depth != len(chain) - 1:
+                edge_type = "uses"
             out.append(Reference(
                 source_file=record["file"], source_symbol=source,
                 target_symbol=target, edge_type=edge_type,
@@ -439,7 +527,8 @@ def resolve_record(record: dict, table: SymbolTable,
         if root in ("self", "cls") and len(chain) > 1:
             owning = enclosing_class.get(reference["enclosing"])
             found = table.member(owning, chain[1], scopes=scopes) if owning else None
-            emit(found, None if found else R_UNKNOWN_TYPE)
+            emit(found, None if found else (
+                missing_member(owning, chain[1]) if owning else R_UNKNOWN_TYPE), depth=1)
             continue
 
         if reference["local"]:
@@ -449,7 +538,7 @@ def resolve_record(record: dict, table: SymbolTable,
             if len(chain) == 1:
                 inner = nested.get((reference["enclosing"], root))
                 if inner is not None:
-                    emit(inner)
+                    emit(inner, depth=0)
                 continue
             # `param.member` where the signature says what `param` is.
             annotation = annotated.get(reference["enclosing"], {}).get(root)
@@ -461,7 +550,7 @@ def resolve_record(record: dict, table: SymbolTable,
                 emit(None, reason)
                 continue
             found = table.member(class_key, chain[1], scopes=scopes)
-            emit(found, None if found else R_NO_SUCH_ATTR)
+            emit(found, None if found else missing_member(class_key, chain[1]), depth=1)
             continue
 
         target = scope.get(root)
@@ -474,22 +563,45 @@ def resolve_record(record: dict, table: SymbolTable,
             continue
 
         if target.kind == "module":
-            if len(chain) == 1:
+            # Walk the chain through submodules: `pkg.sub.thing` is a member
+            # of `pkg.sub`, not a missing member of `pkg`.
+            module, depth = target.module, 1
+            while depth < len(chain) and f"{module}.{chain[depth]}" in table.module_files:
+                module, depth = f"{module}.{chain[depth]}", depth + 1
+            if depth == len(chain):
                 emit(None, R_MODULE)
                 continue
-            key = table.module_names.get(target.module, {}).get(chain[1])
-            emit(key, None if key else R_NO_SUCH_ATTR)
+            name = chain[depth]
+            if name in BUILTIN_NAMES and name.startswith("__"):
+                emit(None, R_BUILTIN)  # `pkg.__file__`: every module has it
+                continue
+            key = table.module_names.get(module, {}).get(name)
+            if key is None:
+                # Not defined there — but a module's scope holds what it
+                # imports and re-exports, and `pkg.Thing` through a package
+                # root is exactly that. `deps.create_access_token` was "no
+                # such attribute" for want of this second look.
+                via = scopes.get(table.module_files.get(module, ""), {}).get(name)
+                if via is not None and via.kind == "symbol":
+                    key = via.symbol
+                elif via is not None and via.kind == "external":
+                    emit(None, R_EXTERNAL)
+                    continue
+                elif via is not None and via.kind == "module":
+                    emit(None, R_MODULE)
+                    continue
+            emit(key, None if key else R_NO_SUCH_ATTR, depth=depth)
             continue
 
         # A symbol in this codebase.
         if len(chain) == 1:
-            emit(target.symbol, R_STAR if target.via_star else None)
+            emit(target.symbol, R_STAR if target.via_star else None, depth=0)
             continue
 
         kind = table.symbols.get(target.symbol, (None,))[0]
         if kind == "class":
             found = table.member(target.symbol, chain[1], scopes=scopes)
-            emit(found, None if found else R_NO_SUCH_ATTR)
+            emit(found, None if found else missing_member(target.symbol, chain[1]), depth=1)
         else:
             emit(None, R_UNKNOWN_TYPE)
     return out

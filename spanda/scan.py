@@ -166,6 +166,7 @@ def for_resolution(record: dict) -> dict:
                          "qualname": d["qualname"], "kind": d["kind"],
                          "parent": d["parent"], "bases": d["bases"],
                          "lines": d["lines"],
+                         "instance_attributes": d.get("instance_attributes", []),
                          "signature": ({"params": [
                              {"name": p["name"], "annotation": p["annotation"]}
                              for p in d["signature"]["params"]]}

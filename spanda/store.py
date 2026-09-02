@@ -291,7 +291,8 @@ CREATE INDEX IF NOT EXISTS idx_symbols_module ON symbols (module);
 #: Unresolved reasons worth storing: these could have pointed at this
 #: codebase. Externals and builtins could not, and would only add bulk.
 KEEPABLE_REASONS = frozenset({
-    "attribute_on_unknown_type", "no_such_attribute", "not_found"})
+    "attribute_on_unknown_type", "attribute_maybe_inherited", "instance_attribute",
+    "no_such_attribute", "not_found"})
 
 SYMBOL_FIELDS = [
     "name", "qualname", "kind", "module", "file_path", "line_start",

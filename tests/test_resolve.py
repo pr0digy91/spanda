@@ -448,3 +448,81 @@ def test_an_assignment_target_is_not_a_possible_caller(resolved):
     assert stores, "the fixture's __init__ writes these"
     assert all(r.reason == R_ASSIGNMENT for r in stores)
     assert R_ASSIGNMENT not in KEEPABLE_REASONS
+
+
+
+# -- three labelling faults a reviewer found in the live index ---------------
+
+def _scoping(resolved):
+    _table, references = resolved
+    return [r for r in references if r.source_file == "sample_pkg/scoping.py"]
+
+
+def test_a_member_of_a_class_with_an_external_base_is_maybe_inherited(resolved):
+    """`a.model_dump()` on a Pydantic model: the class is known, its base is
+    not, so the member is unknown — not absent. 112 of 112 were mislabelled."""
+    (ref,) = [r for r in _scoping(resolved) if r.raw == "a.model_dump"]
+    assert ref.reason == "attribute_maybe_inherited"
+    assert not any(r.reason == "no_such_attribute" for r in _scoping(resolved))
+
+
+def test_names_the_language_binds_are_not_reported_as_unfound(resolved):
+    unfound = [r.raw for r in _scoping(resolved) if r.reason == "not_found"]
+    assert unfound == []
+    (ref,) = [r for r in _scoping(resolved) if r.raw == "__file__"]
+    assert ref.reason == "builtin"
+
+
+def test_a_class_body_reference_resolves_to_the_attribute(resolved):
+    _table, references = resolved
+    assert ("sample_pkg.scoping.Ledger|class",
+            "sample_pkg.scoping.Ledger.rate|variable") in edges(references, "uses")
+
+
+def test_a_module_alias_reaches_its_definitions_and_re_exports(resolved):
+    _table, references = resolved
+    assert ("sample_pkg.scoping.via_alias|function",
+            "sample_pkg.helpers.slugify|function") in edges(references, "calls")
+    assert ("sample_pkg.scoping.via_alias|function",
+            "sample_pkg.models.Order|class") in edges(references, "uses"), \
+        "Order is re-exported by the package root, not defined there"
+
+
+def test_reading_a_member_inside_a_call_is_a_use_not_a_call(resolved):
+    _table, references = resolved
+    key = ("sample_pkg.scoping.filtered|function", "sample_pkg.models.Order.total|method")
+    assert key in edges(references, "uses")
+    assert key not in edges(references, "calls")
+
+
+
+def test_an_attribute_set_on_self_is_an_instance_attribute_not_absent(resolved):
+    reads = [r for r in _scoping(resolved)
+             if r.raw == "self.seconds" and r.reason != "assignment_target"]
+    assert [r.reason for r in reads] == ["instance_attribute"]
+
+
+def test_a_call_further_along_the_chain_is_not_a_call_on_the_member(resolved):
+    """`Order.total.__doc__.strip()` reads total and calls strip."""
+    _table, references = resolved
+    key = ("sample_pkg.scoping.described|function", "sample_pkg.models.Order.total|method")
+    assert key in edges(references, "uses") and key not in edges(references, "calls")
+
+
+def test_a_module_level_loop_target_resolves_as_a_module_name(resolved):
+    _table, references = resolved
+    # The read sits in module-level code, so its source is the module.
+    assert (None, "sample_pkg.scoping._spec|variable") in edges(references, "uses")
+
+
+def test_a_chain_through_a_submodule_reaches_its_member(resolved):
+    _table, references = resolved
+    assert ("sample_pkg.scoping.deep|function",
+            "sample_pkg.helpers.slugify|function") in edges(references, "calls")
+
+
+
+def test_dunder_attributes_every_class_and_module_has_are_builtins(resolved):
+    reasons = {r.raw: r.reason for r in _scoping(resolved)
+               if r.raw in ("Order.__name__", "h.__file__")}
+    assert reasons == {"Order.__name__": "builtin", "h.__file__": "builtin"}

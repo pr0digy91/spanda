@@ -1,0 +1,1058 @@
+{
+  "file": "sample_pkg/scoping.py",
+  "module": "sample_pkg.scoping",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:cb0cd3ff4bbb4b5a6895916598e23f3d",
+  "module_docstring": "Names a resolver mislabels without meaning to.\n\nA review of the live index found three labelling faults, none in what the\nindex stores: a member missing from a class with an external base reported\nas \"no such attribute\" (112 of 112 wrong), lambda and comprehension\nvariables and class-body attributes reported as \"not found\", and a column\nread inside a query call recorded as a *call* to the column. Each shape is\nhere once.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "import sample_pkg as pkg",
+      "module": null,
+      "names": [
+        {
+          "name": "sample_pkg",
+          "alias": "pkg"
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 11,
+      "conditional": false
+    },
+    {
+      "raw": "from . import helpers as h",
+      "module": ".",
+      "names": [
+        {
+          "name": "helpers",
+          "alias": "h"
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 12,
+      "conditional": false
+    },
+    {
+      "raw": "from .middleware import Auditor",
+      "module": ".middleware",
+      "names": [
+        {
+          "name": "Auditor",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 13,
+      "conditional": false
+    },
+    {
+      "raw": "from .models import Order",
+      "module": ".models",
+      "names": [
+        {
+          "name": "Order",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 14,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "variable",
+      "name": "HERE",
+      "qualname": "HERE",
+      "parent": null,
+      "lines": [
+        16,
+        16
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:de4b67a5abce3dcf7fd328cd4dde32b0",
+      "body_hash": "sha256:47f6f34a2693ceb1169f4b320cc67b87",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d2",
+      "kind": "class",
+      "name": "Ledger",
+      "qualname": "Ledger",
+      "parent": null,
+      "lines": [
+        19,
+        21
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [],
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "bases()",
+      "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
+      "content_hash": "sha256:aa84bd9983e39d7ecd01147425c8c6ac",
+      "body_hash": "sha256:0fbcdf9893e11e117d5cd91e415bd6c1",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d3",
+      "kind": "variable",
+      "name": "rate",
+      "qualname": "Ledger.rate",
+      "parent": "d2",
+      "lines": [
+        20,
+        20
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:22d63b95c34f0d0b4acf50477200a150",
+      "body_hash": "sha256:c13ab94d71f9e96dce44e04f5dd81264",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d4",
+      "kind": "variable",
+      "name": "double",
+      "qualname": "Ledger.double",
+      "parent": "d2",
+      "lines": [
+        21,
+        21
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:c3e0a0ad3e7c123290b774aa8a3f36e5",
+      "body_hash": "sha256:2412b53c8ed19192b10494acec8d53b1",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d5",
+      "kind": "function",
+      "name": "apply_all",
+      "qualname": "apply_all",
+      "parent": null,
+      "lines": [
+        24,
+        25
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "items",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:items)->",
+      "signature_hash": "sha256:697306a9e2f930e41b2a5e4e53ab36f3",
+      "content_hash": "sha256:242cc809849ad5864cf3e18ee6631076",
+      "body_hash": "sha256:e626d310e007d6b27cd87c1725a53328",
+      "loop_depth": 1,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d6",
+      "kind": "function",
+      "name": "dump",
+      "qualname": "dump",
+      "parent": null,
+      "lines": [
+        28,
+        29
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "a",
+            "kind": "positional",
+            "annotation": "Auditor",
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:a:Auditor)->",
+      "signature_hash": "sha256:6bcd6df4e92043af82e428a2c8ccb0f6",
+      "content_hash": "sha256:1063141e7cfc65a36922e9536eec0866",
+      "body_hash": "sha256:70fb41ed6151c0e66a62860f74f094ad",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d7",
+      "kind": "function",
+      "name": "via_alias",
+      "qualname": "via_alias",
+      "parent": null,
+      "lines": [
+        32,
+        33
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "text",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:text)->",
+      "signature_hash": "sha256:8172805e319aaf00971d4025a5c7724c",
+      "content_hash": "sha256:23667beb9e31891f1738666b876359bf",
+      "body_hash": "sha256:9ff857492a3492baf6d7ba7b2005a0b2",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d8",
+      "kind": "function",
+      "name": "filtered",
+      "qualname": "filtered",
+      "parent": null,
+      "lines": [
+        36,
+        37
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "query",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:query)->",
+      "signature_hash": "sha256:01092e35c213afe45d0e6f37c6384279",
+      "content_hash": "sha256:bf6fb606f10ba908f92e65347758930f",
+      "body_hash": "sha256:dcc59adb154db6d15606805299553d64",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d9",
+      "kind": "function",
+      "name": "described",
+      "qualname": "described",
+      "parent": null,
+      "lines": [
+        40,
+        41
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "()->str",
+      "signature_hash": "sha256:fcc4c0c5b51213b840ff1e53f352585c",
+      "content_hash": "sha256:83dbdf55323e8bcf7e21a66003b95920",
+      "body_hash": "sha256:f596b498ede4442db352c9f729bb885e",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d10",
+      "kind": "variable",
+      "name": "PAIRS",
+      "qualname": "PAIRS",
+      "parent": null,
+      "lines": [
+        44,
+        44
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:e06a9d28950ba462544d6176bb67fed6",
+      "body_hash": "sha256:68374951a3792f388c0c24f2b52345de",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d11",
+      "kind": "variable",
+      "name": "_kind",
+      "qualname": "_kind",
+      "parent": null,
+      "lines": [
+        45,
+        45
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": true,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:2ed4f9e008b536666b03384a641e1768",
+      "body_hash": "sha256:7af3420ac79dd57aeecfb0971ad8b789",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d12",
+      "kind": "variable",
+      "name": "_spec",
+      "qualname": "_spec",
+      "parent": null,
+      "lines": [
+        45,
+        45
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": true,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:2ed4f9e008b536666b03384a641e1768",
+      "body_hash": "sha256:7af3420ac79dd57aeecfb0971ad8b789",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d13",
+      "kind": "variable",
+      "name": "LAST",
+      "qualname": "LAST",
+      "parent": null,
+      "lines": [
+        46,
+        46
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:a54ab2f79df3bec148cfc9089cd230d8",
+      "body_hash": "sha256:b25f3ab0522a8889a65e6e2b29b65321",
+      "loop_depth": 1,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d14",
+      "kind": "class",
+      "name": "Window",
+      "qualname": "Window",
+      "parent": null,
+      "lines": [
+        49,
+        54
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [],
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "bases()",
+      "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
+      "content_hash": "sha256:9dec380db4c056088b1b711b3e434ddb",
+      "body_hash": "sha256:ae3b9d20d075ede38885cea2efc00644",
+      "loop_depth": 0,
+      "instance_attributes": [
+        "seconds"
+      ]
+    },
+    {
+      "local_id": "d15",
+      "kind": "method",
+      "name": "__init__",
+      "qualname": "Window.__init__",
+      "parent": "d14",
+      "lines": [
+        50,
+        51
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "seconds",
+            "kind": "positional",
+            "annotation": "int",
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:self,positional:seconds:int)->",
+      "signature_hash": "sha256:0c5d0b036777c766d97dec12df25a167",
+      "content_hash": "sha256:9e5cae4a2350141a2e2267699c5dfcd1",
+      "body_hash": "sha256:b41f88f2468dd7158d1ff5675e0efb19",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d16",
+      "kind": "method",
+      "name": "cutoff",
+      "qualname": "Window.cutoff",
+      "parent": "d14",
+      "lines": [
+        53,
+        54
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "now",
+            "kind": "positional",
+            "annotation": "float",
+            "default": null
+          }
+        ],
+        "returns": "float"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:self,positional:now:float)->float",
+      "signature_hash": "sha256:f24b741f5f47bdb1bc193145e0dcf41a",
+      "content_hash": "sha256:d13c115f0f9c60a8606ee50f32abf560",
+      "body_hash": "sha256:3baf757cf67203f1b05f3208685fce96",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d17",
+      "kind": "function",
+      "name": "deep",
+      "qualname": "deep",
+      "parent": null,
+      "lines": [
+        57,
+        58
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "text",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:text)->",
+      "signature_hash": "sha256:8172805e319aaf00971d4025a5c7724c",
+      "content_hash": "sha256:05146ae00dff502aa52108a8ee0b1908",
+      "body_hash": "sha256:23f7e3874a081e629dbf60784d46f96a",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d18",
+      "kind": "variable",
+      "name": "KIND",
+      "qualname": "KIND",
+      "parent": null,
+      "lines": [
+        61,
+        61
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:b277cae5037a14a17753d2c9c6d55b65",
+      "body_hash": "sha256:ef08c15a69e5ba711fe7dc1aaa8116f0",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d19",
+      "kind": "variable",
+      "name": "WHERE",
+      "qualname": "WHERE",
+      "parent": null,
+      "lines": [
+        62,
+        62
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:ef811a725f80db7926a2fc9566db505c",
+      "body_hash": "sha256:8204ff79795f6d5b432af2d5e5a64811",
+      "loop_depth": 0,
+      "instance_attributes": []
+    }
+  ],
+  "references": [
+    {
+      "raw": "__file__",
+      "root": "__file__",
+      "chain": [
+        "__file__"
+      ],
+      "context": "name",
+      "line": 16,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "rate",
+      "root": "rate",
+      "chain": [
+        "rate"
+      ],
+      "context": "name",
+      "line": 21,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "call",
+      "line": 25,
+      "enclosing": "d5",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "map",
+      "root": "map",
+      "chain": [
+        "map"
+      ],
+      "context": "call",
+      "line": 25,
+      "enclosing": "d5",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "x",
+      "root": "x",
+      "chain": [
+        "x"
+      ],
+      "context": "name",
+      "line": 25,
+      "enclosing": "d5",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "items",
+      "root": "items",
+      "chain": [
+        "items"
+      ],
+      "context": "name",
+      "line": 25,
+      "enclosing": "d5",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "items",
+      "root": "items",
+      "chain": [
+        "items"
+      ],
+      "context": "name",
+      "line": 25,
+      "enclosing": "d5",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "y",
+      "root": "y",
+      "chain": [
+        "y"
+      ],
+      "context": "name",
+      "line": 25,
+      "enclosing": "d5",
+      "local": true,
+      "loop_depth": 1
+    },
+    {
+      "raw": "y",
+      "root": "y",
+      "chain": [
+        "y"
+      ],
+      "context": "name",
+      "line": 25,
+      "enclosing": "d5",
+      "local": true,
+      "loop_depth": 1
+    },
+    {
+      "raw": "Auditor",
+      "root": "Auditor",
+      "chain": [
+        "Auditor"
+      ],
+      "context": "annotation",
+      "line": 28,
+      "enclosing": "d6",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "a.model_dump",
+      "root": "a",
+      "chain": [
+        "a",
+        "model_dump"
+      ],
+      "context": "call",
+      "line": 29,
+      "enclosing": "d6",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "h.slugify",
+      "root": "h",
+      "chain": [
+        "h",
+        "slugify"
+      ],
+      "context": "call",
+      "line": 33,
+      "enclosing": "d7",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "text",
+      "root": "text",
+      "chain": [
+        "text"
+      ],
+      "context": "name",
+      "line": 33,
+      "enclosing": "d7",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "pkg.Order",
+      "root": "pkg",
+      "chain": [
+        "pkg",
+        "Order"
+      ],
+      "context": "name",
+      "line": 33,
+      "enclosing": "d7",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "query.where",
+      "root": "query",
+      "chain": [
+        "query",
+        "where"
+      ],
+      "context": "call",
+      "line": 37,
+      "enclosing": "d8",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "Order.total",
+      "root": "Order",
+      "chain": [
+        "Order",
+        "total"
+      ],
+      "context": "name",
+      "line": 37,
+      "enclosing": "d8",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 40,
+      "enclosing": "d9",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "Order.total.__doc__.strip",
+      "root": "Order",
+      "chain": [
+        "Order",
+        "total",
+        "__doc__",
+        "strip"
+      ],
+      "context": "call",
+      "line": 41,
+      "enclosing": "d9",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "PAIRS",
+      "root": "PAIRS",
+      "chain": [
+        "PAIRS"
+      ],
+      "context": "name",
+      "line": 45,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "_spec",
+      "root": "_spec",
+      "chain": [
+        "_spec"
+      ],
+      "context": "name",
+      "line": 46,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 1
+    },
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 50,
+      "enclosing": "d15",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "self.seconds",
+      "root": "self",
+      "chain": [
+        "self",
+        "seconds"
+      ],
+      "context": "assign_target",
+      "line": 51,
+      "enclosing": "d15",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "seconds",
+      "root": "seconds",
+      "chain": [
+        "seconds"
+      ],
+      "context": "name",
+      "line": 51,
+      "enclosing": "d15",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "float",
+      "root": "float",
+      "chain": [
+        "float"
+      ],
+      "context": "annotation",
+      "line": 53,
+      "enclosing": "d16",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "float",
+      "root": "float",
+      "chain": [
+        "float"
+      ],
+      "context": "annotation",
+      "line": 53,
+      "enclosing": "d16",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "now",
+      "root": "now",
+      "chain": [
+        "now"
+      ],
+      "context": "name",
+      "line": 54,
+      "enclosing": "d16",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "self.seconds",
+      "root": "self",
+      "chain": [
+        "self",
+        "seconds"
+      ],
+      "context": "name",
+      "line": 54,
+      "enclosing": "d16",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "pkg.helpers.slugify",
+      "root": "pkg",
+      "chain": [
+        "pkg",
+        "helpers",
+        "slugify"
+      ],
+      "context": "call",
+      "line": 58,
+      "enclosing": "d17",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "text",
+      "root": "text",
+      "chain": [
+        "text"
+      ],
+      "context": "name",
+      "line": 58,
+      "enclosing": "d17",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "Order.__name__",
+      "root": "Order",
+      "chain": [
+        "Order",
+        "__name__"
+      ],
+      "context": "name",
+      "line": 61,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "h.__file__",
+      "root": "h",
+      "chain": [
+        "h",
+        "__file__"
+      ],
+      "context": "name",
+      "line": 62,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 0
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "a",
+      "line": 44,
+      "enclosing": null
+    },
+    {
+      "kind": "identifier_string",
+      "value": "n",
+      "line": 44,
+      "enclosing": null
+    },
+    {
+      "kind": "identifier_string",
+      "value": "n",
+      "line": 46,
+      "enclosing": null
+    }
+  ]
+}

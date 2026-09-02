@@ -54,7 +54,8 @@
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
       "content_hash": "sha256:a7d399f29bfc13731227ead54be87438",
       "body_hash": "sha256:089e438bf3d5c4d40db1194b1eef1c34",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     },
     {
       "local_id": "d2",
@@ -89,7 +90,8 @@
       "signature_hash": "sha256:1c71e8766901814c4ca50bcf51fc32fe",
       "content_hash": "sha256:20c83dada926c7be3eb557a371f12f54",
       "body_hash": "sha256:cbc4872c3c343f703fb26a318bb29280",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     }
   ],
   "references": [
@@ -170,7 +172,7 @@
       "chain": [
         "order_id"
       ],
-      "context": "call",
+      "context": "name",
       "line": 16,
       "enclosing": "d2",
       "local": true,

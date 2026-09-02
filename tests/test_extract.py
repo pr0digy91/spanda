@@ -24,6 +24,7 @@ EXPECTED_COUNTS = {
     "sample_pkg/lazy.py":      (1, 1, 0, 0, 0),
     "sample_pkg/batch.py":     (5, 4, 0, 0, 1),
     "sample_pkg/middleware.py": (15, 3, 3, 4, 5),
+    "sample_pkg/scoping.py":    (19, 6, 2, 2, 9),
     "sample_pkg/registry/__init__.py": (1, 0, 0, 0, 1),
     "sample_pkg/registry/impl.py":     (1, 1, 0, 0, 0),
     "sample_pkg/a.py":         (3, 2, 0, 0, 1),
@@ -77,10 +78,10 @@ def test_definition_counts_match_answer_key(records, path, expected):
 
 
 def test_totals(records):
-    assert len(records) == 20
-    assert sum(len(r["definitions"]) for r in records.values()) == 79
+    assert len(records) == 21
+    assert sum(len(r["definitions"]) for r in records.values()) == 98
     parsed = [r for r in records.values() if r["parse_status"] == "ok"]
-    assert len(parsed) == 19
+    assert len(parsed) == 20
 
 
 # -- the hard edges --------------------------------------------------------
@@ -412,3 +413,39 @@ def test_a_nested_function_starts_its_own_loop_count(tmp_path):
     assert by["outer.inner"]["loop_depth"] == 0
     depths = {r["raw"]: r["loop_depth"] for r in record["references"]}
     assert depths["helper"] == 0 and depths["inner"] == 1
+
+
+
+# -- scopes the language has and the walker used to lack ---------------------
+
+def test_lambda_and_comprehension_names_are_local(records):
+    refs = {(r["raw"], r["local"]) for r in records["sample_pkg/scoping.py"]["references"]}
+    assert ("x", True) in refs, "a lambda parameter"
+    assert ("y", True) in refs, "a comprehension target"
+    assert ("items", True) in refs, "the enclosing function's parameter, as before"
+
+
+def test_a_class_body_reads_its_own_attribute_as_local(records):
+    refs = [(r["raw"], r["local"], r["context"])
+            for r in records["sample_pkg/scoping.py"]["references"] if r["raw"] == "rate"]
+    assert refs == [("rate", True, "name")]
+
+
+def test_an_argument_is_read_not_called(records):
+    refs = {r["raw"]: r["context"] for r in records["sample_pkg/scoping.py"]["references"]}
+    assert refs["Order.total"] == "name", "inside where(...) but not the thing called"
+    assert refs["query.where"] == "call"
+    assert refs["h.slugify"] == "call"
+
+
+
+def test_module_level_loop_targets_are_definitions(records):
+    names = _by_qualname(records["sample_pkg/scoping.py"])
+    assert names["_kind"]["kind"] == "variable" and names["_spec"]["kind"] == "variable"
+    assert "Window.__init__.seconds" not in names, "a function-level target is not"
+
+
+def test_attributes_assigned_on_self_are_recorded_on_the_class(records):
+    names = _by_qualname(records["sample_pkg/scoping.py"])
+    assert names["Window"]["instance_attributes"] == ["seconds"]
+    assert names["Ledger"]["instance_attributes"] == []

@@ -48,7 +48,8 @@
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
       "content_hash": "sha256:7e30c3cec7c0d54a5956e78b2b45d73e",
       "body_hash": "sha256:b7155225c5494efbfd24b63a2ebe2c94",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     }
   ],
   "references": [],

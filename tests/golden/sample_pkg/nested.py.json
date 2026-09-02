@@ -56,7 +56,8 @@
       "signature_hash": "sha256:b1996aa4290575733ac6adec58d9edeb",
       "content_hash": "sha256:f91d9a089f765bafcbc3c00c9e1efc30",
       "body_hash": "sha256:d1b69b146700422904c60eaea431a656",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     },
     {
       "local_id": "d2",
@@ -91,7 +92,8 @@
       "signature_hash": "sha256:6cc194678076b385e8e986380d1060bd",
       "content_hash": "sha256:a38776afe8922e0c2b39a6079f4fe0ca",
       "body_hash": "sha256:da19f0761add9dc71d8c519ad200896c",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     },
     {
       "local_id": "d3",
@@ -134,7 +136,8 @@
       "signature_hash": "sha256:958b88299ad4633cd6d18076cf277dbb",
       "content_hash": "sha256:aba676d1cc4a2a773f37b92566c9fd1c",
       "body_hash": "sha256:fd7fdae72ed25a2e413116921cf5c637",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     },
     {
       "local_id": "d4",
@@ -187,7 +190,8 @@
       "signature_hash": "sha256:9c59f6a081879019a9a766abfc5d50cd",
       "content_hash": "sha256:43f975f29caf24d1c7a4a5f1b1feffc2",
       "body_hash": "sha256:528db40683d8b01a0774613acaa7427b",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     },
     {
       "local_id": "d5",
@@ -212,7 +216,8 @@
       "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
       "content_hash": "sha256:8b12d42b521c77f3613470dd5665478f",
       "body_hash": "sha256:0ff58b970bad5b7572b55dfcc9a7f951",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     },
     {
       "local_id": "d6",
@@ -237,7 +242,8 @@
       "signature_hash": "sha256:99538b3192756ff5c4a97394cf49d657",
       "content_hash": "sha256:ed37dad8a472c115003d99aea416e1ab",
       "body_hash": "sha256:6e83b3bbe2458d5196c315f854c4782d",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     },
     {
       "local_id": "d7",
@@ -262,7 +268,8 @@
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
       "content_hash": "sha256:cd4d0db839527552004193aaa6426813",
       "body_hash": "sha256:c4ba40c36a0df616d8164ac5446b02ea",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     },
     {
       "local_id": "d8",
@@ -297,7 +304,8 @@
       "signature_hash": "sha256:241662efb905849dbd20926af7de972d",
       "content_hash": "sha256:3859ad71301990cd55f16ea6874632c9",
       "body_hash": "sha256:a184910ac5f9e31850ab9cc24706e329",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     }
   ],
   "references": [

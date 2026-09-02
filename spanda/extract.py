@@ -231,6 +231,23 @@ class _BindingCollector(ast.NodeVisitor):
         self.declared_elsewhere.update(node.names)
 
 
+def _class_bindings(node: ast.ClassDef) -> set[str]:
+    """Names bound in a class body: attributes, methods, nested classes.
+
+    A class body is a scope of its own — `double = rate * 2` reads `rate`
+    from the body above it — but not one a method can see. Forty-six
+    ORM-model column references were "not found" for want of this."""
+    collector = _BindingCollector()
+    for statement in node.body:
+        collector.visit(statement)
+    return collector.names - collector.declared_elsewhere
+
+
+def _target_names(target) -> set[str]:
+    """Names a comprehension or loop target binds, tuples included."""
+    return {n.id for n in ast.walk(target) if isinstance(n, ast.Name)}
+
+
 def _local_bindings(node) -> set[str]:
     collector = _BindingCollector()
     for statement in node.body:
@@ -346,6 +363,11 @@ class _Walker(ast.NodeVisitor):
         self.docstrings: set[int] = {module_docstring} if module_docstring else set()
         self.out = _FileResult()
         self.scopes: list[_Scope] = [_Scope(None, "", False, False)]
+        #: Names bound by a lambda or a comprehension the walk is inside.
+        #: Neither is a definition, so neither is a scope on the stack; but
+        #: `lambda x: x * 2` binds `x` all the same, and a resolver that
+        #: does not know it reports forty-seven one-letter names as unfound.
+        self.transient: list[set[str]] = []
         self.context = "name"
         self.conditional = 0
         self._counter = 0
@@ -364,11 +386,32 @@ class _Walker(ast.NodeVisitor):
         return "\n".join(line.rstrip() for line in segment)
 
     def _is_local(self, root: str | None) -> bool:
-        """True if the root name is bound in an enclosing function scope."""
+        """True if the root name is bound where the reference sits: by a
+        lambda or comprehension around it, by the class body it is directly
+        in, or by an enclosing function."""
         if root is None:
             return False
+        if any(root in names for names in self.transient):
+            return True
+        if self.scope.is_class and root in self.scope.bindings:
+            return True
         return any(scope.is_function and root in scope.bindings
                    for scope in reversed(self.scopes))
+
+    def _binding(self, names: set[str], visit) -> None:
+        self.transient.append(names)
+        try:
+            visit()
+        finally:
+            self.transient.pop()
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        args = node.args
+        for default in list(args.defaults) + [d for d in args.kw_defaults if d]:
+            self.visit(default)  # evaluated where the lambda is written
+        names = {a.arg for a in list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs)}
+        names |= {a.arg for a in (args.vararg, args.kwarg) if a}
+        self._binding(names, lambda: self.visit(node.body))
 
     def _record_reference(self, node, raw: str, chain: list[str] | None) -> None:
         root = chain[0] if chain else None
@@ -442,6 +485,10 @@ class _Walker(ast.NodeVisitor):
             # body once that body has been walked. For a variable, where
             # the assignment sits — 1 for one assigned inside a loop.
             "loop_depth": self.scope.loop_depth,
+            # Filled in for a class as its methods are walked: names its
+            # methods assign on self. Always present, so a record's shape does
+            # not depend on what the class happened to contain.
+            "instance_attributes": [],
         })
         return local_id
 
@@ -461,10 +508,49 @@ class _Walker(ast.NodeVisitor):
 
     def visit_For(self, node) -> None:
         self.visit(node.iter)
+        # A loop target at module or class level binds a name there, like an
+        # assignment does: `for _type, _spec in CATALOG.items()` at the top of
+        # a module makes `_spec` a module name the body below reads.
+        if not self.scope.is_function:
+            for name in self._assignment_names(node.target):
+                self._add_definition(node, "variable", name.id,
+                                     lines=[node.lineno, node.lineno])
         self.visit(node.target)
         self._in_loop(lambda: [self.visit(s) for s in node.body])
         for statement in node.orelse:
             self.visit(statement)
+
+    def visit_With(self, node) -> None:
+        for item in node.items:
+            self.visit(item.context_expr)
+            if item.optional_vars is not None:
+                if not self.scope.is_function:
+                    for name in self._assignment_names(item.optional_vars):
+                        self._add_definition(node, "variable", name.id,
+                                             lines=[node.lineno, node.lineno])
+                self.visit(item.optional_vars)
+        for statement in node.body:
+            self.visit(statement)
+
+    visit_AsyncWith = visit_With
+
+    def _note_instance_attribute(self, target) -> None:
+        """`self.x = ...` inside a method: `x` exists on every instance, and
+        a later `self.x` read is not a missing attribute. Recorded on the
+        enclosing class so the resolver can tell absent from unrecorded."""
+        if not (isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name)
+                and target.value.id in ("self", "cls")):
+            return
+        for scope in reversed(self.scopes):
+            if scope.is_class:
+                definition = next(
+                    d for d in reversed(self.out.definitions) if d["local_id"] == scope.local_id)
+                attributes = definition.setdefault("instance_attributes", [])
+                if target.attr not in attributes:
+                    attributes.append(target.attr)
+                return
+            if not scope.is_function:
+                return
 
     visit_AsyncFor = visit_For
 
@@ -487,7 +573,8 @@ class _Walker(ast.NodeVisitor):
             if i > 0:
                 self.visit(generator.iter)  # runs inside the previous loop
             self.visit(generator.target)
-            self._in_loop(lambda: [self.visit(c) for c in generator.ifs] + [inside(i + 1)])
+            self._binding(_target_names(generator.target), lambda: self._in_loop(
+                lambda: [self.visit(c) for c in generator.ifs] + [inside(i + 1)]))
 
         self.visit(generators[0].iter)
         inside(0)
@@ -559,7 +646,8 @@ class _Walker(ast.NodeVisitor):
             docstring=ast.get_docstring(node),
         )
         qualname = f"{self.scope.qualname}.{node.name}" if self.scope.qualname else node.name
-        self.scopes.append(_Scope(local_id, qualname, is_class=True, is_function=False))
+        self.scopes.append(_Scope(local_id, qualname, is_class=True, is_function=False,
+                                  bindings=_class_bindings(node)))
         self._in_context("decorator", lambda: [self.visit(d) for d in node.decorator_list])
         self._in_context("base_class", lambda: [self.visit(b) for b in node.bases])
         for statement in node.body:
@@ -584,6 +672,10 @@ class _Walker(ast.NodeVisitor):
                 for name in self._assignment_names(target):
                     self._add_definition(node, "variable", name.id,
                                          lines=[node.lineno, node.end_lineno])
+        else:
+            for target in node.targets:
+                for element in (target.elts if isinstance(target, ast.Tuple) else [target]):
+                    self._note_instance_attribute(element)
         self._in_context("assign_target",
                          lambda: [self.visit(t) for t in node.targets])
         self.visit(node.value)
@@ -593,6 +685,8 @@ class _Walker(ast.NodeVisitor):
             self._add_definition(node, "variable", node.target.id,
                                  annotation=_unparse(node.annotation),
                                  lines=[node.lineno, node.end_lineno])
+        elif self.scope.is_function:
+            self._note_instance_attribute(node.target)
         self._in_context("annotation", lambda: self.visit(node.annotation))
         if node.value:
             self.visit(node.value)
@@ -647,10 +741,13 @@ class _Walker(ast.NodeVisitor):
                 "enclosing": self.scope.local_id,
             })
         self._in_context("call", lambda: self.visit(node.func))
-        for argument in node.args:
-            self.visit(argument)
-        for keyword in node.keywords:
-            self.visit(keyword.value)
+        # An argument is read, not called. Without this, everything inside
+        # `select(X).where(X.col == v)` inherits the outer "call" context —
+        # the function of `.where` is itself a call — and 2,739 column
+        # reads on the target codebase became "calls" edges to columns.
+        argument_context = self.context if self.context in self.STRUCTURAL else "name"
+        self._in_context(argument_context, lambda: [
+            self.visit(a) for a in node.args] + [self.visit(k.value) for k in node.keywords])
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         chain = _dotted_chain(node)

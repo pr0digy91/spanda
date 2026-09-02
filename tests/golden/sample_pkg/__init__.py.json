@@ -97,7 +97,8 @@
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
       "content_hash": "sha256:010ca5bf0d812ce85fab3c5014d0d4f3",
       "body_hash": "sha256:b4961261ea1bfb14be9c6844ff79a911",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     },
     {
       "local_id": "d2",
@@ -122,7 +123,8 @@
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
       "content_hash": "sha256:f7c1152ced11e787ca946fcc34d4d81a",
       "body_hash": "sha256:7fbd8a0cbcc747a042e43b8fe11fce5c",
-      "loop_depth": 0
+      "loop_depth": 0,
+      "instance_attributes": []
     }
   ],
   "references": [],
