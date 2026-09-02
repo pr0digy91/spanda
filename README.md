@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/banner.png" alt="spanda" width="100%">
+<img src="https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/banner.png" alt="An arc drawn between two posts, with the shorter dashed paths that were not taken shown beneath it" width="100%">
 
 # spanda
 
@@ -44,6 +44,54 @@ That is the whole idea. Everything else is in service of it.
 
 No LLM calls, no network, no telemetry. Zero runtime dependencies — standard
 library only. Same input, same output, every time.
+
+## Why this exists
+
+You inherit a Python service with a thousand files and four years of history.
+Somewhere in it is code nothing has called in three years, and you cannot tell
+which — so you delete none of it.
+
+`grep` gives you forty hits: a third in tests, a third in strings, the rest in
+an `__init__.py` that re-exports the name one more hop. And the one caller that
+actually matters is a Celery task, a Django signal, or a route handler that no
+line of code names at all.
+
+So the file stays. Every file stays. That is how a codebase gets to a thousand
+files.
+
+Ask an agent instead, and it reads fifteen files to answer one question, spends
+the context you needed for the real work, and still finishes with "it appears
+to be unused."
+
+## What changes, measured
+
+Both charts below are real measurements, taken with Claude Code working on a
+production Python codebase — not projections.
+
+### Answering costs a fraction of reading
+
+<img src="https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/cost-to-ask.png" alt="Token cost of four questions answered by reading files versus by querying the index: 16,000 to 400 tokens; 4,400 to 640; 29,000 to 640; 29,000 to 215." width="100%">
+
+An index answers from a table rather than from the source. The agent stops
+opening files to work out what calls what, and the context it saves goes to the
+work you actually wanted done. Reading the index's own guide costs about 2,400
+tokens once, and pays for itself by the second question.
+
+### The "probably dead" list actually resolves
+
+<img src="https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/candidates-fall.png" alt="Line chart falling from 246 candidates needing human judgement to 2 over six steps: first measurement, re-export bug fixed, lazy imports followed, 21 functions deleted, 3 cascades removed, and 9 more plus new patterns." width="100%">
+
+246 symbols with no visible caller, down to 2 in a day.
+
+The important part is *why* it fell. Roughly two thirds of that drop is the
+tool learning what the frameworks in that codebase actually call — a re-export
+chain it was losing the trail on, lazy imports inside function bodies, one
+vetted decorator pattern at a time. Only the remaining third is code genuinely
+deleted.
+
+That distinction is the entire point. A tool that had simply reported 246 dead
+symbols on day one would have been wrong about most of them, and confidently
+so.
 
 ## Install
 
