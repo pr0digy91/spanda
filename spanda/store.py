@@ -21,7 +21,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -137,6 +137,10 @@ CREATE TABLE IF NOT EXISTS symbol_versions (
     canonical_signature TEXT,
     line_start          INTEGER,
     body_hash           TEXT,
+    -- Loop depth as of this version, so drift can say "deeper than it was".
+    -- NULL on rows written before schema 13 whose body has since changed;
+    -- the row for a body that is still current is filled at the next scan.
+    loop_depth          INTEGER,
     PRIMARY KEY (symbol_uuid, scan_id)
 );
 
@@ -274,6 +278,7 @@ MIGRATIONS: dict[int, list[tuple[str, str, str]]] = {
          ("symbol_versions", "body_hash", "TEXT")],
     12: [("symbols", "loop_depth", "INTEGER NOT NULL DEFAULT 0"),
          ("edges", "loop_depth", "INTEGER NOT NULL DEFAULT 0")],
+    13: [("symbol_versions", "loop_depth", "INTEGER")],
 }
 
 
@@ -593,6 +598,18 @@ class Index:
         self._open_scan = None
 
     def finish_scan(self, scan_id: int) -> dict:
+        # A version row written before loop depth existed has NULL there. If
+        # its body is the one this scan just read — same content hash — the
+        # depth is known exactly, because depth is a function of the body.
+        # Older bodies stay NULL: nothing read them, and a migration cannot
+        # invent what it never saw.
+        self.connection.execute(
+            "UPDATE symbol_versions SET loop_depth = ("
+            "  SELECT s.loop_depth FROM symbols s WHERE s.uuid = symbol_versions.symbol_uuid)"
+            " WHERE loop_depth IS NULL AND EXISTS ("
+            "  SELECT 1 FROM symbols s WHERE s.uuid = symbol_versions.symbol_uuid"
+            "  AND s.content_hash = symbol_versions.content_hash"
+            "  AND s.last_seen_scan_id = ?)", (scan_id,))
         # Derived from the files this scan says are present, not accumulated
         # as they streamed past. An incremental scan only opens the files that
         # changed, so an accumulator would describe the diff rather than the
@@ -755,10 +772,11 @@ class Index:
                 self.connection.execute(
                     "INSERT OR REPLACE INTO symbol_versions (symbol_uuid, scan_id,"
                     " content_hash, signature_hash, canonical_signature, line_start,"
-                    " body_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    " body_hash, loop_depth) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (symbol_uuid, scan_id, definition["content_hash"],
                      definition["signature_hash"], definition["canonical_signature"],
-                     definition["lines"][0], definition["body_hash"]))
+                     definition["lines"][0], definition["body_hash"],
+                     definition["loop_depth"]))
 
         return len(definitions)
 

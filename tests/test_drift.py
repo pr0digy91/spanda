@@ -260,3 +260,65 @@ def test_missing_edge_data_is_a_caveat_not_a_zero(tmp_path):
     assert report.edges_added == [] and report.edges_removed == []
     assert any("no reference data" in c for c in report.caveats)
     assert any("import graph was never computed" in c for c in report.caveats)
+
+
+
+# -- loop depth --------------------------------------------------------------
+
+def test_a_loop_added_inside_a_loop_reads_as_deeper(project):
+    """Depth is a property of the body, so it is also an internal change;
+    it is reported on its own because it is a different question."""
+    source, db = project
+    index_once(db, source)
+    (source / "billing.py").write_text(
+        "def total(items, tax):\n"
+        "    out = 0\n"
+        "    for i in items:\n"
+        "        for extra in i.extras:\n"
+        "            out += extra\n"
+        "    return out * tax\n\n\n"
+        "def receipt(order):\n"
+        "    return str(total(order.items, 1.05))\n")
+    index_once(db, source)
+    report = drift_between(db, 1, 2)
+    assert [(c.qualname, c.before, c.after) for c in report.loops_deeper] == [("total", "1", "2")]
+    assert report.loops_shallower == []
+    assert [c.qualname for c in report.internal] == ["total"]
+
+    (source / "billing.py").write_text(
+        "def total(items, tax):\n"
+        "    return sum(items) * tax\n\n\n"
+        "def receipt(order):\n"
+        "    return str(total(order.items, 1.05))\n")
+    index_once(db, source)
+    report = drift_between(db, 2, 3)
+    assert [(c.qualname, c.before, c.after) for c in report.loops_shallower] == [("total", "2", "0")]
+
+
+def test_a_version_without_loop_depth_is_a_caveat_not_a_zero(project):
+    """Rows written before schema 13 carry NULL. If that body is still the
+    current one the next scan fills it exactly; if it was replaced, nothing
+    can, and the report says so instead of comparing against zero."""
+    source, db = project
+    index_once(db, source)
+    with Index(db) as index:
+        index.connection.execute("UPDATE symbol_versions SET loop_depth = NULL")
+    # An unchanged scan: the current bodies get their depth back.
+    index_once(db, source)
+    with Index(db) as index:
+        missing = index.connection.execute(
+            "SELECT COUNT(*) FROM symbol_versions WHERE loop_depth IS NULL").fetchone()[0]
+    assert missing == 0
+
+    with Index(db) as index:
+        index.connection.execute(
+            "UPDATE symbol_versions SET loop_depth = NULL WHERE scan_id = 1")
+    (source / "billing.py").write_text(
+        "def total(items, tax):\n"
+        "    return sum(i.price for i in items) * tax * 2\n\n\n"
+        "def receipt(order):\n"
+        "    return str(total(order.items, 1.05))\n")
+    index_once(db, source)
+    report = drift_between(db, 1, 3)
+    assert report.loops_deeper == [] and report.loops_shallower == []
+    assert any("no loop depth recorded" in c for c in report.caveats)

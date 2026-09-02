@@ -19,6 +19,7 @@ M4 complete: import resolution, processing order, circular import groups.
 M5/M6 complete: reference resolution, edges, and `spanda callers`.
 M7 complete: incremental re-index — 425 commits in 52 seconds, not 12 minutes.
 M8 complete: drift over reference edges and circular-import groups.
+Since then: `body_hash`, `spanda profile`, `spanda loops`, and loop depth in drift.
 
 All eight planned milestones built, plus `gaps`, `profile` and `loops`, which
 were not in the original plan.

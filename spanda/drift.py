@@ -51,6 +51,12 @@ class DriftReport:
     #: Circular-import groups that appeared or dissolved, as sorted file lists.
     cycles_appeared: list[list[str]] = field(default_factory=list)
     cycles_gone: list[list[str]] = field(default_factory=list)
+    #: Symbols whose own-body loop depth rose or fell. Each is also a shape
+    #: or internal change — depth is a property of the body — but it is a
+    #: different question, so it is listed on its own. Depth reached through
+    #: calls is not tracked per scan and is not compared here.
+    loops_deeper: list[Change] = field(default_factory=list)
+    loops_shallower: list[Change] = field(default_factory=list)
     #: Reasons the comparison itself may be incomplete, e.g. files that failed
     #: to parse in either scan. Surfaced rather than quietly tolerated.
     caveats: list[str] = field(default_factory=list)
@@ -113,6 +119,7 @@ def compare(index, scan_a: int, scan_b: int) -> DriftReport:
         report.removed.append(change(uuid, "removed",
                                      before=_describe(version) if version else None))
 
+    loop_depth_unknown = 0
     for uuid in at_a & at_b:
         was = index.version_at(uuid, scan_a)
         now = index.version_at(uuid, scan_b)
@@ -125,11 +132,27 @@ def compare(index, scan_a: int, scan_b: int) -> DriftReport:
             report.internal.append(change(uuid, "internal"))
         else:
             report.unchanged_count += 1
+        if was["content_hash"] != now["content_hash"]:
+            depth_was, depth_now = was["loop_depth"], now["loop_depth"]
+            if depth_was is None or depth_now is None:
+                loop_depth_unknown += 1
+            elif depth_now > depth_was:
+                report.loops_deeper.append(change(
+                    uuid, "loops", before=str(depth_was), after=str(depth_now)))
+            elif depth_now < depth_was:
+                report.loops_shallower.append(change(
+                    uuid, "loops", before=str(depth_was), after=str(depth_now)))
 
-    for bucket in (report.added, report.removed, report.shape, report.internal):
+    for bucket in (report.added, report.removed, report.shape, report.internal,
+                   report.loops_deeper, report.loops_shallower):
         bucket.sort(key=Change.sort_key)
 
     report.caveats = _caveats(index, a, b)
+    if loop_depth_unknown:
+        report.caveats.append(
+            f"{loop_depth_unknown} changed symbol(s) have no loop depth recorded at "
+            f"one of these scans (versions written before schema 13, for bodies "
+            f"since replaced); loop changes among them are not reported")
     _compare_edges(index, scan_a, scan_b, report)
     _compare_cycles(index, scan_a, scan_b, report)
     return report

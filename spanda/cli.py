@@ -419,6 +419,9 @@ def cmd_drift(args: argparse.Namespace) -> int:
         if report.cycles_appeared or report.cycles_gone:
             headline.append(f"{len(report.cycles_appeared)} circular-import "
                             f"group(s) appeared, {len(report.cycles_gone)} dissolved")
+        if report.loops_deeper or report.loops_shallower:
+            headline.append(f"{len(report.loops_deeper)} nest loops deeper, "
+                            f"{len(report.loops_shallower)} shallower")
         print(", ".join(headline).capitalize() + ".")
         print(f"{report.unchanged_count} symbols untouched.\n")
 
@@ -450,6 +453,20 @@ def cmd_drift(args: argparse.Namespace) -> int:
     elif report.internal:
         print(f"({len(report.internal)} internal-only changes hidden; "
               f"drop --brief to list them)\n")
+
+    if report.loops_deeper:
+        print("LOOPS DEEPER — more nesting in the body than before (own loops only;\n"
+              "depth reached through calls is not compared)\n")
+        for change in report.loops_deeper:
+            print(_bullet(change))
+            print(f"        was {change.before} deep, now {change.after}")
+        print()
+    if report.loops_shallower:
+        print("LOOPS SHALLOWER\n")
+        for change in report.loops_shallower:
+            print(_bullet(change))
+            print(f"        was {change.before} deep, now {change.after}")
+        print()
 
     if report.cycles_appeared:
         print("CIRCULAR IMPORTS APPEARED — these files now import each other\n")
