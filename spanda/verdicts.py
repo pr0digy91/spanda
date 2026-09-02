@@ -1,39 +1,32 @@
-"""Human verdicts, and the loop that turns a miss into a pattern line.
+"""Human verdicts, kept in the index, and the loop that turns a miss into a
+pattern line.
 
 The tool can say "no callers" and it can say "I do not know this shape". It
 cannot say "dead". Only a person who has looked can, and that decision was
-being made in a chat window and lost. `<repo>/.spanda/verdicts.txt` keeps
-it, one line per symbol, committed with the code it describes:
+being made in a chat window and lost. The `verdicts` table keeps it, in the
+one authoritative store this project has: the index.
 
-    alive  server.py::RequestLoggingMiddleware.dispatch  2026-09-02  Starlette calls dispatch by name
-    dead   services/legacy.py::old_helper                2026-09-02  removed in PR 412
+    spanda vet <repo> --alive server.py::RequestLoggingMiddleware.dispatch \\
+        --note "Starlette calls dispatch by name"
+    spanda vet <repo> --dead services/legacy.py::old_helper --note "removed in PR 412"
 
-`spanda vet` reads the file against the index and does four things: loads
-the verdicts so `spanda callers` and the guide's queries can see them;
-turns every *alive* verdict on an unrecognised shape into the pattern line
-that would have recognised it; reports verdicts the code has since
-contradicted — a "dead" that now has callers, an "alive" that no longer
-exists; and prints the next candidates to vet, as lines ready to paste
-back. A miss costs one line once it is known, and this is where the line
-comes from.
+`spanda vet` with no flags reads the verdicts against the newest scan and
+does four things: turns every *alive* verdict on an unrecognised shape into
+the pattern line that would have recognised it; reports verdicts the code
+has since contradicted — a "dead" that now has callers, an "alive" that no
+longer exists; flags an alive verdict nothing explains as a blind spot in
+the tool; and prints the next candidates to vet. A miss costs one line once
+it is known, and this is where the line comes from.
+
+The index is not committed, so verdicts live with the index on the machine
+that holds it. `--export` prints them as lines and `--from FILE` reads such
+lines back, for moving them between machines or surviving a rebuild.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
-from pathlib import Path
-
-VERDICTS_NAME = "verdicts.txt"
-HEADER = """# Verdicts: human decisions about symbols spanda cannot see callers for.
-# Committed with the code. One per line, whitespace-separated:
-#
-#   <alive|dead>  <file_path>::<qualname>  <YYYY-MM-DD>  <note, free text>
-#
-# `spanda vet` reads this file: an alive verdict on a shape the tool did not
-# recognise becomes a pattern line to add; a dead verdict that later gains a
-# caller is reported as contradicted. `spanda callers` shows the verdict.
-"""
+from datetime import date, datetime, timezone
 
 
 @dataclass(frozen=True)
@@ -43,7 +36,7 @@ class Verdict:
     verdict: str        # alive | dead
     date: str
     note: str
-    line: int
+    line: int = 0       # source line, when read from a file
 
 
 @dataclass
@@ -53,13 +46,19 @@ class ParseProblem:
     why: str
 
 
-def verdicts_path(root: Path) -> Path:
-    from spanda.store import index_dir
-    return index_dir(root) / VERDICTS_NAME
+def parse_target(target: str) -> tuple[str, str] | None:
+    """`file_path::qualname`, or None if it is not that shape."""
+    if "::" not in target:
+        return None
+    file_path, _, qualname = target.partition("::")
+    if not file_path or not qualname:
+        return None
+    return file_path, qualname
 
 
 def parse(text: str) -> tuple[list[Verdict], list[ParseProblem]]:
-    """Read the file. A bad line is reported, never silently skipped."""
+    """Read verdict lines — the format `--export` writes and `--from` reads.
+    A bad line is reported, never silently skipped."""
     verdicts, problems = [], []
     for number, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
@@ -74,7 +73,8 @@ def parse(text: str) -> tuple[list[Verdict], list[ParseProblem]]:
         if verdict not in ("alive", "dead"):
             problems.append(ParseProblem(number, raw, f"verdict must be alive or dead, not {parts[0]!r}"))
             continue
-        if "::" not in target:
+        parsed = parse_target(target)
+        if parsed is None:
             problems.append(ParseProblem(number, raw, "target must be file_path::qualname"))
             continue
         try:
@@ -82,18 +82,17 @@ def parse(text: str) -> tuple[list[Verdict], list[ParseProblem]]:
         except ValueError:
             problems.append(ParseProblem(number, raw, f"date must be YYYY-MM-DD, not {when!r}"))
             continue
-        file_path, _, qualname = target.partition("::")
-        verdicts.append(Verdict(file_path, qualname, verdict, when, note, number))
+        verdicts.append(Verdict(parsed[0], parsed[1], verdict, when, note, number))
     return verdicts, problems
 
 
-def load(root: Path) -> tuple[list[Verdict], list[ParseProblem], bool]:
-    """Verdicts from the repo's file; the flag says whether the file exists."""
-    path = verdicts_path(root)
-    if not path.exists():
-        return [], [], False
-    verdicts, problems = parse(path.read_text())
-    return verdicts, problems, True
+def as_line(verdict: Verdict) -> str:
+    return (f"{verdict.verdict:<5}  {verdict.file_path}::{verdict.qualname}  "
+            f"{verdict.date}  {verdict.note}").rstrip()
+
+
+def today() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
 
 
 # --------------------------------------------------------------------------
@@ -110,9 +109,7 @@ class Suggestion:
 @dataclass
 class VetReport:
     scan_id: int
-    file_exists: bool
     verdicts: list[Verdict]
-    problems: list[ParseProblem]
     suggestions: list[Suggestion] = field(default_factory=list)
     #: (verdict, what the code says now)
     contradicted: list[tuple[Verdict, str]] = field(default_factory=list)
@@ -139,15 +136,15 @@ def suggestion_for(hint: str | None, qualname: str) -> Suggestion | None:
     return None
 
 
-def vet(index, verdicts: list[Verdict], problems: list[ParseProblem],
-        file_exists: bool, include_tests: bool = False, limit: int = 30) -> VetReport:
+def vet(index, include_tests: bool = False, limit: int = 30) -> VetReport:
+    """Read the recorded verdicts against the newest scan."""
     connection = index.connection
     latest = connection.execute(
         "SELECT MAX(scan_id) FROM scans WHERE completed = 1").fetchone()[0]
     if latest is None:
         raise ValueError("no completed scan to vet against")
-    report = VetReport(latest, file_exists, verdicts, problems)
-    index.load_verdicts(verdicts)
+    verdicts = index.verdicts()
+    report = VetReport(latest, verdicts)
 
     seen_lines: set[str] = set()
     for verdict in verdicts:
@@ -212,22 +209,13 @@ def vet(index, verdicts: list[Verdict], problems: list[ParseProblem],
     return report
 
 
-def render(report: VetReport, repo: str, verdicts_file: Path) -> str:
+def render(report: VetReport, repo: str) -> str:
     out: list[str] = []
     p = out.append
-    today = date.today().isoformat()
     p(f"{repo}: vetting, against scan {report.scan_id}")
-    if not report.file_exists:
-        p(f"no verdicts file yet — create {verdicts_file} with lines like:")
-        p("    dead   path/to/file.py::qualname  YYYY-MM-DD  why")
-        p("    alive  path/to/file.py::Class.method  YYYY-MM-DD  what calls it")
-    else:
-        alive = sum(1 for v in report.verdicts if v.verdict == "alive")
-        p(f"{len(report.verdicts)} verdict(s) in {verdicts_file.name}: "
-          f"{alive} alive, {len(report.verdicts) - alive} dead")
-    for problem in report.problems:
-        p(f"  ! line {problem.line}: {problem.why}")
-        p(f"      {problem.text}")
+    alive = sum(1 for v in report.verdicts if v.verdict == "alive")
+    p(f"{len(report.verdicts)} verdict(s) recorded in the index: "
+      f"{alive} alive, {len(report.verdicts) - alive} dead")
     p("")
 
     if report.suggestions:
@@ -254,13 +242,14 @@ def render(report: VetReport, repo: str, verdicts_file: Path) -> str:
 
     p(f"TO VET — {report.candidates_total} symbol(s) with no caller, no hint, no verdict"
       + (f"; first {len(report.candidates)}" if report.candidates_total > len(report.candidates) else ""))
-    p("  Paste the lines that are really dead into the verdicts file; change 'dead' to")
-    p("  'alive' and say what calls it for the ones that are not:")
+    p(f"  Record a decision with  spanda vet {repo} --dead <target>  or  --alive <target>")
+    p(f"  --note \"what calls it\";  or save the lines you agree with to a file and run")
+    p(f"  spanda vet {repo} --from <file>:")
     for file_path, qualname, line in report.candidates:
-        p(f"    dead   {file_path}::{qualname}  {today}  ")
+        p(f"    dead   {file_path}::{qualname}  {today()}  ")
     if not report.candidates:
         p("    nothing left to vet")
     p("")
-    p("A verdict is a person's decision, dated. The tool records it and checks it")
-    p("against later scans; it does not make it.")
+    p("A verdict is a person's decision, dated. The index records it and checks it")
+    p("against later scans; the tool does not make it.")
     return "\n".join(out)

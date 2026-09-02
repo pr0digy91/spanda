@@ -241,8 +241,10 @@ CREATE TABLE IF NOT EXISTS scan_decorators (
     PRIMARY KEY (scan_id, base)
 );
 
--- Human verdicts, loaded from `.spanda/verdicts.txt` so queries can join on
--- them. The file is the source of truth; this table is its current reading.
+-- Human verdicts: a person's decision that a symbol is dead, or alive and
+-- why. Not derivable from anything, and kept here because the index is the
+-- one authoritative store. Survives every scan; only `spanda vet --forget`
+-- removes a row.
 CREATE TABLE IF NOT EXISTS verdicts (
     file_path TEXT NOT NULL,
     qualname  TEXT NOT NULL,
@@ -339,7 +341,7 @@ def index_dir(root: Path) -> Path:
 #: inside whichever one you happened to open.
 DB_FILENAME = "index.db"
 
-OLD_GITIGNORE_BODY = """# Spanda index files.
+GITIGNORE_BODY = """# Spanda index files.
 #
 # Derived data: everything here is rebuildable from the source it describes,
 # and the files are large and binary. Ignoring the whole directory, including
@@ -347,7 +349,24 @@ OLD_GITIGNORE_BODY = """# Spanda index files.
 *
 """
 
-GITIGNORE_BODY = """# Spanda index files.
+#: A body an earlier build wrote, which let a verdicts file through. Verdicts
+#: live in the index now, so a directory still carrying it is brought back.
+_SUPERSEDED_GITIGNORE_BODIES = (
+    GITIGNORE_BODY.replace("*\n", "*\n!.gitignore\n!verdicts.txt\n"),
+    GITIGNORE_BODY.replace("*\n", "*\n!verdicts.txt\n"),
+    """# Spanda index files.
+#
+# Derived data: everything here is rebuildable from the source it describes,
+# and the files are large and binary. Ignoring the directory keeps generated
+# indexes out of the repository's history.
+#
+# verdicts.txt is the exception: human decisions about symbols the tool cannot
+# see callers for. Those are not derivable from anything and belong in git.
+*
+!.gitignore
+!verdicts.txt
+""",
+    """# Spanda index files.
 #
 # Derived data: everything here is rebuildable from the source it describes,
 # and the files are large and binary. Ignoring the directory keeps generated
@@ -358,7 +377,8 @@ GITIGNORE_BODY = """# Spanda index files.
 # This file stays ignored too; spanda writes it again wherever it runs.
 *
 !verdicts.txt
-"""
+""",
+)
 
 
 def db_path(root: Path) -> Path:
@@ -371,9 +391,9 @@ def ensure_index_dir(root: Path) -> Path:
     directory = index_dir(root)
     directory.mkdir(parents=True, exist_ok=True)
     gitignore = directory / ".gitignore"
-    # Rewritten only when it is verbatim the file an earlier spanda wrote;
+    # Rewritten only when it is verbatim a file an earlier spanda wrote;
     # anything a person edited is theirs and is left alone.
-    if not gitignore.exists() or gitignore.read_text() == OLD_GITIGNORE_BODY:
+    if not gitignore.exists() or gitignore.read_text() in _SUPERSEDED_GITIGNORE_BODIES:
         gitignore.write_text(GITIGNORE_BODY)
     return directory
 
@@ -659,13 +679,25 @@ class Index:
             " AND dispatch_hint IS NULL",
             [(f"external_base:{base}", key) for key, base in hints.items()])
 
-    def load_verdicts(self, verdicts) -> None:
-        """Replace the table with the file's current contents."""
-        self.connection.execute("DELETE FROM verdicts")
-        self.connection.executemany(
+    def record_verdict(self, file_path: str, qualname: str, verdict: str,
+                       note: str = "", date: str | None = None) -> None:
+        """Write one decision. A later verdict on the same symbol replaces it."""
+        from spanda.verdicts import today
+        self.connection.execute(
             "INSERT OR REPLACE INTO verdicts (file_path, qualname, verdict, date, note)"
             " VALUES (?, ?, ?, ?, ?)",
-            [(v.file_path, v.qualname, v.verdict, v.date, v.note) for v in verdicts])
+            (file_path, qualname, verdict, date or today(), note))
+
+    def forget_verdict(self, file_path: str, qualname: str) -> bool:
+        return self.connection.execute(
+            "DELETE FROM verdicts WHERE file_path = ? AND qualname = ?",
+            (file_path, qualname)).rowcount > 0
+
+    def verdicts(self) -> list:
+        from spanda.verdicts import Verdict
+        return [Verdict(r["file_path"], r["qualname"], r["verdict"], r["date"], r["note"] or "")
+                for r in self.connection.execute(
+                    "SELECT * FROM verdicts ORDER BY file_path, qualname")]
 
     def verdict_for(self, file_path: str, qualname: str) -> sqlite3.Row | None:
         return self.connection.execute(
@@ -1135,6 +1167,11 @@ class Index:
         return {r["symbol_uuid"] for r in self.connection.execute(
             "SELECT symbol_uuid FROM symbol_spans"
             " WHERE from_scan <= ? AND to_scan >= ?", (scan_id, scan_id))}
+
+    def symbol_by_path(self, file_path: str, qualname: str) -> sqlite3.Row | None:
+        return self.connection.execute(
+            "SELECT * FROM symbols WHERE file_path = ? AND qualname = ?"
+            " ORDER BY last_seen_scan_id DESC LIMIT 1", (file_path, qualname)).fetchone()
 
     def symbol_by_key(self, key: str) -> sqlite3.Row | None:
         return self.connection.execute(

@@ -130,19 +130,15 @@ def render(index, root: Path) -> str:
         note = ("This index holds no reference edges yet. `spanda backfill` resolves "
                 "them only\nfor the newest commit; run `spanda index` to fill them in.")
 
-    # The verdicts loop, as it stands: read from the repo's file, checked
+    # The verdicts loop, as it stands: the recorded decisions, checked
     # against this scan. Generated, like everything else here; the one thing
     # it never generates is the verdict itself.
-    known, problems, exists = verdicts_module.load(root)
-    vetting = verdicts_module.vet(index, known, problems, exists, limit=CANDIDATE_LIMIT)
+    vetting = verdicts_module.vet(index, limit=CANDIDATE_LIMIT)
+    known = vetting.verdicts
     verdict_lines = [
-        f"{len(known)} verdict(s) on record"
+        f"{len(known)} verdict(s) recorded in the index"
         + (f" ({sum(1 for v in known if v.verdict == 'alive')} alive, "
-           f"{sum(1 for v in known if v.verdict == 'dead')} dead)" if known else "")
-        + ("" if exists else " — no `.spanda/verdicts.txt` yet")]
-    if problems:
-        verdict_lines.append(f"{len(problems)} line(s) in the file could not be read; "
-                             f"`spanda vet` says which")
+           f"{sum(1 for v in known if v.verdict == 'dead')} dead)" if known else "")]
     if vetting.suggestions:
         verdict_lines.append(f"{len(vetting.suggestions)} pattern line(s) waiting to be "
                              f"added — alive verdicts on shapes the tool did not recognise")

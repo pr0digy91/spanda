@@ -265,10 +265,6 @@ def _run_scan(db_path, root, plan, patterns):
         counts["lost"] = lost
         index.set_external_base_hints(
             scan_id, override_hints(run.collected, run.module_index))
-        known, problems, _exists = verdicts_module.load(root)
-        index.load_verdicts(known)
-        for problem in problems:
-            print(f"  ! verdicts.txt line {problem.line}: {problem.why}", file=sys.stderr)
 
         totals = index.finish_scan(scan_id)
         missing = index.gone_since_previous(scan_id)
@@ -828,7 +824,7 @@ def cmd_callers(args: argparse.Namespace) -> int:
             if verdict:
                 print(f"\n  Vetted {verdict['verdict'].upper()} by a person on "
                       f"{verdict['date']}" + (f": {verdict['note']}" if verdict["note"] else "")
-                      + "\n     (from .spanda/verdicts.txt; `spanda vet` checks it "
+                      + "\n     (recorded in the index; `spanda vet` checks it "
                         "against each scan)")
             elif not callers and not symbol["has_dynamic_dispatch"] and not maybe \
                     and not symbol["dispatch_hint"]:
@@ -846,11 +842,50 @@ def cmd_vet(args: argparse.Namespace) -> int:
         print(f"no index yet at {db_path(root)} — run `spanda index` first",
               file=sys.stderr)
         return 1
-    known, problems, exists = verdicts_module.load(root)
+    status = 0
     with Index(target) as index:
-        report = verdicts_module.vet(index, known, problems, exists,
-                                     include_tests=args.include_tests, limit=args.limit)
-    print(verdicts_module.render(report, root.name, verdicts_module.verdicts_path(root)))
+        # -- record, forget, import: writes first, then the report -----------
+        recorded = 0
+        for verdict, targets in (("alive", args.alive or []), ("dead", args.dead or [])):
+            for spec in targets:
+                parsed = verdicts_module.parse_target(spec)
+                if parsed is None:
+                    print(f"  ! {spec!r} is not file_path::qualname", file=sys.stderr)
+                    status = 1
+                    continue
+                if index.symbol_by_path(*parsed) is None:
+                    print(f"  ! no symbol {spec} in this index; recorded anyway — "
+                          f"`spanda vet` will report it as contradicted", file=sys.stderr)
+                index.record_verdict(*parsed, verdict, note=args.note or "")
+                recorded += 1
+        for spec in args.forget or []:
+            parsed = verdicts_module.parse_target(spec)
+            if parsed is None or not index.forget_verdict(*parsed):
+                print(f"  ! no verdict recorded for {spec}", file=sys.stderr)
+                status = 1
+            else:
+                recorded += 1
+        if args.from_file:
+            source = Path(args.from_file)
+            imported, problems = verdicts_module.parse(source.read_text())
+            for problem in problems:
+                print(f"  ! {source.name} line {problem.line}: {problem.why}\n"
+                      f"      {problem.text}", file=sys.stderr)
+                status = 1
+            for v in imported:
+                index.record_verdict(v.file_path, v.qualname, v.verdict, v.note, v.date)
+            recorded += len(imported)
+        if recorded:
+            print(f"{recorded} verdict(s) written to {target}\n")
+
+        if args.export:
+            for v in index.verdicts():
+                print(verdicts_module.as_line(v))
+            return status
+
+        report = verdicts_module.vet(index, include_tests=args.include_tests,
+                                     limit=args.limit)
+    print(verdicts_module.render(report, root.name))
     if args.append_to and report.suggestions:
         destination = Path(args.append_to)
         existing = destination.read_text() if destination.exists() else ""
@@ -858,11 +893,11 @@ def cmd_vet(args: argparse.Namespace) -> int:
         if new:
             with destination.open("a") as handle:
                 handle.write(f"\n# From `spanda vet {root.name}` on "
-                             f"{datetime.now(timezone.utc).date().isoformat()}:\n")
+                             f"{verdicts_module.today()}:\n")
                 for s in new:
                     handle.write(f"# {s.because}\n{s.line}\n")
         print(f"appended {len(new)} pattern line(s) to {destination}")
-    return 0
+    return status
 
 
 def cmd_profile(args: argparse.Namespace) -> int:
@@ -990,9 +1025,21 @@ def main(argv: list[str] | None = None) -> int:
     loops_cmd.set_defaults(func=cmd_loops)
 
     vet_cmd = subparsers.add_parser(
-        "vet", help="the verdicts loop: read .spanda/verdicts.txt against the index, "
-                    "print pattern lines to add and the next candidates to vet")
+        "vet", help="the verdicts loop: record a person's decision in the index, "
+                    "check recorded decisions against the newest scan, print the "
+                    "pattern lines they imply and the next candidates")
     vet_cmd.add_argument("path", help="root of the indexed codebase")
+    vet_cmd.add_argument("--alive", action="append", metavar="FILE::QUALNAME",
+                         help="record that this symbol is alive (repeatable)")
+    vet_cmd.add_argument("--dead", action="append", metavar="FILE::QUALNAME",
+                         help="record that this symbol is dead (repeatable)")
+    vet_cmd.add_argument("--note", default="", help="why, for the verdicts recorded now")
+    vet_cmd.add_argument("--forget", action="append", metavar="FILE::QUALNAME",
+                         help="remove a recorded verdict")
+    vet_cmd.add_argument("--from", dest="from_file", metavar="FILE",
+                         help="record every verdict line in this file")
+    vet_cmd.add_argument("--export", action="store_true",
+                         help="print every recorded verdict as a line --from can read")
     vet_cmd.add_argument("--include-tests", action="store_true",
                          help="list candidates under tests/ too")
     vet_cmd.add_argument("--limit", type=int, default=30, metavar="N",

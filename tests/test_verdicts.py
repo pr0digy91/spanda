@@ -1,10 +1,11 @@
-"""The verdicts loop: a person decides, the tool keeps it and checks it.
+"""The verdicts loop: a person decides, the index keeps it and checks it.
 
-What is pinned: the file format refuses bad lines out loud; an alive verdict
-on an unrecognised shape becomes the pattern line that would have caught
-it; a verdict the code later contradicts is reported; the candidate list
-excludes anything vetted; and the verdicts file survives the directory's
-own .gitignore.
+What is pinned: verdicts survive scans; an alive verdict on an unrecognised
+shape becomes the pattern line that would have caught it; a verdict the
+code later contradicts is reported; the candidate list excludes anything
+vetted; import and export round-trip; and the verdicts file that an
+earlier build let through the directory's .gitignore is not let through
+any more.
 """
 
 from __future__ import annotations
@@ -16,9 +17,8 @@ from pathlib import Path
 import pytest
 
 from spanda.cli import main
-from spanda.gaps import load_patterns
-from spanda.store import Index, ensure_index_dir, prepare_db_path
-from spanda.verdicts import load, parse, render, suggestion_for, vet, verdicts_path
+from spanda.store import GITIGNORE_BODY, Index, ensure_index_dir, prepare_db_path
+from spanda.verdicts import as_line, parse, render, suggestion_for, vet
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "fixtures"
@@ -45,31 +45,40 @@ def test_bad_lines_are_reported_not_skipped():
     assert [p.line for p in problems] == [3, 4, 5]
 
 
-def test_an_alive_verdict_on_an_unknown_shape_becomes_a_pattern_line(indexed):
-    verdicts_path(indexed).write_text(
-        "alive  sample_pkg/middleware.py::nightly_cleanup      2026-09-02  apscheduler runs it\n"
-        "alive  sample_pkg/middleware.py::Auditor.on_validate  2026-09-02  pydantic hook\n"
-        "alive  sample_pkg/middleware.py::RequestLogger.dispatch  2026-09-02  already a pattern\n")
-    known, problems, exists = load(indexed)
-    assert exists and not problems
+def test_a_verdict_is_recorded_in_the_index_and_survives_a_scan(indexed, capsys):
+    assert main(["vet", str(indexed), "--alive", "sample_pkg/handlers.py::on_paid",
+                 "--note", "dispatched from HANDLER_NAMES"]) == 0
+    assert main(["index", str(indexed)]) == 0
+    capsys.readouterr()
+    assert main(["callers", str(indexed), "on_paid"]) == 0
+    out = capsys.readouterr().out
+    assert "Vetted ALIVE by a person on " in out
+    assert "dispatched from HANDLER_NAMES" in out and "recorded in the index" in out
     with Index(prepare_db_path(indexed)) as index:
-        report = vet(index, known, problems, exists)
+        (verdict,) = index.verdicts()
+    assert (verdict.verdict, verdict.qualname) == ("alive", "on_paid")
+
+
+def test_an_alive_verdict_on_an_unknown_shape_becomes_a_pattern_line(indexed):
+    with Index(prepare_db_path(indexed)) as index:
+        index.record_verdict("sample_pkg/middleware.py", "nightly_cleanup", "alive", "apscheduler")
+        index.record_verdict("sample_pkg/middleware.py", "Auditor.on_validate", "alive", "pydantic hook")
+        index.record_verdict("sample_pkg/middleware.py", "RequestLogger.dispatch", "alive", "already a pattern")
+        report = vet(index)
     assert [s.line for s in report.suggestions] == [
-        "scheduler.scheduled_job", "method:BaseModel.on_validate"]
+        "method:BaseModel.on_validate", "scheduler.scheduled_job"]
     assert [v.qualname for v, _why in report.explained] == ["RequestLogger.dispatch"]
     assert report.contradicted == [] and report.blind_spots == []
-    text = render(report, "proj", verdicts_path(indexed))
+    text = render(report, "proj")
     assert "PATTERN LINES TO ADD" in text and "scheduler.scheduled_job" in text
 
 
 def test_a_contradicted_verdict_is_reported(indexed):
-    verdicts_path(indexed).write_text(
-        "dead   sample_pkg/helpers.py::slugify   2026-09-02  thought unused\n"
-        "alive  sample_pkg/helpers.py::vanished  2026-09-02  never existed\n"
-        "alive  sample_pkg/handlers.py::on_paid  2026-09-02  called by name from a string\n")
-    known, problems, exists = load(indexed)
     with Index(prepare_db_path(indexed)) as index:
-        report = vet(index, known, problems, exists)
+        index.record_verdict("sample_pkg/helpers.py", "slugify", "dead", "thought unused")
+        index.record_verdict("sample_pkg/helpers.py", "vanished", "alive", "never existed")
+        index.record_verdict("sample_pkg/handlers.py", "on_paid", "alive", "called by name")
+        report = vet(index)
     why = {v.qualname: reason for v, reason in report.contradicted}
     assert "caller(s) now" in why["slugify"]
     assert why["vanished"] == "no such symbol in the index"
@@ -79,33 +88,47 @@ def test_a_contradicted_verdict_is_reported(indexed):
 
 def test_candidates_exclude_the_vetted_and_the_hinted(indexed):
     with Index(prepare_db_path(indexed)) as index:
-        before = vet(index, [], [], False)
-    assert before.candidates_total > 0
-    names = {q for _f, q, _l in before.candidates}
-    assert "nightly_cleanup" not in names, "an unknown decorator is a hint, not a candidate"
-    assert "Auditor.on_validate" not in names
-    first_file, first_name, _line = before.candidates[0]
-    verdicts_path(indexed).write_text(f"dead  {first_file}::{first_name}  2026-09-02  vetted\n")
-    known, problems, exists = load(indexed)
-    with Index(prepare_db_path(indexed)) as index:
-        after = vet(index, known, problems, exists)
+        before = vet(index)
+        assert before.candidates_total > 0
+        names = {q for _f, q, _l in before.candidates}
+        assert "nightly_cleanup" not in names, "an unknown decorator is a hint, not a candidate"
+        assert "Auditor.on_validate" not in names
+        first_file, first_name, _line = before.candidates[0]
+        index.record_verdict(first_file, first_name, "dead", "vetted")
+        after = vet(index)
     assert after.candidates_total == before.candidates_total - 1
     assert (first_file, first_name) not in {(f, q) for f, q, _l in after.candidates}
 
 
-def test_index_loads_verdicts_and_callers_shows_them(indexed, capsys):
-    verdicts_path(indexed).write_text(
-        "alive  sample_pkg/handlers.py::on_paid  2026-09-02  dispatched from HANDLER_NAMES\n")
-    assert main(["index", str(indexed)]) == 0
+def test_export_and_import_round_trip(indexed, tmp_path, capsys):
+    assert main(["vet", str(indexed), "--dead", "sample_pkg/helpers.py::_internal_only",
+                 "--alive", "sample_pkg/handlers.py::on_paid", "--note", "by name"]) == 0
     capsys.readouterr()
-    assert main(["callers", str(indexed), "on_paid"]) == 0
-    out = capsys.readouterr().out
-    assert "Vetted ALIVE by a person on 2026-09-02: dispatched from HANDLER_NAMES" in out
+    assert main(["vet", str(indexed), "--export"]) == 0
+    exported = capsys.readouterr().out
+    lines = [l for l in exported.splitlines() if l.startswith(("alive", "dead"))]
+    assert len(lines) == 2 and any("on_paid" in l and "by name" in l for l in lines)
+
+    fresh = tmp_path / "again"
+    shutil.copytree(FIXTURES, fresh, ignore=shutil.ignore_patterns(".spanda"))
+    assert main(["index", str(fresh)]) == 0
+    saved = tmp_path / "verdicts.txt"
+    saved.write_text(exported)
+    assert main(["vet", str(fresh), "--from", str(saved)]) == 0
+    with Index(prepare_db_path(fresh)) as index:
+        assert sorted(as_line(v) for v in index.verdicts()) == sorted(lines)
 
 
-def test_append_to_writes_the_lines_once(indexed, tmp_path, capsys):
-    verdicts_path(indexed).write_text(
-        "alive  sample_pkg/middleware.py::nightly_cleanup  2026-09-02  apscheduler\n")
+def test_forget_removes_a_verdict_and_says_so_when_there_is_none(indexed, capsys):
+    assert main(["vet", str(indexed), "--dead", "sample_pkg/helpers.py::_internal_only"]) == 0
+    assert main(["vet", str(indexed), "--forget", "sample_pkg/helpers.py::_internal_only"]) == 0
+    assert main(["vet", str(indexed), "--forget", "sample_pkg/helpers.py::_internal_only"]) == 1
+    assert "no verdict recorded" in capsys.readouterr().err
+
+
+def test_append_to_writes_the_lines_once(indexed, tmp_path):
+    with Index(prepare_db_path(indexed)) as index:
+        index.record_verdict("sample_pkg/middleware.py", "nightly_cleanup", "alive", "apscheduler")
     patterns = tmp_path / "patterns.txt"
     patterns.write_text("*.get\n")
     assert main(["vet", str(indexed), "--append-to", str(patterns)]) == 0
@@ -115,28 +138,27 @@ def test_append_to_writes_the_lines_once(indexed, tmp_path, capsys):
     assert lines[0] == "*.get"
 
 
-def test_the_verdicts_file_survives_the_directory_gitignore(tmp_path):
+def test_the_whole_index_directory_is_ignored_again(tmp_path):
     repo = tmp_path / "r"
     repo.mkdir()
     subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
     ensure_index_dir(repo)
     (repo / ".spanda" / "index.db").write_bytes(b"x")
-    verdicts_path(repo).write_text("# verdicts\n")
+    (repo / ".spanda" / "verdicts.txt").write_text("# a leftover from an earlier build\n")
     result = subprocess.run(
         ["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=all"],
         capture_output=True, text=True, check=True).stdout
-    assert ".spanda/verdicts.txt" in result
-    assert ".gitignore" not in result, "regenerated wherever spanda runs; not for git"
-    assert "index.db" not in result
+    assert ".spanda" not in result
 
 
-def test_an_old_gitignore_is_brought_forward_but_an_edited_one_is_kept(tmp_path):
-    from spanda.store import GITIGNORE_BODY, OLD_GITIGNORE_BODY
-    old = tmp_path / "old"
-    (old / ".spanda").mkdir(parents=True)
-    (old / ".spanda" / ".gitignore").write_text(OLD_GITIGNORE_BODY)
-    ensure_index_dir(old)
-    assert (old / ".spanda" / ".gitignore").read_text() == GITIGNORE_BODY
+def test_a_superseded_gitignore_is_brought_back_but_an_edited_one_is_kept(tmp_path):
+    from spanda.store import _SUPERSEDED_GITIGNORE_BODIES
+    for number, body in enumerate(_SUPERSEDED_GITIGNORE_BODIES):
+        old = tmp_path / f"old{number}"
+        (old / ".spanda").mkdir(parents=True)
+        (old / ".spanda" / ".gitignore").write_text(body)
+        ensure_index_dir(old)
+        assert (old / ".spanda" / ".gitignore").read_text() == GITIGNORE_BODY
 
     edited = tmp_path / "edited"
     (edited / ".spanda").mkdir(parents=True)

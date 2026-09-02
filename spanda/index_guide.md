@@ -65,29 +65,35 @@ has been recorded — and is the safer route than a hand-written query.
 ## Rule 3: "dead" is a person's decision, and it is kept
 
 The tool never says dead. It says "no caller, no hint", and lists those as
-candidates. A person looks, decides, and writes one line in
-`.spanda/verdicts.txt`, which is committed with the code:
+candidates. A person looks, decides, and records it in the index — the one
+authoritative store — with a date and a reason:
 
-```
-alive  server.py::RequestLoggingMiddleware.dispatch  2026-09-02  Starlette calls dispatch by name
-dead   services/legacy.py::old_helper                2026-09-02  removed in PR 412
+```sh
+spanda vet {{repo}} --alive server.py::RequestLoggingMiddleware.dispatch --note "Starlette calls dispatch by name"
+spanda vet {{repo}} --dead  services/legacy.py::old_helper --note "removed in PR 412"
 ```
 
-`spanda vet {{repo}}` reads that file against the index: it loads the
-verdicts into the `verdicts` table, turns every *alive* verdict on an
+That writes the `verdicts` table. `spanda vet {{repo}}` on its own reads
+the table against the newest scan: it turns every *alive* verdict on an
 unrecognised shape into the pattern line that would have recognised it,
-reports verdicts the code has since contradicted, and prints the next
-candidates as lines ready to paste back. As of this scan:
+reports verdicts the code has since contradicted, flags an alive verdict
+nothing explains as a blind spot, and prints the next candidates. Scans
+never touch the table; only `--forget` removes a row. The index itself is
+not committed, so verdicts live with it on the machine that holds it:
+`--export` prints them as lines and `--from FILE` reads such lines back,
+for moving them or surviving a rebuild. As of this scan:
 
 {{verdict_summary}}
 
 ### Waiting for a verdict — {{candidates_total}} symbols, no caller, no hint, no decision
 
-Each line below is a candidate, formatted as a verdict. Nothing about it has
-been decided: the tool found no static caller and nothing that explains the
-silence, and that is all it knows. A person who looks and agrees pastes the
-line into `.spanda/verdicts.txt` as it is; one who finds it alive changes
-the word and writes down what calls it. Tests are left out.
+Each line below is a candidate, formatted as a verdict line. Nothing about
+it has been decided: the tool found no static caller and nothing that
+explains the silence, and that is all it knows. A person who looks and
+agrees records it with `spanda vet {{repo}} --dead <target>`, or saves the
+lines they agree with to a file and runs `spanda vet {{repo}} --from
+<file>`; one who finds it alive records `--alive` and says what calls it.
+Tests are left out.
 
 ```
 {{candidates_block}}
@@ -106,7 +112,7 @@ the word and writes down what calls it. Tests are left out.
 | `unresolved_refs` | reference that could not be proven | **current scan only** |
 | `loop_calls` | a call inside a loop the resolver could not follow | current scan only; `session.execute` in a loop lives here, since the session type never resolves |
 | `lost_trails` | an import the resolver could not place | current scan only; expect none |
-| `verdicts` | a human decision about a symbol | loaded from `.spanda/verdicts.txt` by `spanda vet` and `spanda index` |
+| `verdicts` | a human decision about a symbol | written by `spanda vet --alive/--dead`; survives every scan |
 | `files` | file | current state, first and last seen |
 | `file_versions` | scan where a file changed | file history |
 | `scans` | index run | commit, timestamp, counts, fingerprint, what was recorded |
