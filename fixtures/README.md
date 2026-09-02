@@ -26,6 +26,7 @@ Both are deliberate.
 | `consumer.py` | 2 | 1 | 0 | 0 | 1 |
 | `lazy.py` | 1 | 1 | 0 | 0 | 0 |
 | `batch.py` | 5 | 4 | 0 | 0 | 1 |
+| `middleware.py` | 6 | 2 | 1 | 1 | 2 |
 | `a.py` | 3 | 2 | 0 | 0 | 1 |
 | `b.py` | 1 | 1 | 0 | 0 | 0 |
 | `checkout.py` | 4 | 4 | 0 | 0 | 0 |
@@ -41,9 +42,9 @@ Both are deliberate.
 | `registry/impl.py` | 1 | 1 | 0 | 0 | 0 |
 | `star.py` | 1 | 1 | 0 | 0 | 0 |
 | `broken.py` | — | unparseable; the reported line and wording vary by interpreter |
-| **Total** | **64** | 33 | 6 | 10 | 15 |
+| **Total** | **70** | 35 | 7 | 11 | 17 |
 
-19 files: 18 parse, 1 does not.
+20 files: 19 parse, 1 does not.
 
 ## What each file proves
 
@@ -62,12 +63,13 @@ Both are deliberate.
 | `recursion.py` | Self- and mutual recursion. The graph is not a DAG. |
 | `lazy.py` | An import inside a function body, called through. The import audit passes on it; the call must still become an edge. |
 | `batch.py` | Loops: two nested in one body, one calling a two-loop function (three deep across the call), and a database call inside a loop. |
+| `middleware.py` | Framework-called with no caller in the code: `@app.middleware`, `@server.list_tools()`, and a `dispatch` override on an external base that no decorator marks. |
 | `nested.py` | Nested function, nested class, async, and every parameter kind. |
 | `broken.py` | A syntax error must be recorded, not fatal. |
 
 ## Specific assertions the extractor must satisfy
 
-**Decorators — exactly 6 decorated definitions, recorded verbatim:**
+**Decorators — exactly 8 decorated definitions, recorded verbatim:**
 
 | Symbol | Decorator |
 |---|---|

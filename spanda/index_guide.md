@@ -40,7 +40,10 @@ Three things are missing from it, by design rather than by oversight:
 
 - **Runtime dispatch.** A FastAPI route handler is called by the framework.
   Nothing in the codebase names it. `has_dynamic_dispatch = 1` marks these —
-  {{dynamic}} of them here.
+  {{dynamic}} of them here. The mark comes from a decorator on the pattern
+  list, or from a method override the framework calls by name on a subclass
+  of its own base (`dispatch` on a `BaseHTTPMiddleware`), which no decorator
+  shows.
 - **Attribute access on an unknown type.** `obj.method()` where nothing says
   what `obj` is. {{unknown_type}} such references. Each *might* be a call to something
   in the codebase; none can be proven.

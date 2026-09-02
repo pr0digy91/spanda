@@ -111,7 +111,7 @@ def test_unchanged_files_are_carried_forward_not_deleted(repo):
         scan_id = incremental(index, repo, patterns,
                               changed_python_files(repo, before))
         assert index.missing_at(scan_id) == []
-        assert index.scan(scan_id)["total_files"] == 19
+        assert index.scan(scan_id)["total_files"] == 20
 
 
 def test_a_commit_changing_nothing_still_carries_everything(repo):

@@ -58,6 +58,46 @@ workflow.query
 tool
 tool_decorator
 
+# Added after a human vetting of the "unreferenced" list found four live
+# symbols in it. Not from the census: from the miss.
+#
+# ASGI middleware registered on the app; the framework calls it per request.
+*.middleware
+*.exception_handler
+# MCP server handlers: the client's requests are routed to these by the SDK.
+*.list_tools
+*.call_tool
+*.list_resources
+*.read_resource
+*.list_prompts
+*.get_prompt
+*.tool
+*.resource
+*.prompt
+
+# Methods a framework calls by name on a subclass of its own base class.
+# A decorator cannot express this: nothing is written at the definition
+# except the override itself, and the base lives outside the codebase, so
+# the resolver never sees the call. Syntax: `method:<base>.<method>`, both
+# globs, matched against the base names as written in the class statement
+# — `BaseHTTPMiddleware` and `starlette.middleware.base.BaseHTTPMiddleware`
+# both match the short form.
+method:BaseHTTPMiddleware.dispatch
+method:HTTPEndpoint.get
+method:HTTPEndpoint.post
+method:HTTPEndpoint.put
+method:HTTPEndpoint.patch
+method:HTTPEndpoint.delete
+method:HTTPEndpoint.head
+method:HTTPEndpoint.options
+method:WebSocketEndpoint.on_connect
+method:WebSocketEndpoint.on_receive
+method:WebSocketEndpoint.on_disconnect
+method:Thread.run
+method:Process.run
+method:TestCase.setUp
+method:TestCase.tearDown
+
 # Deliberately NOT listed, though they appeared in the census:
 #
 #   @pytest.mark.*   A marker does not dispatch anything. The test function is

@@ -24,10 +24,51 @@ def load_patterns(path: Path | None = None) -> list[str]:
     ]
 
 
+METHOD_PREFIX = "method:"
+
+
 def is_dynamic_dispatch(decorator_base: str | None, patterns: list[str]) -> bool:
     if not decorator_base:
         return False
-    return any(fnmatch(decorator_base, pattern) for pattern in patterns)
+    return any(fnmatch(decorator_base, pattern) for pattern in patterns
+               if not pattern.startswith(METHOD_PREFIX))
+
+
+def is_framework_method(bases: list[str] | None, name: str, patterns: list[str]) -> bool:
+    """A method the framework calls by name on a subclass of its base.
+
+    `class RequestLogger(BaseHTTPMiddleware)` with a `dispatch` method: no
+    decorator, no call anywhere in the codebase, and the base is external
+    so the resolver never sees what invokes it. Matched on the base names
+    as written, both in full and by their last component.
+    """
+    if not bases:
+        return False
+    written = set()
+    for base in bases:
+        # `Generic[T]`, `Base[Model]` — the subscript is not part of the name.
+        plain = base.split("[", 1)[0]
+        written.add(plain)
+        written.add(plain.rpartition(".")[2])
+    for pattern in patterns:
+        if not pattern.startswith(METHOD_PREFIX):
+            continue
+        base_glob, _, name_glob = pattern[len(METHOD_PREFIX):].rpartition(".")
+        if fnmatch(name, name_glob) and any(fnmatch(b, base_glob) for b in written):
+            return True
+    return False
+
+
+def is_framework_called(definition: dict, bases_by_local: dict, patterns: list[str]) -> bool:
+    """Either way a framework can own the call: a decorator, or an override."""
+    if any(is_dynamic_dispatch(d["base"], patterns) for d in definition["decorators"]):
+        return True
+    return definition["kind"] == "method" and is_framework_method(
+        bases_by_local.get(definition["parent"]), definition["name"], patterns)
+
+
+def class_bases_by_local(definitions: list[dict]) -> dict:
+    return {d["local_id"]: d["bases"] for d in definitions if d["kind"] == "class"}
 
 
 def referenced_names(scan) -> set[str]:
@@ -78,6 +119,20 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
                         "dynamic_dispatch_decorator", record["file"],
                         definition["lines"][0], definition["qualname"],
                         "@" + decorator["raw"]))
+
+    # 1b. An override the framework calls by name. Same confidence as a
+    #     decorator — the base and the method name are both written — and
+    #     the one shape a decorator list could never express.
+    for record in scan.records:
+        bases = class_bases_by_local(record["definitions"])
+        for definition in record["definitions"]:
+            if definition["kind"] == "method" and is_framework_method(
+                    bases.get(definition["parent"]), definition["name"], patterns):
+                gaps.append(Gap(
+                    "framework_method_override", record["file"],
+                    definition["lines"][0], definition["qualname"],
+                    f"overrides {definition['name']} on "
+                    f"{', '.join(bases.get(definition['parent']) or [])}"))
 
     # 2. Call sites that choose their target at runtime. The *target* is
     #    unknown; the site itself is certain.

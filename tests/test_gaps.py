@@ -34,7 +34,27 @@ def gaps(scan):
 
 def test_the_decorated_hook_is_flagged(gaps):
     flagged = {g.symbol for g in gaps if g.kind == "dynamic_dispatch_decorator"}
-    assert flagged == {"_apply_rls_context"}
+    assert flagged == {"_apply_rls_context", "security_headers", "list_tools"}
+
+
+def test_an_override_the_framework_calls_by_name_is_flagged(gaps):
+    """No decorator, no caller: `dispatch` on a BaseHTTPMiddleware subclass.
+    A human vetting found this one alive on the dead list."""
+    flagged = {g.symbol: g.detail for g in gaps if g.kind == "framework_method_override"}
+    assert flagged == {"RequestLogger.dispatch": "overrides dispatch on BaseHTTPMiddleware"}
+
+
+def test_framework_method_matching_is_by_written_base_name():
+    from spanda.gaps import is_framework_method
+    patterns = load_patterns()
+    assert is_framework_method(["BaseHTTPMiddleware"], "dispatch", patterns)
+    assert is_framework_method(["starlette.middleware.base.BaseHTTPMiddleware"],
+                               "dispatch", patterns)
+    assert is_framework_method(["HTTPEndpoint"], "post", patterns)
+    assert not is_framework_method(["BaseHTTPMiddleware"], "helper", patterns)
+    assert not is_framework_method(["PaymentMethod"], "dispatch", patterns), \
+        "an internal base with a method called dispatch is resolvable, not framework-called"
+    assert not is_framework_method(None, "dispatch", patterns)
 
 
 def test_ordinary_decorators_are_not_flagged():

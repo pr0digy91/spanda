@@ -150,6 +150,10 @@ GAP_HEADINGS = {
     "dynamic_dispatch_decorator":
         "Decorated with something that dispatches at runtime — the framework "
         "calls these,\n  and no reference in this codebase names them:",
+    "framework_method_override":
+        "Methods a framework calls by name on a subclass of its own base — no "
+        "decorator\n  marks them, nothing here calls them, and the base is outside "
+        "this codebase:",
     "runtime_attribute_access":
         "Call sites that pick their target at runtime — the site is certain, "
         "the target is not:",

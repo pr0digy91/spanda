@@ -86,7 +86,7 @@ class SymbolTable:
     dynamic: set[str] = field(default_factory=set)
 
     def add_record(self, record: dict, patterns: list[str]) -> None:
-        from spanda.gaps import is_dynamic_dispatch
+        from spanda.gaps import class_bases_by_local, is_framework_called
 
         module, file_path = record["module"], record["file"]
         self.module_names.setdefault(module, {})
@@ -94,13 +94,13 @@ class SymbolTable:
             self.exports[module] = record["dunder_all"]
 
         by_local: dict[str, str] = {}
+        bases_by_local = class_bases_by_local(record["definitions"])
         for definition in record["definitions"]:
             key = symbol_key(file_path, definition["qualname"], definition["kind"])
             by_local[definition["local_id"]] = key
             self.symbols[key] = (definition["kind"], file_path, definition["qualname"])
 
-            if any(is_dynamic_dispatch(d["base"], patterns)
-                   for d in definition["decorators"]):
+            if is_framework_called(definition, bases_by_local, patterns):
                 self.dynamic.add(key)
 
             parent = definition["parent"]

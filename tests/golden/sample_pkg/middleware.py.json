@@ -1,0 +1,421 @@
+{
+  "file": "sample_pkg/middleware.py",
+  "module": "sample_pkg.middleware",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:3e33c620fe5c82a8d550773faced3658",
+  "module_docstring": "Called by a framework, marked by nothing the code names.\n\nA human vetting of the \"unreferenced\" list found four live symbols in it,\nall of these shapes: MCP handlers, an HTTP middleware function, and a\nmiddleware class whose `dispatch` the framework calls by name. That last\none carries no decorator at all \u2014 only the override.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from fastapi import FastAPI",
+      "module": "fastapi",
+      "names": [
+        {
+          "name": "FastAPI",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 9,
+      "conditional": false
+    },
+    {
+      "raw": "from mcp.server import Server",
+      "module": "mcp.server",
+      "names": [
+        {
+          "name": "Server",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 10,
+      "conditional": false
+    },
+    {
+      "raw": "from starlette.middleware.base import BaseHTTPMiddleware",
+      "module": "starlette.middleware.base",
+      "names": [
+        {
+          "name": "BaseHTTPMiddleware",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 11,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "variable",
+      "name": "app",
+      "qualname": "app",
+      "parent": null,
+      "lines": [
+        13,
+        13
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:27cafac75b3a8ec29581d35e69cbb7e4",
+      "body_hash": "sha256:30866b1ee9c9536d98c3f96bf8ae569c",
+      "loop_depth": 0
+    },
+    {
+      "local_id": "d2",
+      "kind": "variable",
+      "name": "server",
+      "qualname": "server",
+      "parent": null,
+      "lines": [
+        14,
+        14
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:b6bf9df16ff0369947a44ef5a694590d",
+      "body_hash": "sha256:939b10730df9d89951fe01b788d11ed1",
+      "loop_depth": 0
+    },
+    {
+      "local_id": "d3",
+      "kind": "function",
+      "name": "security_headers",
+      "qualname": "security_headers",
+      "parent": null,
+      "lines": [
+        17,
+        21
+      ],
+      "decorator_lines": [
+        17,
+        17
+      ],
+      "is_async": true,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "request",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "call_next",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "app.middleware('http')",
+          "base": "app.middleware"
+        }
+      ],
+      "docstring": null,
+      "canonical_signature": "[async](positional:request,positional:call_next)->",
+      "signature_hash": "sha256:0f4ed360b4bf21748568ec04b35b1cc6",
+      "content_hash": "sha256:ec580cd640db3911fb5dd0249cee53b1",
+      "body_hash": "sha256:a249399f5c531b4e7eaa79d6395effe6",
+      "loop_depth": 0
+    },
+    {
+      "local_id": "d4",
+      "kind": "function",
+      "name": "list_tools",
+      "qualname": "list_tools",
+      "parent": null,
+      "lines": [
+        24,
+        26
+      ],
+      "decorator_lines": [
+        24,
+        24
+      ],
+      "is_async": true,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "server.list_tools()",
+          "base": "server.list_tools"
+        }
+      ],
+      "docstring": null,
+      "canonical_signature": "[async]()->",
+      "signature_hash": "sha256:7801162beedbcd8c87e30cfc3805dd46",
+      "content_hash": "sha256:a83c8e42cca25f7686b251428336f0fd",
+      "body_hash": "sha256:c1ed0197b90080c0ea3ac29990e8ad34",
+      "loop_depth": 0
+    },
+    {
+      "local_id": "d5",
+      "kind": "class",
+      "name": "RequestLogger",
+      "qualname": "RequestLogger",
+      "parent": null,
+      "lines": [
+        29,
+        31
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [
+        "BaseHTTPMiddleware"
+      ],
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "bases(BaseHTTPMiddleware)",
+      "signature_hash": "sha256:3980ee16c8639cd340307f67cdb5c9d6",
+      "content_hash": "sha256:f1f14368161900c1b0797daf46d4eb04",
+      "body_hash": "sha256:98afd6892b4691026e84dc3ded6dd7d6",
+      "loop_depth": 0
+    },
+    {
+      "local_id": "d6",
+      "kind": "method",
+      "name": "dispatch",
+      "qualname": "RequestLogger.dispatch",
+      "parent": "d5",
+      "lines": [
+        30,
+        31
+      ],
+      "decorator_lines": null,
+      "is_async": true,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "request",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "call_next",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "[async](positional:self,positional:request,positional:call_next)->",
+      "signature_hash": "sha256:9f63d9f5aad4a73105b995bccdc37d25",
+      "content_hash": "sha256:3e5744f1e7779f5c2d528601684a41f9",
+      "body_hash": "sha256:b10abadf0008bc19616040ff68c84a4b",
+      "loop_depth": 0
+    }
+  ],
+  "references": [
+    {
+      "raw": "FastAPI",
+      "root": "FastAPI",
+      "chain": [
+        "FastAPI"
+      ],
+      "context": "call",
+      "line": 13,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "Server",
+      "root": "Server",
+      "chain": [
+        "Server"
+      ],
+      "context": "call",
+      "line": 14,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "app.middleware",
+      "root": "app",
+      "chain": [
+        "app",
+        "middleware"
+      ],
+      "context": "decorator",
+      "line": 17,
+      "enclosing": "d3",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "call_next",
+      "root": "call_next",
+      "chain": [
+        "call_next"
+      ],
+      "context": "call",
+      "line": 19,
+      "enclosing": "d3",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "request",
+      "root": "request",
+      "chain": [
+        "request"
+      ],
+      "context": "name",
+      "line": 19,
+      "enclosing": "d3",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "response.headers",
+      "root": "response",
+      "chain": [
+        "response",
+        "headers"
+      ],
+      "context": "assign_target",
+      "line": 20,
+      "enclosing": "d3",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "response",
+      "root": "response",
+      "chain": [
+        "response"
+      ],
+      "context": "name",
+      "line": 21,
+      "enclosing": "d3",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "server.list_tools",
+      "root": "server",
+      "chain": [
+        "server",
+        "list_tools"
+      ],
+      "context": "decorator",
+      "line": 24,
+      "enclosing": "d4",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "BaseHTTPMiddleware",
+      "root": "BaseHTTPMiddleware",
+      "chain": [
+        "BaseHTTPMiddleware"
+      ],
+      "context": "base_class",
+      "line": 29,
+      "enclosing": "d5",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "call_next",
+      "root": "call_next",
+      "chain": [
+        "call_next"
+      ],
+      "context": "call",
+      "line": 31,
+      "enclosing": "d6",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "request",
+      "root": "request",
+      "chain": [
+        "request"
+      ],
+      "context": "name",
+      "line": 31,
+      "enclosing": "d6",
+      "local": true,
+      "loop_depth": 0
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "sample",
+      "line": 14,
+      "enclosing": null
+    },
+    {
+      "kind": "identifier_string",
+      "value": "http",
+      "line": 17,
+      "enclosing": "d3"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "DENY",
+      "line": 20,
+      "enclosing": "d3"
+    }
+  ]
+}

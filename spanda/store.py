@@ -671,7 +671,7 @@ class Index:
     # -- writing ----------------------------------------------------------
     def write_record(self, scan_id: int, record: dict, patterns: list[str]) -> int:
         """Store one file's worth of extraction. Returns symbols written."""
-        from spanda.gaps import is_dynamic_dispatch
+        from spanda.gaps import class_bases_by_local, is_framework_called
 
         definitions = merge_duplicate_definitions(record["definitions"])
         error = record.get("parse_error") or {}
@@ -713,10 +713,10 @@ class Index:
                 " message) VALUES (?, ?, ?, ?)",
                 (scan_id, path, error.get("line"), error.get("message")))
 
+        bases_by_local = class_bases_by_local(definitions)
         for definition in definitions:
             key = symbol_key(record["file"], definition["qualname"], definition["kind"])
-            dynamic = any(is_dynamic_dispatch(d["base"], patterns)
-                          for d in definition["decorators"])
+            dynamic = is_framework_called(definition, bases_by_local, patterns)
             # Built by column name and then ordered by SYMBOL_FIELDS, so a
             # column added to one and not the other fails here, loudly, not
             # by writing every value one slot to the left.

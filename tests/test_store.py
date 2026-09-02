@@ -107,10 +107,10 @@ def test_indexing_unchanged_code_twice_produces_zero_drift(workspace):
         versions = index.connection.execute(
             "SELECT COUNT(*) c FROM symbol_versions WHERE scan_id = 2").fetchone()
 
-    assert rows["total"] == 64
+    assert rows["total"] == 70
     assert rows["added"] == 0, "a re-index of unchanged code invented new symbols"
     assert rows["removed"] == 0, "a re-index of unchanged code lost symbols"
-    assert rows["uuids"] == rows["keys"] == 64
+    assert rows["uuids"] == rows["keys"] == 70
     assert versions["c"] == 0, "unchanged symbols must not write version rows"
 
 
@@ -243,8 +243,8 @@ def test_unchanged_files_do_not_write_a_row_every_scan(tmp_path):
         later = index.connection.execute(
             "SELECT COUNT(*) c FROM file_versions WHERE scan_id > 1").fetchone()["c"]
 
-    assert files == 19, "one row per file, not per file per scan"
-    assert versions == 19, "every file recorded once, at the scan that found it"
+    assert files == 20, "one row per file, not per file per scan"
+    assert versions == 20, "every file recorded once, at the scan that found it"
     assert later == 0, "three scans of unchanged code add nothing"
 
 
@@ -518,3 +518,18 @@ def test_scan_report_names_only_what_went_missing_this_time(workspace, capsys):
     assert "gone" not in capsys.readouterr().out
     with Index(db_path(workspace)) as index:
         assert len(index.missing_at(4)) == 2, "history keeps both"
+
+
+
+def test_framework_called_symbols_carry_the_flag_in_the_index(workspace):
+    """The flag is what keeps a symbol off the dead list. All three shapes
+    from the vetting — decorator on a function, MCP handler, and an
+    override with no decorator — must carry it."""
+    from spanda.cli import main
+    workspace, _ = workspace
+    assert main(["index", str(workspace)]) == 0
+    with Index(db_path(workspace)) as index:
+        flagged = {r["qualname"] for r in index.connection.execute(
+            "SELECT qualname FROM symbols WHERE file_path = 'sample_pkg/middleware.py'"
+            " AND has_dynamic_dispatch = 1")}
+    assert flagged == {"security_headers", "list_tools", "RequestLogger.dispatch"}
