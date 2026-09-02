@@ -65,6 +65,8 @@ def parse(text: str) -> tuple[list[Verdict], list[ParseProblem]]:
         if not line or line.startswith("#"):
             continue
         parts = line.split(None, 3)
+        if parts[0] == "?":
+            continue  # a candidate nobody decided on; not an error, not a verdict
         if len(parts) < 3:
             problems.append(ParseProblem(number, raw, "expected: verdict  file::qualname  date  note"))
             continue
@@ -243,10 +245,11 @@ def render(report: VetReport, repo: str) -> str:
     p(f"TO VET — {report.candidates_total} symbol(s) with no caller, no hint, no verdict"
       + (f"; first {len(report.candidates)}" if report.candidates_total > len(report.candidates) else ""))
     p(f"  Record a decision with  spanda vet {repo} --dead <target>  or  --alive <target>")
-    p(f"  --note \"what calls it\";  or save the lines you agree with to a file and run")
-    p(f"  spanda vet {repo} --from <file>:")
+    p(f"  --note \"what calls it\";  or save these lines to a file, replace each ? with")
+    p(f"  alive or dead, add the date and a note, and run  spanda vet {repo} --from <file>.")
+    p(f"  A line still marked ? is skipped: no decision, no record.")
     for file_path, qualname, line in report.candidates:
-        p(f"    dead   {file_path}::{qualname}  {today()}  ")
+        p(f"    ?      {file_path}::{qualname}")
     if not report.candidates:
         p("    nothing left to vet")
     p("")

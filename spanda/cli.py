@@ -156,6 +156,9 @@ GAP_HEADINGS = {
         "Methods a framework calls by name on a subclass of its own base — no "
         "decorator\n  marks them, nothing here calls them, and the base is outside "
         "this codebase:",
+    "framework_owned_class":
+        "Classes a framework owns by inheritance — a mapped table, a model the "
+        "framework\n  registers. Alive whether or not Python names them:",
     "unknown_decorator":
         "Decorated with something on neither list, and nothing names them. Not "
         "a claim\n  that a framework calls these — a statement that spanda does "

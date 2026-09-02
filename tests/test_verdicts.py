@@ -35,6 +35,7 @@ def indexed(tmp_path):
 def test_bad_lines_are_reported_not_skipped():
     verdicts, problems = parse(
         "# comment\n"
+        "?      a.py::undecided\n"
         "alive  a.py::f  2026-09-02  fine\n"
         "maybe  a.py::g  2026-09-02  not a verdict\n"
         "dead   a.py/g   2026-09-02  no double colon\n"
@@ -42,7 +43,8 @@ def test_bad_lines_are_reported_not_skipped():
         "dead   a.py::i  2026-09-02\n")
     assert [(v.verdict, v.qualname, v.note) for v in verdicts] == [
         ("alive", "f", "fine"), ("dead", "i", "")]
-    assert [p.line for p in problems] == [3, 4, 5]
+    assert [p.line for p in problems] == [4, 5, 6]
+    assert not any(v.qualname == "undecided" for v in verdicts), "a ? is not a verdict"
 
 
 def test_a_verdict_is_recorded_in_the_index_and_survives_a_scan(indexed, capsys):
@@ -71,6 +73,9 @@ def test_an_alive_verdict_on_an_unknown_shape_becomes_a_pattern_line(indexed):
     assert report.contradicted == [] and report.blind_spots == []
     text = render(report, "proj")
     assert "PATTERN LINES TO ADD" in text and "scheduler.scheduled_job" in text
+    block = text.split("TO VET", 1)[1]
+    assert "\n    ?      " in block
+    assert "\n    dead " not in block, "a candidate line carries no verdict and no date"
 
 
 def test_a_contradicted_verdict_is_reported(indexed):

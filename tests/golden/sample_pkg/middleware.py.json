@@ -3,7 +3,7 @@
   "module": "sample_pkg.middleware",
   "parse_status": "ok",
   "parse_error": null,
-  "file_hash": "sha256:00223ade1d01cd8bc4b1b1ef80b4a668",
+  "file_hash": "sha256:b326086cba086702c709324ad42079a1",
   "module_docstring": "Called by a framework, marked by nothing the code names.\n\nA human vetting of the \"unreferenced\" list found four live symbols in it,\nall of these shapes: MCP handlers, an HTTP middleware function, and a\nmiddleware class whose `dispatch` the framework calls by name. That last\none carries no decorator at all \u2014 only the override.",
   "dunder_all": [],
   "imports": [
@@ -68,6 +68,20 @@
       "conditional": false
     },
     {
+      "raw": "from sqlalchemy.orm import declarative_base",
+      "module": "sqlalchemy.orm",
+      "names": [
+        {
+          "name": "declarative_base",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 13,
+      "conditional": false
+    },
+    {
       "raw": "from starlette.middleware.base import BaseHTTPMiddleware",
       "module": "starlette.middleware.base",
       "names": [
@@ -78,7 +92,7 @@
       ],
       "level": 0,
       "is_star": false,
-      "line": 13,
+      "line": 14,
       "conditional": false
     }
   ],
@@ -90,8 +104,8 @@
       "qualname": "app",
       "parent": null,
       "lines": [
-        15,
-        15
+        16,
+        16
       ],
       "decorator_lines": null,
       "is_async": false,
@@ -115,8 +129,8 @@
       "qualname": "server",
       "parent": null,
       "lines": [
-        16,
-        16
+        17,
+        17
       ],
       "decorator_lines": null,
       "is_async": false,
@@ -140,8 +154,8 @@
       "qualname": "scheduler",
       "parent": null,
       "lines": [
-        17,
-        17
+        18,
+        18
       ],
       "decorator_lines": null,
       "is_async": false,
@@ -160,17 +174,94 @@
     },
     {
       "local_id": "d4",
+      "kind": "variable",
+      "name": "Base",
+      "qualname": "Base",
+      "parent": null,
+      "lines": [
+        19,
+        19
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:c1d0eff5db7cf2b4f1e6695aba51201f",
+      "body_hash": "sha256:0d84b6908d2cd290f569bc102bcc60ea",
+      "loop_depth": 0
+    },
+    {
+      "local_id": "d5",
+      "kind": "class",
+      "name": "AuditLog",
+      "qualname": "AuditLog",
+      "parent": null,
+      "lines": [
+        22,
+        25
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [
+        "Base"
+      ],
+      "annotation": null,
+      "decorators": [],
+      "docstring": "A mapped table. Nothing in Python names it; Alembic owns it.",
+      "canonical_signature": "bases(Base)",
+      "signature_hash": "sha256:8aa48e2b53caf6d5a6b4dd88814eb783",
+      "content_hash": "sha256:6936d59f7732dd0036a2045af2f660f9",
+      "body_hash": "sha256:980c30104b56b97c4cd55b511fd3ac7e",
+      "loop_depth": 0
+    },
+    {
+      "local_id": "d6",
+      "kind": "variable",
+      "name": "__tablename__",
+      "qualname": "AuditLog.__tablename__",
+      "parent": "d5",
+      "lines": [
+        25,
+        25
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:cc2f5e032fd9fcfaf74ccc02a6f6d7f9",
+      "body_hash": "sha256:2d77bb9d168560dd4a7272a39b876b17",
+      "loop_depth": 0
+    },
+    {
+      "local_id": "d7",
       "kind": "function",
       "name": "security_headers",
       "qualname": "security_headers",
       "parent": null,
       "lines": [
-        20,
-        24
+        28,
+        32
       ],
       "decorator_lines": [
-        20,
-        20
+        28,
+        28
       ],
       "is_async": true,
       "is_private": false,
@@ -208,18 +299,18 @@
       "loop_depth": 0
     },
     {
-      "local_id": "d5",
+      "local_id": "d8",
       "kind": "function",
       "name": "list_tools",
       "qualname": "list_tools",
       "parent": null,
       "lines": [
-        27,
-        29
+        35,
+        37
       ],
       "decorator_lines": [
-        27,
-        27
+        35,
+        35
       ],
       "is_async": true,
       "is_private": false,
@@ -244,14 +335,14 @@
       "loop_depth": 0
     },
     {
-      "local_id": "d6",
+      "local_id": "d9",
       "kind": "class",
       "name": "RequestLogger",
       "qualname": "RequestLogger",
       "parent": null,
       "lines": [
-        32,
-        34
+        40,
+        42
       ],
       "decorator_lines": null,
       "is_async": false,
@@ -271,14 +362,14 @@
       "loop_depth": 0
     },
     {
-      "local_id": "d7",
+      "local_id": "d10",
       "kind": "method",
       "name": "dispatch",
       "qualname": "RequestLogger.dispatch",
-      "parent": "d6",
+      "parent": "d9",
       "lines": [
-        33,
-        34
+        41,
+        42
       ],
       "decorator_lines": null,
       "is_async": true,
@@ -318,18 +409,18 @@
       "loop_depth": 0
     },
     {
-      "local_id": "d8",
+      "local_id": "d11",
       "kind": "function",
       "name": "nightly_cleanup",
       "qualname": "nightly_cleanup",
       "parent": null,
       "lines": [
-        37,
-        40
+        45,
+        48
       ],
       "decorator_lines": [
-        37,
-        37
+        45,
+        45
       ],
       "is_async": true,
       "is_private": false,
@@ -354,14 +445,14 @@
       "loop_depth": 0
     },
     {
-      "local_id": "d9",
+      "local_id": "d12",
       "kind": "class",
       "name": "Auditor",
       "qualname": "Auditor",
       "parent": null,
       "lines": [
-        43,
-        56
+        51,
+        64
       ],
       "decorator_lines": null,
       "is_async": false,
@@ -381,14 +472,14 @@
       "loop_depth": 0
     },
     {
-      "local_id": "d10",
+      "local_id": "d13",
       "kind": "method",
       "name": "on_validate",
       "qualname": "Auditor.on_validate",
-      "parent": "d9",
+      "parent": "d12",
       "lines": [
-        47,
-        48
+        55,
+        56
       ],
       "decorator_lines": null,
       "is_async": false,
@@ -416,14 +507,14 @@
       "loop_depth": 0
     },
     {
-      "local_id": "d11",
+      "local_id": "d14",
       "kind": "method",
       "name": "_helper",
       "qualname": "Auditor._helper",
-      "parent": "d9",
+      "parent": "d12",
       "lines": [
-        50,
-        51
+        58,
+        59
       ],
       "decorator_lines": null,
       "is_async": false,
@@ -451,18 +542,18 @@
       "loop_depth": 0
     },
     {
-      "local_id": "d12",
+      "local_id": "d15",
       "kind": "method",
       "name": "name_present",
       "qualname": "Auditor.name_present",
-      "parent": "d9",
+      "parent": "d12",
       "lines": [
-        53,
-        56
+        61,
+        64
       ],
       "decorator_lines": [
-        53,
-        53
+        61,
+        61
       ],
       "is_async": false,
       "is_private": false,
@@ -508,7 +599,7 @@
         "FastAPI"
       ],
       "context": "call",
-      "line": 15,
+      "line": 16,
       "enclosing": null,
       "local": false,
       "loop_depth": 0
@@ -520,7 +611,7 @@
         "Server"
       ],
       "context": "call",
-      "line": 16,
+      "line": 17,
       "enclosing": null,
       "local": false,
       "loop_depth": 0
@@ -532,8 +623,32 @@
         "AsyncIOScheduler"
       ],
       "context": "call",
-      "line": 17,
+      "line": 18,
       "enclosing": null,
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "declarative_base",
+      "root": "declarative_base",
+      "chain": [
+        "declarative_base"
+      ],
+      "context": "call",
+      "line": 19,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "Base",
+      "root": "Base",
+      "chain": [
+        "Base"
+      ],
+      "context": "base_class",
+      "line": 22,
+      "enclosing": "d5",
       "local": false,
       "loop_depth": 0
     },
@@ -545,8 +660,8 @@
         "middleware"
       ],
       "context": "decorator",
-      "line": 20,
-      "enclosing": "d4",
+      "line": 28,
+      "enclosing": "d7",
       "local": false,
       "loop_depth": 0
     },
@@ -557,8 +672,8 @@
         "call_next"
       ],
       "context": "call",
-      "line": 22,
-      "enclosing": "d4",
+      "line": 30,
+      "enclosing": "d7",
       "local": true,
       "loop_depth": 0
     },
@@ -569,8 +684,8 @@
         "request"
       ],
       "context": "name",
-      "line": 22,
-      "enclosing": "d4",
+      "line": 30,
+      "enclosing": "d7",
       "local": true,
       "loop_depth": 0
     },
@@ -582,8 +697,8 @@
         "headers"
       ],
       "context": "assign_target",
-      "line": 23,
-      "enclosing": "d4",
+      "line": 31,
+      "enclosing": "d7",
       "local": true,
       "loop_depth": 0
     },
@@ -594,8 +709,8 @@
         "response"
       ],
       "context": "name",
-      "line": 24,
-      "enclosing": "d4",
+      "line": 32,
+      "enclosing": "d7",
       "local": true,
       "loop_depth": 0
     },
@@ -607,8 +722,8 @@
         "list_tools"
       ],
       "context": "decorator",
-      "line": 27,
-      "enclosing": "d5",
+      "line": 35,
+      "enclosing": "d8",
       "local": false,
       "loop_depth": 0
     },
@@ -619,8 +734,8 @@
         "BaseHTTPMiddleware"
       ],
       "context": "base_class",
-      "line": 32,
-      "enclosing": "d6",
+      "line": 40,
+      "enclosing": "d9",
       "local": false,
       "loop_depth": 0
     },
@@ -631,8 +746,8 @@
         "call_next"
       ],
       "context": "call",
-      "line": 34,
-      "enclosing": "d7",
+      "line": 42,
+      "enclosing": "d10",
       "local": true,
       "loop_depth": 0
     },
@@ -643,8 +758,8 @@
         "request"
       ],
       "context": "name",
-      "line": 34,
-      "enclosing": "d7",
+      "line": 42,
+      "enclosing": "d10",
       "local": true,
       "loop_depth": 0
     },
@@ -656,8 +771,8 @@
         "scheduled_job"
       ],
       "context": "decorator",
-      "line": 37,
-      "enclosing": "d8",
+      "line": 45,
+      "enclosing": "d11",
       "local": false,
       "loop_depth": 0
     },
@@ -668,8 +783,8 @@
         "BaseModel"
       ],
       "context": "base_class",
-      "line": 43,
-      "enclosing": "d9",
+      "line": 51,
+      "enclosing": "d12",
       "local": false,
       "loop_depth": 0
     },
@@ -680,8 +795,8 @@
         "field_validator"
       ],
       "context": "decorator",
-      "line": 53,
-      "enclosing": "d12",
+      "line": 61,
+      "enclosing": "d15",
       "local": false,
       "loop_depth": 0
     },
@@ -692,8 +807,8 @@
         "value"
       ],
       "context": "name",
-      "line": 56,
-      "enclosing": "d12",
+      "line": 64,
+      "enclosing": "d15",
       "local": true,
       "loop_depth": 0
     }
@@ -702,32 +817,38 @@
     {
       "kind": "identifier_string",
       "value": "sample",
-      "line": 16,
+      "line": 17,
       "enclosing": null
     },
     {
       "kind": "identifier_string",
+      "value": "audit_log",
+      "line": 25,
+      "enclosing": "d5"
+    },
+    {
+      "kind": "identifier_string",
       "value": "http",
-      "line": 20,
-      "enclosing": "d4"
+      "line": 28,
+      "enclosing": "d7"
     },
     {
       "kind": "identifier_string",
       "value": "DENY",
-      "line": 23,
-      "enclosing": "d4"
+      "line": 31,
+      "enclosing": "d7"
     },
     {
       "kind": "identifier_string",
       "value": "cron",
-      "line": 37,
-      "enclosing": "d8"
+      "line": 45,
+      "enclosing": "d11"
     },
     {
       "kind": "identifier_string",
       "value": "name",
-      "line": 53,
-      "enclosing": "d12"
+      "line": 61,
+      "enclosing": "d15"
     }
   ]
 }

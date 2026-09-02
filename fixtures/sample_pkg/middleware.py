@@ -10,11 +10,19 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from mcp.server import Server
 from pydantic import BaseModel, field_validator
+from sqlalchemy.orm import declarative_base
 from starlette.middleware.base import BaseHTTPMiddleware
 
 app = FastAPI()
 server = Server("sample")
 scheduler = AsyncIOScheduler()
+Base = declarative_base()
+
+
+class AuditLog(Base):
+    """A mapped table. Nothing in Python names it; Alembic owns it."""
+
+    __tablename__ = "audit_log"
 
 
 @app.middleware("http")

@@ -93,7 +93,7 @@ def test_the_guide_lists_candidates_but_decides_nothing(indexed):
     assert "dead   sample_pkg/handlers.py::on_paid" not in block, \
         "on_paid is named in a string literal: reachable through unresolved_refs? no — " \
         "it is on the candidate list only if nothing explains it"
-    first = next(line for line in block.splitlines() if line.startswith("dead   "))
+    first = next(line for line in block.splitlines() if line.startswith("?      "))
     target = first.split()[1]
     file_path, qualname = target.split("::")
 

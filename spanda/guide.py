@@ -148,9 +148,8 @@ def render(index, root: Path) -> str:
     if vetting.blind_spots:
         verdict_lines.append(f"{len(vetting.blind_spots)} alive verdict(s) with nothing "
                              f"to explain them — blind spots to report")
-    today = datetime.now(timezone.utc).date().isoformat()
     if vetting.candidates:
-        candidate_lines = [f"dead   {f}::{q}  {today}  " for f, q, _l in vetting.candidates]
+        candidate_lines = [f"?      {f}::{q}" for f, q, _l in vetting.candidates]
         if vetting.candidates_total > len(vetting.candidates):
             candidate_lines.append(
                 f"# ... and {vetting.candidates_total - len(vetting.candidates)} more: "

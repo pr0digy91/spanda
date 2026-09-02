@@ -107,10 +107,10 @@ def test_indexing_unchanged_code_twice_produces_zero_drift(workspace):
         versions = index.connection.execute(
             "SELECT COUNT(*) c FROM symbol_versions WHERE scan_id = 2").fetchone()
 
-    assert rows["total"] == 76
+    assert rows["total"] == 79
     assert rows["added"] == 0, "a re-index of unchanged code invented new symbols"
     assert rows["removed"] == 0, "a re-index of unchanged code lost symbols"
-    assert rows["uuids"] == rows["keys"] == 76
+    assert rows["uuids"] == rows["keys"] == 79
     assert versions["c"] == 0, "unchanged symbols must not write version rows"
 
 
@@ -533,7 +533,7 @@ def test_framework_called_symbols_carry_the_flag_in_the_index(workspace):
             "SELECT qualname FROM symbols WHERE file_path = 'sample_pkg/middleware.py'"
             " AND has_dynamic_dispatch = 1")}
     assert flagged == {"security_headers", "list_tools", "RequestLogger.dispatch",
-                       "Auditor.name_present"}
+                       "Auditor.name_present", "AuditLog"}
     with Index(db_path(workspace)) as index:
         hints = {r["qualname"]: r["dispatch_hint"] for r in index.connection.execute(
             "SELECT qualname, dispatch_hint FROM symbols"
@@ -545,6 +545,7 @@ def test_framework_called_symbols_carry_the_flag_in_the_index(workspace):
     assert hints["Auditor.name_present"] == "dispatch:field_validator", \
         "a decorator explanation outranks the vaguer external-base one"
     assert hints["Auditor._helper"] is None, "private: the class's own"
+    assert hints["AuditLog"] == "inherits:Base", "a mapped table is alive by inheritance"
     assert hints["app"] is None
 
 

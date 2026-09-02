@@ -70,6 +70,19 @@ def test_a_public_method_on_an_external_base_is_a_candidate(gaps):
     # _helper is private; methods on internal bases (derived.py) resolve.
 
 
+def test_a_class_a_framework_owns_by_inheritance_is_flagged(gaps):
+    """Eleven SQLAlchemy models sat on a dead list: nothing in Python named
+    them, and every one was a table Alembic owns."""
+    owned = {g.symbol: g.detail for g in gaps if g.kind == "framework_owned_class"}
+    assert owned == {"AuditLog": "inherits from Base"}
+    from spanda.gaps import framework_class_base
+    patterns = load_patterns()
+    assert framework_class_base(["Base", "TimestampMixin"], patterns) == "Base"
+    assert framework_class_base(["db.Model"], patterns) == "db.Model"
+    assert framework_class_base(["BaseModel"], patterns) is None, \
+        "a Pydantic schema is used by reference, not registered by inheritance"
+
+
 def test_framework_method_matching_is_by_written_base_name():
     from spanda.gaps import is_framework_method
     patterns = load_patterns()

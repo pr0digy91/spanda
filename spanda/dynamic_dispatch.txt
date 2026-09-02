@@ -75,6 +75,18 @@ tool_decorator
 *.resource
 *.prompt
 
+# Classes a framework owns by inheritance. A SQLAlchemy model is a mapped
+# table whether or not any Python names the class: Alembic owns it, and
+# deleting the class orphans the table. Eleven such models sat on a dead
+# list before this section existed. Syntax: `class:<base glob>`, matched
+# against the base names as written in the class statement.
+class:Base
+class:DeclarativeBase
+class:SQLModel
+class:db.Model
+class:models.Model
+class:Model
+
 # Methods a framework calls by name on a subclass of its own base class.
 # A decorator cannot express this: nothing is written at the definition
 # except the override itself, and the base lives outside the codebase, so

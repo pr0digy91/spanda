@@ -87,13 +87,13 @@ for moving them or surviving a rebuild. As of this scan:
 
 ### Waiting for a verdict — {{candidates_total}} symbols, no caller, no hint, no decision
 
-Each line below is a candidate, formatted as a verdict line. Nothing about
-it has been decided: the tool found no static caller and nothing that
-explains the silence, and that is all it knows. A person who looks and
-agrees records it with `spanda vet {{repo}} --dead <target>`, or saves the
-lines they agree with to a file and runs `spanda vet {{repo}} --from
-<file>`; one who finds it alive records `--alive` and says what calls it.
-Tests are left out.
+Each line below is a candidate. The `?` is the tool's whole opinion: it
+found no static caller and nothing that explains the silence, and it does
+not know which. A person who looks records `spanda vet {{repo}} --dead
+<target>` or `--alive <target> --note "what calls it"`, or saves these
+lines to a file, replaces each `?` with `alive` or `dead`, adds the date
+and a note, and runs `spanda vet {{repo}} --from <file>`. A line still
+marked `?` is skipped: no decision, no record. Tests are left out.
 
 ```
 {{candidates_block}}
@@ -102,11 +102,13 @@ Tests are left out.
 **Before recording `dead`, check the four places a caller hides.** Every
 miss so far was one of these:
 
-1. **A framework calls it through a base class or a runtime value.** A class
-   whose base is `Base = declarative_base()` is a table SQLAlchemy registers;
-   a method named `dispatch` on a middleware subclass is called by Starlette.
-   The tool marks bases it knows are external; a base that is a *variable*
-   in this codebase it cannot see through yet.
+1. **A framework owns it through its base class.** A class whose base is
+   `Base = declarative_base()` is a table SQLAlchemy and Alembic own, alive
+   whether or not Python names it; a method named `dispatch` on a middleware
+   subclass is called by Starlette. `class:<base>` and `method:<base>.<name>`
+   lines in the pattern file mark these (`inherits:<base>` and
+   `override:<base>.<name>` in `dispatch_hint`). A base the file does not
+   list is a pattern line waiting to be added.
 2. **A framework calls it through a decorator not on the list.** `spanda
    gaps` lists decorators the tool does not recognise. If the symbol carries
    one, it is not on this list — but a decorator alias (`pytestmark_db =

@@ -25,8 +25,9 @@ def load_patterns(path: Path | None = None) -> list[str]:
 
 
 METHOD_PREFIX = "method:"
+CLASS_PREFIX = "class:"
 HARMLESS_PREFIX = "harmless:"
-PREFIXES = (METHOD_PREFIX, HARMLESS_PREFIX)
+PREFIXES = (METHOD_PREFIX, CLASS_PREFIX, HARMLESS_PREFIX)
 
 
 def is_dynamic_dispatch(decorator_base: str | None, patterns: list[str]) -> bool:
@@ -68,6 +69,10 @@ def dispatch_hint(definition: dict, bases_by_local: dict, patterns: list[str]) -
         bases = bases_by_local.get(definition["parent"])
         if is_framework_method(bases, definition["name"], patterns):
             return f"override:{'/'.join(bases)}.{definition['name']}"
+    if definition["kind"] == "class":
+        owned_by = framework_class_base(definition["bases"], patterns)
+        if owned_by:
+            return f"inherits:{owned_by}"
     for decorator in definition["decorators"]:
         if classify_decorator(decorator["base"], patterns) == "unknown":
             return f"unknown_decorator:{decorator['base'] or decorator['raw']}"
@@ -99,12 +104,40 @@ def is_framework_method(bases: list[str] | None, name: str, patterns: list[str])
     return False
 
 
+def _written_bases(bases: list[str] | None) -> set[str]:
+    written = set()
+    for base in bases or []:
+        plain = base.split("[", 1)[0]  # `Generic[T]` — the subscript is not the name
+        written.add(plain)
+        written.add(plain.rpartition(".")[2])
+    return written
+
+
+def framework_class_base(bases: list[str] | None, patterns: list[str]) -> str | None:
+    """The base a `class:` pattern matched, if any — a framework owns this
+    class by inheritance, whether or not Python ever names it."""
+    written = _written_bases(bases)
+    for pattern in patterns:
+        if not pattern.startswith(CLASS_PREFIX):
+            continue
+        glob = pattern[len(CLASS_PREFIX):]
+        for base in written:
+            if fnmatch(base, glob):
+                return base
+    return None
+
+
 def is_framework_called(definition: dict, bases_by_local: dict, patterns: list[str]) -> bool:
-    """Either way a framework can own the call: a decorator, or an override."""
+    """Any of the ways a framework can own a symbol: a decorator, an
+    override it calls by name, or a base class it registers."""
     if any(is_dynamic_dispatch(d["base"], patterns) for d in definition["decorators"]):
         return True
-    return definition["kind"] == "method" and is_framework_method(
-        bases_by_local.get(definition["parent"]), definition["name"], patterns)
+    if definition["kind"] == "method":
+        return is_framework_method(
+            bases_by_local.get(definition["parent"]), definition["name"], patterns)
+    if definition["kind"] == "class":
+        return framework_class_base(definition["bases"], patterns) is not None
+    return False
 
 
 def class_bases_by_local(definitions: list[dict]) -> dict:
@@ -221,6 +254,19 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
                     definition["lines"][0], definition["qualname"],
                     f"overrides {definition['name']} on "
                     f"{', '.join(bases.get(definition['parent']) or [])}"))
+
+    # 1a'. A class a framework owns by inheritance: a mapped table is alive
+    #      whether or not Python names it.
+    for record in scan.records:
+        for definition in record["definitions"]:
+            if definition["kind"] != "class":
+                continue
+            owned_by = framework_class_base(definition["bases"], patterns)
+            if owned_by:
+                gaps.append(Gap(
+                    "framework_owned_class", record["file"],
+                    definition["lines"][0], definition["qualname"],
+                    f"inherits from {owned_by}"))
 
     # 1c. A decorator on neither list, on a symbol nothing names. Not a
     #     claim that a framework calls it — a statement that the tool does
