@@ -1,7 +1,6 @@
 [project]
 # The import package and the command are both `spanda`; only the published
-# distribution carries the suffix, because `spanda` on PyPI is an unrelated
-# soil-spectroscopy library that got there first.
+# distribution carries the suffix, because `spanda` on PyPI was already taken.
 name = "spanda-graph"
 version = "0.1.0"
 description = "Deterministic static-analysis indexing engine for Python codebases"

@@ -1,5 +1,7 @@
 # spanda
 
+![A thin arc of light and its reflection meeting at two points on still water](https://raw.githubusercontent.com/pr0digy91/spanda/main/docs/banner.png)
+
 [![CI](https://github.com/pr0digy91/spanda/actions/workflows/ci.yml/badge.svg)](https://github.com/pr0digy91/spanda/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
@@ -48,8 +50,7 @@ uv add spanda-graph              # or as a project dependency
 ```
 
 The published distribution is `spanda-graph`; the command and the import
-package are both `spanda`. (`spanda` on PyPI is an unrelated soil-spectroscopy
-library that got there first.)
+package are both `spanda`.
 
 Straight from the repository, no release needed:
 
