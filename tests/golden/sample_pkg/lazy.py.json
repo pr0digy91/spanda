@@ -1,0 +1,108 @@
+{
+  "file": "sample_pkg/lazy.py",
+  "module": "sample_pkg.lazy",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:5e86d574a548dccf0d65c866b8b09b4d",
+  "module_docstring": "An import written inside a function body, then called through.\n\nTwo real functions \u2014 a flow executor and a nightly job \u2014 were imported this\nway in the codebase this tool was built against, and both reported zero\ncallers. The import was traced, so the audit passed; the call through it\nwas then discarded as a reference to a local name.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from .helpers import slugify",
+      "module": ".helpers",
+      "names": [
+        {
+          "name": "slugify",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 12,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "function",
+      "name": "run_later",
+      "qualname": "run_later",
+      "parent": null,
+      "lines": [
+        10,
+        13
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "text",
+            "kind": "positional",
+            "annotation": "str",
+            "default": null
+          }
+        ],
+        "returns": "str"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Imports lazily, the way code does to sidestep an import cycle.",
+      "canonical_signature": "(positional:text:str)->str",
+      "signature_hash": "sha256:58a1c6d4511b7d2e974d7e36463adb43",
+      "content_hash": "sha256:e5886aa088df38c95d34e478f5a8ef89",
+      "body_hash": "sha256:4a62a2648890ddd5a1df51d1ab2d1900"
+    }
+  ],
+  "references": [
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 10,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 10,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "slugify",
+      "root": "slugify",
+      "chain": [
+        "slugify"
+      ],
+      "context": "call",
+      "line": 13,
+      "enclosing": "d1",
+      "local": false
+    },
+    {
+      "raw": "text",
+      "root": "text",
+      "chain": [
+        "text"
+      ],
+      "context": "name",
+      "line": 13,
+      "enclosing": "d1",
+      "local": true
+    }
+  ],
+  "dynamic_hints": []
+}

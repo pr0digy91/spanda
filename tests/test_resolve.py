@@ -49,6 +49,13 @@ def test_a_call_across_a_circular_import_resolves(resolved):
             "sample_pkg.a.TABLE_PREFIX|variable") in edges(references)
 
 
+def test_a_call_through_a_function_local_import_resolves(resolved):
+    """The audit already covered the import; this covers the call."""
+    _table, references = resolved
+    assert ("sample_pkg.lazy.run_later|function",
+            "sample_pkg.helpers.slugify|function") in edges(references, "calls")
+
+
 def test_inheritance_across_files_resolves(resolved):
     _table, references = resolved
     assert ("sample_pkg.derived.UpiPayment|class",

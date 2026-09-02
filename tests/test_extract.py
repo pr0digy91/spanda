@@ -21,6 +21,7 @@ GOLDEN = ROOT / "tests" / "golden"
 EXPECTED_COUNTS = {
     "sample_pkg/__init__.py":  (2, 0, 0, 0, 2),
     "sample_pkg/consumer.py":  (2, 1, 0, 0, 1),
+    "sample_pkg/lazy.py":      (1, 1, 0, 0, 0),
     "sample_pkg/registry/__init__.py": (1, 0, 0, 0, 1),
     "sample_pkg/registry/impl.py":     (1, 1, 0, 0, 0),
     "sample_pkg/a.py":         (3, 2, 0, 0, 1),
@@ -70,10 +71,10 @@ def test_definition_counts_match_answer_key(records, path, expected):
 
 
 def test_totals(records):
-    assert len(records) == 17
-    assert sum(len(r["definitions"]) for r in records.values()) == 58
+    assert len(records) == 18
+    assert sum(len(r["definitions"]) for r in records.values()) == 59
     parsed = [r for r in records.values() if r["parse_status"] == "ok"]
-    assert len(parsed) == 16
+    assert len(parsed) == 17
 
 
 # -- the hard edges --------------------------------------------------------
@@ -187,6 +188,16 @@ def test_locals_are_resolved_in_stage_one(records):
     by_root = {(r["root"], r["local"]) for r in recursion["references"]}
     assert ("n", True) in by_root
     assert ("countdown", False) in by_root
+
+
+def test_a_name_imported_inside_a_function_is_not_a_local(records):
+    """`from .helpers import slugify` inside run_later binds a name to a
+    symbol elsewhere. Marking it local discarded the call; the flow executor
+    in a real codebase read as having no callers because of exactly this."""
+    lazy = records["sample_pkg/lazy.py"]
+    by_root = {(r["root"], r["local"]) for r in lazy["references"]}
+    assert ("slugify", False) in by_root
+    assert ("text", True) in by_root
 
 
 # -- golden files ----------------------------------------------------------

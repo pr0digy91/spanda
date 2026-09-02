@@ -210,13 +210,19 @@ class _BindingCollector(ast.NodeVisitor):
             self.names.add(node.name)
         self.generic_visit(node)
 
+    # An import inside a function body binds a name here, but to a symbol
+    # defined somewhere else — which is exactly what resolution exists to
+    # find. Counting it as a local hid every call made through one: two
+    # real functions imported this way, a flow executor and a nightly job,
+    # reported zero callers while the import audit passed, because the
+    # import *was* traced and the call through it was then discarded as a
+    # local name. Imports are therefore not local bindings, and a name
+    # imported inside a function resolves through the file's scope.
     def visit_Import(self, node: ast.Import) -> None:
-        for alias in node.names:
-            self.names.add((alias.asname or alias.name).split(".")[0])
+        pass
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        for alias in node.names:
-            self.names.add(alias.asname or alias.name)
+        pass
 
     def visit_Global(self, node: ast.Global) -> None:
         self.declared_elsewhere.update(node.names)

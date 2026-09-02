@@ -24,6 +24,7 @@ Both are deliberate.
 |---|---:|---:|---:|---:|---:|
 | `__init__.py` | 2 | 0 | 0 | 0 | 2 |
 | `consumer.py` | 2 | 1 | 0 | 0 | 1 |
+| `lazy.py` | 1 | 1 | 0 | 0 | 0 |
 | `a.py` | 3 | 2 | 0 | 0 | 1 |
 | `b.py` | 1 | 1 | 0 | 0 | 0 |
 | `checkout.py` | 4 | 4 | 0 | 0 | 0 |
@@ -39,9 +40,9 @@ Both are deliberate.
 | `registry/impl.py` | 1 | 1 | 0 | 0 | 0 |
 | `star.py` | 1 | 1 | 0 | 0 | 0 |
 | `broken.py` | — | unparseable; the reported line and wording vary by interpreter |
-| **Total** | **58** | 28 | 6 | 10 | 14 |
+| **Total** | **59** | 29 | 6 | 10 | 14 |
 
-17 files: 16 parse, 1 does not.
+18 files: 17 parse, 1 does not.
 
 ## What each file proves
 
@@ -58,6 +59,7 @@ Both are deliberate.
 | `handlers.py` | Two functions with zero static references that are called at runtime. |
 | `dynamic.py` | `getattr`/`hasattr` dispatch, runtime-assembled names, conditional import, and an `importlib.import_module` call the import audit cannot see. |
 | `recursion.py` | Self- and mutual recursion. The graph is not a DAG. |
+| `lazy.py` | An import inside a function body, called through. The import audit passes on it; the call must still become an edge. |
 | `nested.py` | Nested function, nested class, async, and every parameter kind. |
 | `broken.py` | A syntax error must be recorded, not fatal. |
 

@@ -598,9 +598,10 @@ def _report_lost_trails(lost) -> None:
     from this run deserves suspicion until the cause is found.
     """
     if not lost:
-        print("  self-audit: every name brought in by an import statement was "
-              "traced to its definition\n  (imports done by calling importlib "
-              "are not statements; `spanda gaps` lists those)")
+        print("  self-audit: every name brought in by an import statement, at the "
+              "top of a file or\n  inside a function, was traced to its definition "
+              "(imports done by calling importlib\n  are not statements; `spanda "
+              "gaps` lists those)")
         return
     print(f"\n  SELF-AUDIT: {len(lost)} imported name(s) whose definition could "
           f"not be found.")
