@@ -322,3 +322,29 @@ def test_a_version_without_loop_depth_is_a_caveat_not_a_zero(project):
     report = drift_between(db, 1, 3)
     assert report.loops_deeper == [] and report.loops_shallower == []
     assert any("no loop depth recorded" in c for c in report.caveats)
+
+
+
+# -- decorators ----------------------------------------------------------------
+
+def test_a_decorator_seen_for_the_first_time_is_drift(project):
+    source, db = project
+    index_once(db, source)
+    (source / "billing.py").write_text(
+        "from somewhere import scheduler\n\n\n"
+        "def total(items, tax):\n"
+        "    return sum(i.price for i in items) * tax\n\n\n"
+        "@scheduler.scheduled_job('cron')\n"
+        "def receipt(order):\n"
+        "    return str(total(order.items, 1.05))\n")
+    index_once(db, source)
+    report = drift_between(db, 1, 2)
+    assert report.decorators_appeared == [("scheduler.scheduled_job", "unknown", 1)]
+    assert report.decorators_gone == []
+    report = drift_between(db, 1, 2)
+
+    with Index(db) as index:
+        index.connection.execute("UPDATE scans SET decorators_recorded = 0 WHERE scan_id = 1")
+    report = drift_between(db, 1, 2)
+    assert report.decorators_appeared == []
+    assert any("no decorator census" in c for c in report.caveats)

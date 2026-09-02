@@ -23,7 +23,7 @@ EXPECTED_COUNTS = {
     "sample_pkg/consumer.py":  (2, 1, 0, 0, 1),
     "sample_pkg/lazy.py":      (1, 1, 0, 0, 0),
     "sample_pkg/batch.py":     (5, 4, 0, 0, 1),
-    "sample_pkg/middleware.py": (6, 2, 1, 1, 2),
+    "sample_pkg/middleware.py": (12, 3, 2, 4, 3),
     "sample_pkg/registry/__init__.py": (1, 0, 0, 0, 1),
     "sample_pkg/registry/impl.py":     (1, 1, 0, 0, 0),
     "sample_pkg/a.py":         (3, 2, 0, 0, 1),
@@ -50,6 +50,8 @@ EXPECTED_DECORATORS = {
     ("sample_pkg/nested.py", "expensive_lookup"): "functools.lru_cache",
     ("sample_pkg/middleware.py", "security_headers"): "app.middleware",
     ("sample_pkg/middleware.py", "list_tools"): "server.list_tools",
+    ("sample_pkg/middleware.py", "nightly_cleanup"): "scheduler.scheduled_job",
+    ("sample_pkg/middleware.py", "Auditor.name_present"): "field_validator",
 }
 
 
@@ -76,7 +78,7 @@ def test_definition_counts_match_answer_key(records, path, expected):
 
 def test_totals(records):
     assert len(records) == 20
-    assert sum(len(r["definitions"]) for r in records.values()) == 70
+    assert sum(len(r["definitions"]) for r in records.values()) == 76
     parsed = [r for r in records.values() if r["parse_status"] == "ok"]
     assert len(parsed) == 19
 

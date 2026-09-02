@@ -21,7 +21,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS scans (
     -- graph. An incremental backfill scan reads a handful of files and
     -- cannot; drift must say "no cycle data at scan N", never "no cycles".
     cycles_recorded     INTEGER NOT NULL DEFAULT 0,
+    decorators_recorded INTEGER NOT NULL DEFAULT 0,
     completed           INTEGER NOT NULL DEFAULT 0
 );
 
@@ -159,6 +160,13 @@ CREATE TABLE IF NOT EXISTS symbols (
     docstring            TEXT,
     decorators           TEXT,
     has_dynamic_dispatch INTEGER NOT NULL DEFAULT 0,
+    -- Why this symbol's callers may be hidden: `dispatch:<decorator>` or
+    -- `override:<base>.<method>` (a pattern matched; has_dynamic_dispatch is
+    -- 1), `unknown_decorator:<decorator>` (on neither list — the tool does
+    -- not know), `external_base:<base>` (a public method nothing names, on
+    -- a subclass of something outside this codebase). NULL: nothing at the
+    -- definition suggests a hidden caller.
+    dispatch_hint        TEXT,
     -- >1 means the same name is defined more than once in one file, usually
     -- one branch per platform. Which one runs is not statically knowable, so
     -- the count is surfaced rather than a winner silently chosen.
@@ -223,6 +231,16 @@ CREATE TABLE IF NOT EXISTS unresolved_refs (
     reason             TEXT    NOT NULL
 );
 
+-- Every decorator base name in use at a scan, with a count, so a decorator
+-- that appears for the first time is a drift event — the day a framework is
+-- adopted, not the day someone vets the dead list.
+CREATE TABLE IF NOT EXISTS scan_decorators (
+    scan_id INTEGER NOT NULL,
+    base    TEXT    NOT NULL,
+    symbols INTEGER NOT NULL,
+    PRIMARY KEY (scan_id, base)
+);
+
 -- Calls inside loops that the resolver could not follow — a database session
 -- is an external type, so `session.execute` in a loop never becomes an edge,
 -- and without this row the loop body would read as empty. Current scan only.
@@ -265,7 +283,7 @@ KEEPABLE_REASONS = frozenset({
 SYMBOL_FIELDS = [
     "name", "qualname", "kind", "module", "file_path", "line_start",
     "line_end", "signature", "canonical_signature", "docstring", "decorators",
-    "has_dynamic_dispatch", "definition_count", "signature_varies",
+    "has_dynamic_dispatch", "dispatch_hint", "definition_count", "signature_varies",
     "content_hash", "signature_hash", "body_hash", "loop_depth",
 ]
 
@@ -279,6 +297,8 @@ MIGRATIONS: dict[int, list[tuple[str, str, str]]] = {
     12: [("symbols", "loop_depth", "INTEGER NOT NULL DEFAULT 0"),
          ("edges", "loop_depth", "INTEGER NOT NULL DEFAULT 0")],
     13: [("symbol_versions", "loop_depth", "INTEGER")],
+    14: [("symbols", "dispatch_hint", "TEXT"),
+         ("scans", "decorators_recorded", "INTEGER NOT NULL DEFAULT 0")],
 }
 
 
@@ -597,7 +617,52 @@ class Index:
         self.connection.execute("ROLLBACK")
         self._open_scan = None
 
+    def set_external_base_hints(self, scan_id: int, hints: dict[str, str]) -> None:
+        """Record the overrides found after resolution, replacing last scan's.
+
+        A hint from an earlier scan must not survive a call appearing: the
+        whole set is cleared for the symbols this scan saw, then written.
+        Hints that come from the definition itself (a decorator, a pattern
+        line) are not touched — those were set when the symbol was written.
+        """
+        self.connection.execute(
+            "UPDATE symbols SET dispatch_hint = NULL WHERE last_seen_scan_id = ?"
+            " AND dispatch_hint LIKE 'external_base:%'", (scan_id,))
+        self.connection.executemany(
+            "UPDATE symbols SET dispatch_hint = ? WHERE symbol_key = ?"
+            " AND dispatch_hint IS NULL",
+            [(f"external_base:{base}", key) for key, base in hints.items()])
+
+    def record_decorator_census(self, scan_id: int) -> None:
+        """Every decorator base in use at this scan, counted."""
+        census: dict[str, int] = {}
+        for row in self.connection.execute(
+                "SELECT decorators FROM symbols WHERE last_seen_scan_id = ?"
+                " AND decorators != '[]'", (scan_id,)):
+            for decorator in json.loads(row["decorators"]):
+                base = decorator["base"] or decorator["raw"]
+                census[base] = census.get(base, 0) + 1
+        self.connection.executemany(
+            "INSERT OR REPLACE INTO scan_decorators (scan_id, base, symbols)"
+            " VALUES (?, ?, ?)", [(scan_id, b, n) for b, n in census.items()])
+        # An empty census is a fact; a missing one is a gap. Kept apart.
+        self.connection.execute(
+            "UPDATE scans SET decorators_recorded = 1 WHERE scan_id = ?", (scan_id,))
+
+    def decorators_at(self, scan_id: int) -> dict[str, int] | None:
+        """The census, or None if none was recorded for that scan."""
+        recorded = self.connection.execute(
+            "SELECT decorators_recorded FROM scans WHERE scan_id = ?",
+            (scan_id,)).fetchone()
+        if not recorded or not recorded[0]:
+            return None
+        rows = self.connection.execute(
+            "SELECT base, symbols FROM scan_decorators WHERE scan_id = ?",
+            (scan_id,)).fetchall()
+        return {r["base"]: r["symbols"] for r in rows}
+
     def finish_scan(self, scan_id: int) -> dict:
+        self.record_decorator_census(scan_id)
         # A version row written before loop depth existed has NULL there. If
         # its body is the one this scan just read — same content hash — the
         # depth is known exactly, because depth is a function of the body.
@@ -671,7 +736,7 @@ class Index:
     # -- writing ----------------------------------------------------------
     def write_record(self, scan_id: int, record: dict, patterns: list[str]) -> int:
         """Store one file's worth of extraction. Returns symbols written."""
-        from spanda.gaps import class_bases_by_local, is_framework_called
+        from spanda.gaps import class_bases_by_local, dispatch_hint, is_framework_called
 
         definitions = merge_duplicate_definitions(record["definitions"])
         error = record.get("parse_error") or {}
@@ -717,6 +782,7 @@ class Index:
         for definition in definitions:
             key = symbol_key(record["file"], definition["qualname"], definition["kind"])
             dynamic = is_framework_called(definition, bases_by_local, patterns)
+            hint = dispatch_hint(definition, bases_by_local, patterns)
             # Built by column name and then ordered by SYMBOL_FIELDS, so a
             # column added to one and not the other fails here, loudly, not
             # by writing every value one slot to the left.
@@ -732,6 +798,7 @@ class Index:
                 "docstring": definition["docstring"],
                 "decorators": json.dumps(definition["decorators"]),
                 "has_dynamic_dispatch": int(dynamic),
+                "dispatch_hint": hint,
                 "definition_count": definition["definition_count"],
                 "signature_varies": int(definition["signature_varies"]),
                 "content_hash": definition["content_hash"],

@@ -98,15 +98,44 @@ method:Process.run
 method:TestCase.setUp
 method:TestCase.tearDown
 
-# Deliberately NOT listed, though they appeared in the census:
+# Decorators known NOT to hide a caller. Listed so that they can be told
+# apart from decorators this file has never heard of: a symbol with no
+# callers and a decorator on neither list is reported as *unrecognised*,
+# never as dead. That is how the four misses above would have surfaced as
+# questions instead of being vetted by hand. Syntax: `harmless:<glob>`.
 #
-#   @pytest.mark.*   A marker does not dispatch anything. The test function is
-#                    called by pytest, but flagging ~3,000 test functions would
-#                    swamp the report without telling anyone something they did
-#                    not already know about how tests run.
-#   @lru_cache, @wraps, @asynccontextmanager, @dataclass
-#                    Wrappers. Calls to the decorated symbol stay statically
-#                    visible at their call sites.
-#   @property, @staticmethod, @classmethod
-#                    These change the calling convention rather than hiding the
-#                    caller, and are already part of the signature hash.
+#   pytest markers: a marker does not dispatch anything. The test function is
+#   called by pytest, but flagging ~3,000 test functions would swamp the
+#   report without telling anyone something they did not already know.
+harmless:pytest.mark.*
+harmless:mark.*
+#   wrappers: calls to the decorated symbol stay visible at their call sites.
+harmless:lru_cache
+harmless:cache
+harmless:cached_property
+harmless:wraps
+harmless:functools.*
+harmless:dataclass
+harmless:dataclasses.dataclass
+harmless:contextmanager
+harmless:asynccontextmanager
+harmless:contextlib.*
+harmless:total_ordering
+harmless:singledispatch
+harmless:unique
+harmless:retry
+harmless:*.retry
+#   calling convention and typing: part of the signature hash already.
+harmless:property
+harmless:staticmethod
+harmless:classmethod
+harmless:abstractmethod
+harmless:abc.abstractmethod
+harmless:*.setter
+harmless:*.getter
+harmless:*.deleter
+harmless:overload
+harmless:typing.overload
+harmless:final
+harmless:override
+harmless:typing.*

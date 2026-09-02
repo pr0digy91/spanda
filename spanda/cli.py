@@ -23,8 +23,9 @@ from spanda.modules import (EXTERNAL, build_import_graph, cycle_groups,
                             processing_order)
 from spanda.profile import build as build_profile, render as render_profile
 from spanda.scan import (changed_python_files, cycles_for, full_scan, git,
-                         git_failure, import_survey, incremental_scan, plan_for,
-                         resolve_codebase, resolve_collected)
+                         git_failure, import_survey, incremental_scan,
+                         override_hints, plan_for, resolve_codebase,
+                         resolve_collected)
 from spanda.store import SCHEMA_VERSION, Index, IndexError_, db_path, prepare_db_path
 
 
@@ -154,6 +155,14 @@ GAP_HEADINGS = {
         "Methods a framework calls by name on a subclass of its own base — no "
         "decorator\n  marks them, nothing here calls them, and the base is outside "
         "this codebase:",
+    "unknown_decorator":
+        "Decorated with something on neither list, and nothing names them. Not "
+        "a claim\n  that a framework calls these — a statement that spanda does "
+        "not know. Vet, then\n  add a line to dynamic_dispatch.txt either way:",
+    "override_on_external_base":
+        "Public methods nothing names, on classes whose base is outside this "
+        "codebase.\n  Whatever the base's framework is, this is the shape it "
+        "calls through (lower\n  confidence than a pattern match):",
     "runtime_attribute_access":
         "Call sites that pick their target at runtime — the site is certain, "
         "the target is not:",
@@ -253,6 +262,8 @@ def _run_scan(db_path, root, plan, patterns):
             scan_id, references, index.symbol_uuids_by_key())
         index.record_lost_trails(scan_id, lost)
         counts["lost"] = lost
+        index.set_external_base_hints(
+            scan_id, override_hints(run.collected, run.module_index))
 
         totals = index.finish_scan(scan_id)
         missing = index.gone_since_previous(scan_id)
@@ -426,6 +437,10 @@ def cmd_drift(args: argparse.Namespace) -> int:
         if report.loops_deeper or report.loops_shallower:
             headline.append(f"{len(report.loops_deeper)} nest loops deeper, "
                             f"{len(report.loops_shallower)} shallower")
+        if report.decorators_appeared:
+            unknown = sum(1 for _b, k, _c in report.decorators_appeared if k == "unknown")
+            headline.append(f"{len(report.decorators_appeared)} decorator(s) seen for "
+                            f"the first time" + (f", {unknown} on no list" if unknown else ""))
         print(", ".join(headline).capitalize() + ".")
         print(f"{report.unchanged_count} symbols untouched.\n")
 
@@ -457,6 +472,21 @@ def cmd_drift(args: argparse.Namespace) -> int:
     elif report.internal:
         print(f"({len(report.internal)} internal-only changes hidden; "
               f"drop --brief to list them)\n")
+
+    if report.decorators_appeared:
+        print("DECORATORS SEEN FOR THE FIRST TIME — a new framework, or a new way of "
+              "calling\n")
+        for base, kind, count in report.decorators_appeared:
+            note = {"dispatch": "on the dispatch list",
+                    "harmless": "known harmless",
+                    "unknown": "ON NEITHER LIST — vet, then add a line"}[kind]
+            print(f"    @{base:<40} {count:>4} symbol(s)   {note}")
+        print()
+    if report.decorators_gone:
+        print("DECORATORS NO LONGER USED\n")
+        for base, _kind, count in report.decorators_gone:
+            print(f"    @{base:<40} was on {count} symbol(s)")
+        print()
 
     if report.loops_deeper:
         print("LOOPS DEEPER — more nesting in the body than before (own loops only;\n"
@@ -592,10 +622,12 @@ def cmd_backfill(args: argparse.Namespace) -> int:
                     # Doing it for all of them would dominate the run for
                     # edges nobody asks about at a historical commit.
                     if number == len(commits):
-                        _p, _t, _s, references, lost = resolve_codebase(worktree, patterns)
+                        _p, _t, _s, references, lost, hints = resolve_codebase(
+                            worktree, patterns)
                         index.write_references(
                             scan_id, references, index.symbol_uuids_by_key())
                         index.record_lost_trails(scan_id, lost)
+                        index.set_external_base_hints(scan_id, hints)
                         if not index.scan(scan_id)["cycles_recorded"]:
                             index.record_cycles(scan_id, cycles_for(plan))
 
@@ -642,7 +674,7 @@ def cmd_resolve(args: argparse.Namespace) -> int:
         return 2
 
     patterns = load_patterns(Path(args.patterns) if args.patterns else None)
-    plan, table, _scopes, references, lost = resolve_codebase(root, patterns)
+    plan, table, _scopes, references, lost, _hints = resolve_codebase(root, patterns)
 
     resolved = [r for r in references if r.target_symbol]
     unresolved = [r for r in references if not r.target_symbol]
@@ -767,6 +799,16 @@ def cmd_callers(args: argparse.Namespace) -> int:
                 print("\n  ...but this symbol is dispatched at runtime. Whatever "
                       "calls it is not\n     visible in the source, so the count "
                       "above is not the whole story.")
+            elif symbol["dispatch_hint"] and symbol["dispatch_hint"].startswith("unknown_decorator:"):
+                print(f"\n  ...but it is decorated with @{symbol['dispatch_hint'][18:]}, "
+                      f"which spanda does not know.\n     A framework may call it. "
+                      f"Vet it, then add the decorator to dynamic_dispatch.txt\n"
+                      f"     as dispatching or as harmless, so the next reader is told.")
+            elif symbol["dispatch_hint"] and symbol["dispatch_hint"].startswith("external_base:"):
+                print(f"\n  ...but it is a public method on a subclass of "
+                      f"{symbol['dispatch_hint'][14:]}, which is outside this\n"
+                      f"     codebase, and nothing here names it. Frameworks call "
+                      f"such methods by name.")
 
             if maybe:
                 print(f"\n  plus {len(maybe)} place(s) reaching for the name "
@@ -777,7 +819,8 @@ def cmd_callers(args: argparse.Namespace) -> int:
                 if len(maybe) > args.limit:
                     print(f"      ... and {len(maybe) - args.limit} more")
 
-            if not callers and not symbol["has_dynamic_dispatch"] and not maybe:
+            if not callers and not symbol["has_dynamic_dispatch"] and not maybe \
+                    and not symbol["dispatch_hint"]:
                 print("\n  Nothing references it, and nothing explains the "
                       "silence. Possibly unused —\n     though entry points and "
                       "callers outside this codebase are invisible here.")

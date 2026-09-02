@@ -107,10 +107,10 @@ def test_indexing_unchanged_code_twice_produces_zero_drift(workspace):
         versions = index.connection.execute(
             "SELECT COUNT(*) c FROM symbol_versions WHERE scan_id = 2").fetchone()
 
-    assert rows["total"] == 70
+    assert rows["total"] == 76
     assert rows["added"] == 0, "a re-index of unchanged code invented new symbols"
     assert rows["removed"] == 0, "a re-index of unchanged code lost symbols"
-    assert rows["uuids"] == rows["keys"] == 70
+    assert rows["uuids"] == rows["keys"] == 76
     assert versions["c"] == 0, "unchanged symbols must not write version rows"
 
 
@@ -532,4 +532,34 @@ def test_framework_called_symbols_carry_the_flag_in_the_index(workspace):
         flagged = {r["qualname"] for r in index.connection.execute(
             "SELECT qualname FROM symbols WHERE file_path = 'sample_pkg/middleware.py'"
             " AND has_dynamic_dispatch = 1")}
-    assert flagged == {"security_headers", "list_tools", "RequestLogger.dispatch"}
+    assert flagged == {"security_headers", "list_tools", "RequestLogger.dispatch",
+                       "Auditor.name_present"}
+    with Index(db_path(workspace)) as index:
+        hints = {r["qualname"]: r["dispatch_hint"] for r in index.connection.execute(
+            "SELECT qualname, dispatch_hint FROM symbols"
+            " WHERE file_path = 'sample_pkg/middleware.py'")}
+    assert hints["security_headers"] == "dispatch:app.middleware"
+    assert hints["RequestLogger.dispatch"] == "override:BaseHTTPMiddleware.dispatch"
+    assert hints["nightly_cleanup"] == "unknown_decorator:scheduler.scheduled_job"
+    assert hints["Auditor.on_validate"] == "external_base:BaseModel"
+    assert hints["Auditor.name_present"] == "dispatch:field_validator", \
+        "a decorator explanation outranks the vaguer external-base one"
+    assert hints["Auditor._helper"] is None, "private: the class's own"
+    assert hints["app"] is None
+
+
+
+def test_an_external_base_hint_goes_away_when_a_call_appears(workspace):
+    """A hint must describe the newest scan, not the first one that set it."""
+    from spanda.cli import main
+    workspace, _ = workspace
+    assert main(["index", str(workspace)]) == 0
+    (workspace / "sample_pkg" / "consumer.py").write_text(
+        (workspace / "sample_pkg" / "consumer.py").read_text()
+        + "\n\ndef audit(a):\n    return a.on_validate()\n")
+    assert main(["index", str(workspace)]) == 0
+    with Index(db_path(workspace)) as index:
+        hint = index.connection.execute(
+            "SELECT dispatch_hint FROM symbols WHERE qualname = 'Auditor.on_validate'"
+        ).fetchone()[0]
+    assert hint is None

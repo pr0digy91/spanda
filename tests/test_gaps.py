@@ -34,7 +34,8 @@ def gaps(scan):
 
 def test_the_decorated_hook_is_flagged(gaps):
     flagged = {g.symbol for g in gaps if g.kind == "dynamic_dispatch_decorator"}
-    assert flagged == {"_apply_rls_context", "security_headers", "list_tools"}
+    assert flagged == {"_apply_rls_context", "security_headers", "list_tools",
+                       "Auditor.name_present"}
 
 
 def test_an_override_the_framework_calls_by_name_is_flagged(gaps):
@@ -42,6 +43,31 @@ def test_an_override_the_framework_calls_by_name_is_flagged(gaps):
     A human vetting found this one alive on the dead list."""
     flagged = {g.symbol: g.detail for g in gaps if g.kind == "framework_method_override"}
     assert flagged == {"RequestLogger.dispatch": "overrides dispatch on BaseHTTPMiddleware"}
+
+
+def test_a_decorator_on_neither_list_is_reported_as_unknown(gaps):
+    """Not dead, not known: the reader is told the tool does not know."""
+    unknown = {g.symbol: g.detail for g in gaps if g.kind == "unknown_decorator"}
+    assert unknown == {"nightly_cleanup": '@scheduler.scheduled_job(\'cron\', hour=3)'}
+
+
+def test_harmless_decorators_are_neither_dispatch_nor_unknown():
+    from spanda.gaps import classify_decorator
+    patterns = load_patterns()
+    assert classify_decorator("functools.lru_cache", patterns) == "harmless"
+    assert classify_decorator("property", patterns) == "harmless"
+    assert classify_decorator("pytest.mark.parametrize", patterns) == "harmless"
+    assert classify_decorator("event.listens_for", patterns) == "dispatch"
+    assert classify_decorator("scheduler.scheduled_job", patterns) == "unknown"
+
+
+def test_a_public_method_on_an_external_base_is_a_candidate(gaps):
+    found = {g.symbol: g.detail for g in gaps if g.kind == "override_on_external_base"}
+    assert set(found) == {"Auditor.on_validate"}, \
+        "name_present is a validator, explained by its decorator, and not listed twice"
+    assert "BaseModel" in found["Auditor.on_validate"]
+    # dispatch is explained by its pattern line and not listed twice;
+    # _helper is private; methods on internal bases (derived.py) resolve.
 
 
 def test_framework_method_matching_is_by_written_base_name():

@@ -25,13 +25,53 @@ def load_patterns(path: Path | None = None) -> list[str]:
 
 
 METHOD_PREFIX = "method:"
+HARMLESS_PREFIX = "harmless:"
+PREFIXES = (METHOD_PREFIX, HARMLESS_PREFIX)
 
 
 def is_dynamic_dispatch(decorator_base: str | None, patterns: list[str]) -> bool:
     if not decorator_base:
         return False
     return any(fnmatch(decorator_base, pattern) for pattern in patterns
-               if not pattern.startswith(METHOD_PREFIX))
+               if not pattern.startswith(PREFIXES))
+
+
+def classify_decorator(decorator_base: str | None, patterns: list[str]) -> str:
+    """dispatch | harmless | unknown.
+
+    The third answer is the point. A decorator on neither list used to be
+    treated as harmless by default, and that default is how four live
+    symbols were vetted as dead. Unknown is reported as unknown.
+    """
+    if not decorator_base:
+        return "unknown"
+    if is_dynamic_dispatch(decorator_base, patterns):
+        return "dispatch"
+    if any(fnmatch(decorator_base, p[len(HARMLESS_PREFIX):])
+           for p in patterns if p.startswith(HARMLESS_PREFIX)):
+        return "harmless"
+    return "unknown"
+
+
+def dispatch_hint(definition: dict, bases_by_local: dict, patterns: list[str]) -> str | None:
+    """Why this symbol's callers may be hidden, from the definition alone.
+
+    `dispatch:<decorator>` or `override:<base>.<method>` when a pattern
+    matched; `unknown_decorator:<decorator>` when a decorator is on neither
+    list; None when nothing at the definition suggests a hidden caller. The
+    external-base case needs the whole scan and is added after resolution.
+    """
+    for decorator in definition["decorators"]:
+        if is_dynamic_dispatch(decorator["base"], patterns):
+            return f"dispatch:{decorator['base']}"
+    if definition["kind"] == "method":
+        bases = bases_by_local.get(definition["parent"])
+        if is_framework_method(bases, definition["name"], patterns):
+            return f"override:{'/'.join(bases)}.{definition['name']}"
+    for decorator in definition["decorators"]:
+        if classify_decorator(decorator["base"], patterns) == "unknown":
+            return f"unknown_decorator:{decorator['base'] or decorator['raw']}"
+    return None
 
 
 def is_framework_method(bases: list[str] | None, name: str, patterns: list[str]) -> bool:
@@ -69,6 +109,54 @@ def is_framework_called(definition: dict, bases_by_local: dict, patterns: list[s
 
 def class_bases_by_local(definitions: list[dict]) -> dict:
     return {d["local_id"]: d["bases"] for d in definitions if d["kind"] == "class"}
+
+
+def external_base_overrides(records, module_index) -> list[tuple[str, str, int, str]]:
+    """Public methods nothing names, on classes whose base is outside this
+    codebase: (file, qualname, line, base).
+
+    Whatever the base's framework is, this is the shape it calls through —
+    `dispatch` on a middleware, `run` on a thread — and it needs no pattern
+    line to be noticed. Lower confidence than a pattern match, and labelled
+    so: a public helper on a Pydantic model that nothing happens to call
+    lands here too. Dunder and private methods are left out; the first are
+    the language's, the second are the class's own.
+    """
+    from spanda.modules import EXTERNAL, resolve_imports
+
+    named: set[str] = set()
+    for record in records:
+        for reference in record["references"]:
+            if reference["chain"]:
+                named.update(reference["chain"])
+
+    found = []
+    for record in records:
+        external_roots: set[str] = set()
+        for edge in resolve_imports(record, module_index):
+            if edge.reason == EXTERNAL:
+                for name, alias in edge.names:
+                    external_roots.add(alias or name.partition(".")[0])
+        if not external_roots:
+            continue
+        classes = {}
+        for definition in record["definitions"]:
+            if definition["kind"] != "class":
+                continue
+            for base in definition["bases"] or []:
+                plain = base.split("[", 1)[0]
+                if plain.partition(".")[0] in external_roots:
+                    classes[definition["local_id"]] = plain
+                    break
+        for definition in record["definitions"]:
+            if definition["kind"] != "method" or definition["parent"] not in classes:
+                continue
+            name = definition["name"]
+            if name.startswith("_") or name in named:
+                continue
+            found.append((record["file"], definition["qualname"],
+                          definition["lines"][0], classes[definition["parent"]]))
+    return sorted(found)
 
 
 def referenced_names(scan) -> set[str]:
@@ -133,6 +221,35 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
                     definition["lines"][0], definition["qualname"],
                     f"overrides {definition['name']} on "
                     f"{', '.join(bases.get(definition['parent']) or [])}"))
+
+    # 1c. A decorator on neither list, on a symbol nothing names. Not a
+    #     claim that a framework calls it — a statement that the tool does
+    #     not know, which is what an unvetted "dead" used to hide.
+    referenced_for_decorators = referenced_names(scan)
+    for record in scan.records:
+        for definition in record["definitions"]:
+            if definition["name"] in referenced_for_decorators:
+                continue
+            for decorator in definition["decorators"]:
+                if classify_decorator(decorator["base"], patterns) == "unknown":
+                    gaps.append(Gap(
+                        "unknown_decorator", record["file"],
+                        definition["lines"][0], definition["qualname"],
+                        "@" + decorator["raw"]))
+
+    # 1d. Overrides on external bases, whatever the framework.
+    from spanda.modules import ModuleIndex
+    module_index = ModuleIndex()
+    for record in scan.records:
+        module_index.add(record["file"], record["module"])
+    explained = {(g.file, g.symbol) for g in gaps
+                 if g.kind in ("framework_method_override", "dynamic_dispatch_decorator")}
+    for file, qualname, line, base in external_base_overrides(scan.records, module_index):
+        if (file, qualname) in explained:
+            continue  # a validator on a model is explained by its decorator
+        gaps.append(Gap("override_on_external_base", file, line, qualname,
+                        f"public method on a subclass of {base}, which is outside "
+                        f"this codebase; nothing here names it"))
 
     # 2. Call sites that choose their target at runtime. The *target* is
     #    unknown; the site itself is certain.

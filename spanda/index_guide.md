@@ -49,6 +49,13 @@ Three things are missing from it, by design rather than by oversight:
   in the codebase; none can be proven.
 - **Anything outside this repository.** Other services, scripts, notebooks.
 
+- **What the tool does not recognise.** A decorator on neither the dispatch
+  list nor the harmless list, or a public method nothing names on a class
+  whose base is outside this codebase. `dispatch_hint` names the reason:
+  `unknown_decorator:<name>` or `external_base:<base>`. These are not
+  claims that a framework calls the symbol; they are the tool saying it
+  does not know, so that "no callers" is never mistaken for "dead".
+
 So: **zero callers never means unused.** Check `has_dynamic_dispatch` and
 `unresolved_refs` before concluding anything. `spanda callers` does this for
 you and is the safer route.
@@ -69,6 +76,7 @@ you and is the safer route.
 | `scans` | index run | commit, timestamp, counts, fingerprint |
 | `scan_problems` | file a scan could not parse | rare; syntax errors at that commit |
 | `scan_unread` | what a scan chose not to read | explains `skipped_files`: excluded directories with counts, and `.py` files git ignores |
+| `scan_decorators` | a decorator base in use at a scan, with a count | `spanda drift` reports one seen for the first time, and whether it is on a list |
 | `loop_calls` | a call inside a loop the resolver could not follow | newest scan only; `session.execute` in a loop lives here, since the session type never resolves |
 | `meta` | key | schema version, which codebase this index describes, when it was brought forward |
 
@@ -92,6 +100,10 @@ you and is the safer route.
   recorded before this column existed and not re-read since.
 - `has_dynamic_dispatch` — 1 means something calls it that the source does not
   show.
+- `dispatch_hint` — why callers may be hidden: `dispatch:<decorator>`,
+  `override:<base>.<method>`, `unknown_decorator:<decorator>`,
+  `external_base:<base>`, or NULL. The last two are the tool declining to
+  call something dead.
 - `loop_depth` — loops nested in the symbol's own body, counted syntactically
   (for, while, each generator of a comprehension). Says where loops are, not
   how they scale. Loops in functions it *calls* are not included; `spanda
@@ -170,10 +182,23 @@ GROUP BY s.uuid HAVING shapes > 1 ORDER BY shapes DESC;
 **Symbols whose callers cannot be determined** — do not delete these
 
 ```sql
-SELECT qualname, file_path, line_start, decorators
+SELECT qualname, file_path, line_start, dispatch_hint
 FROM symbols
-WHERE has_dynamic_dispatch = 1
+WHERE (has_dynamic_dispatch = 1 OR dispatch_hint IS NOT NULL)
   AND last_seen_scan_id = (SELECT MAX(scan_id) FROM scans WHERE completed = 1);
+```
+
+**Candidates for dead code** — no edge, no hint, and still only candidates
+
+```sql
+SELECT s.qualname, s.file_path, s.line_start
+FROM symbols s
+WHERE s.last_seen_scan_id = (SELECT MAX(scan_id) FROM scans WHERE completed = 1)
+  AND s.kind IN ('function', 'method', 'class')
+  AND s.has_dynamic_dispatch = 0 AND s.dispatch_hint IS NULL
+  AND NOT EXISTS (SELECT 1 FROM edges e WHERE e.target_symbol_uuid = s.uuid
+                  AND e.last_seen_scan_id = s.last_seen_scan_id)
+  AND NOT EXISTS (SELECT 1 FROM unresolved_refs u WHERE u.attr_name = s.name);
 ```
 
 **Which commit is a scan** — to line the index up against git

@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Callable
 
 from spanda.extract import ScanPlan, extract_file, plan_scan, stream_records
+from spanda.gaps import external_base_overrides
 from spanda.modules import (ModuleIndex, build_import_graph, cycle_groups,
                             resolve_imports)
 from spanda.resolve import SymbolTable, build_scopes, resolve_record
@@ -163,7 +164,8 @@ def for_resolution(record: dict) -> dict:
         "references": record["references"],
         "definitions": [{"local_id": d["local_id"], "name": d["name"],
                          "qualname": d["qualname"], "kind": d["kind"],
-                         "parent": d["parent"],
+                         "parent": d["parent"], "bases": d["bases"],
+                         "lines": d["lines"],
                          "signature": ({"params": [
                              {"name": p["name"], "annotation": p["annotation"]}
                              for p in d["signature"]["params"]]}
@@ -187,6 +189,13 @@ def cycles_for(plan: ScanPlan) -> list[list[str]]:
         module_index.add(record["file"], record["module"])
         collected.append(for_resolution(record))
     return cycles_from(collected, module_index)
+
+
+def override_hints(collected, module_index) -> dict[str, str]:
+    """symbol_key -> external base, for the overrides nothing names."""
+    from spanda.store import symbol_key
+    return {symbol_key(file, qualname, "method"): base
+            for file, qualname, _line, base in external_base_overrides(collected, module_index)}
 
 
 def resolve_collected(collected, module_index, table):
@@ -213,7 +222,7 @@ def resolve_codebase(root: Path, patterns):
         table.add_record(record, patterns)
         collected.append(for_resolution(record))
     scopes, references, lost = resolve_collected(collected, module_index, table)
-    return plan, table, scopes, references, lost
+    return plan, table, scopes, references, lost, override_hints(collected, module_index)
 
 
 def import_survey(root: Path):

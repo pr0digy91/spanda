@@ -57,6 +57,11 @@ class DriftReport:
     #: calls is not tracked per scan and is not compared here.
     loops_deeper: list[Change] = field(default_factory=list)
     loops_shallower: list[Change] = field(default_factory=list)
+    #: Decorator bases in use at B and not at A (and the reverse), as
+    #: (base, dispatch|harmless|unknown, symbol count). A new framework shows
+    #: up here on the day it is adopted.
+    decorators_appeared: list[tuple[str, str, int]] = field(default_factory=list)
+    decorators_gone: list[tuple[str, str, int]] = field(default_factory=list)
     #: Reasons the comparison itself may be incomplete, e.g. files that failed
     #: to parse in either scan. Surfaced rather than quietly tolerated.
     caveats: list[str] = field(default_factory=list)
@@ -155,7 +160,28 @@ def compare(index, scan_a: int, scan_b: int) -> DriftReport:
             f"since replaced); loop changes among them are not reported")
     _compare_edges(index, scan_a, scan_b, report)
     _compare_cycles(index, scan_a, scan_b, report)
+    _compare_decorators(index, scan_a, scan_b, report)
     return report
+
+
+def _compare_decorators(index, scan_a: int, scan_b: int, report: DriftReport) -> None:
+    """Decorator names that appeared or vanished between the scans."""
+    from spanda.gaps import classify_decorator, load_patterns
+    before = index.decorators_at(scan_a)
+    after = index.decorators_at(scan_b)
+    for scan_id, census in ((scan_a, before), (scan_b, after)):
+        if census is None:
+            report.caveats.append(
+                f"scan {scan_id} has no decorator census (recorded from schema 14 on); "
+                f"decorators seen for the first time cannot be reported for this pair")
+            return
+    patterns = load_patterns()
+    report.decorators_appeared = sorted(
+        (base, classify_decorator(base, patterns), count)
+        for base, count in after.items() if base not in before)
+    report.decorators_gone = sorted(
+        (base, classify_decorator(base, patterns), count)
+        for base, count in before.items() if base not in after)
 
 
 def _edge_label(row) -> str:
