@@ -9,19 +9,17 @@
 
 **Find out who calls a function — and be told, plainly, when nobody can know.**
 
-spanda reads a Python codebase, records every definition and every reference,
-and stores the result as a queryable index. It is a static analyser, so there
-is a limit to what it can see. The difference from most tools is that it tells
-you where that limit is instead of rounding it down to zero.
+Every static analyser has a blind spot. Ask most of them who calls an event
+hook, a route handler, or anything reached through `getattr`, and you get
+`0 callers` — which reads as *safe to delete*. It isn't. It means the tool
+couldn't see.
 
-Ask most tools who calls an event hook and you get `0 callers`, which reads as
-*safe to delete*. Ask spanda:
+spanda reports that difference:
 
 ```console
 $ spanda callers . _apply_rls_context
 
 models.py:57  function _apply_rls_context
-    (positional:session,positional:flush_context,positional:instances)->None
 
   no static callers found
 
@@ -29,78 +27,68 @@ models.py:57  function _apply_rls_context
      visible in the source, so the count above is not the whole story.
 ```
 
-No LLM calls anywhere. No network access. Zero runtime dependencies —
-standard library only. The same input produces the same output every time.
+That is the whole idea. Everything else is in service of it.
+
+No LLM calls, no network, no telemetry. Zero runtime dependencies — standard
+library only. Same input, same output, every time.
 
 ## Install
 
-The quickest look, with nothing installed permanently — needs
-[uv](https://docs.astral.sh/uv/):
-
 ```sh
-uvx --from spanda-graph spanda gaps path/to/your/code
-```
-
-To keep it:
-
-```sh
-uv tool install spanda-graph     # a standalone `spanda` on your PATH
-pip install spanda-graph         # or into the current environment
-uv add spanda-graph              # or as a project dependency
+uv tool install spanda-graph      # recommended: a standalone `spanda` on your PATH
+pip install spanda-graph          # or into the current environment
 ```
 
 The published distribution is `spanda-graph`; the command and the import
 package are both `spanda`.
 
-Straight from the repository, no release needed:
+<details>
+<summary>Other ways to install</summary>
 
 ```sh
-uv tool install git+https://github.com/pr0digy91/spanda
+uvx --from spanda-graph spanda gaps .        # try it without installing anything
+uv add spanda-graph                          # as a project dependency
+uv tool install git+https://github.com/pr0digy91/spanda    # from source, no release needed
 pip install git+https://github.com/pr0digy91/spanda
 ```
 
-**Run it on the newest Python you have.** A parser cannot read syntax from a
-release later than its own, so an old interpreter records perfectly valid files
-as syntax errors. 3.9 is the supported floor, not the version to use; on macOS
-the built-in `python3` is usually well behind. `uv tool install` and `uvx`
-fetch a current interpreter for you, which is the easy way out of this. The
-output is identical on every supported version, and CI checks that on each
-commit across 3.9, 3.11, 3.12 and 3.14.
-
-## Quick start
-
-Point it at a codebase. Nothing is written outside the index.
+To hack on it:
 
 ```sh
-spanda index .          # parse everything and store it
-spanda gaps .           # what static analysis cannot see here — read this first
-spanda callers . my_function
+git clone https://github.com/pr0digy91/spanda && cd spanda
+uv sync --all-extras && uv run spanda --help
+```
+</details>
+
+> **Run it on the newest Python you have.** A parser cannot read syntax from a
+> release later than its own, so an old interpreter records valid files as
+> syntax errors. 3.9 is the supported floor, not the version to use — and on
+> macOS the built-in `python3` is usually well behind. `uv tool install` and
+> `uvx` fetch a current interpreter for you.
+
+## Using it, in order
+
+### 1. Index the codebase
+
+```sh
+spanda index .
 ```
 
-`spanda index` prints what it did, and ends by auditing itself:
+Parses everything, stores it at `.spanda/index.db` inside the codebase itself,
+and audits its own work: every name brought in by an import is traced to its
+definition, and anything it could not place is reported rather than dropped.
+Safe to re-run — symbols keep their identity across scans.
 
-```console
-$ spanda index .
-index: /path/to/code/.spanda/index.db
-scan 1: 21 files under /path/to/code
+### 2. Find out what it cannot see
 
-scan 1 complete
-  20 files parsed, 1 unparseable, 0 not looked at
-  98 symbols (0 defined more than once in their file)
-  39 references resolved to a definition, 14 could not be
-  self-audit: every name brought in by an import statement, at the top of a file or
-  inside a function, was traced to its definition
-  content fingerprint sha256:7abd2b9a9dd315ebda28ac8edde10191
-  at commit 4c09b067b16e (clean tree)
+```sh
+spanda gaps .
 ```
 
-That "could not be" number is not swept up. `spanda gaps` breaks it down, and
-every entry carries the reason:
+**Read this before you trust anything else.** It is the map of the blind spot,
+grouped by *why* each symbol is invisible:
 
 ```console
-$ spanda gaps .
-21 files, 98 symbols, 0 files not looked at
-
 Decorated with something that dispatches at runtime — the framework calls these,
   and no reference in this codebase names them:
 
@@ -108,14 +96,6 @@ Decorated with something that dispatches at runtime — the framework calls thes
       _apply_rls_context
       @event.listens_for(Session, 'before_flush')
   (4)
-
-Methods a framework calls by name on a subclass of its own base — no decorator
-  marks them, nothing here calls them, and the base is outside this codebase:
-
-  middleware.py:41
-      RequestLogger.dispatch
-      overrides dispatch on BaseHTTPMiddleware
-  (1)
 
 Decorated with something on neither list, and nothing names them. Not a claim
   that a framework calls these — a statement that spanda does not know. Vet, then
@@ -130,94 +110,31 @@ String literals that spell the name of a symbol defined elsewhere (heuristic —
   a name match is not a call, and must never become an edge):
 
   dynamic.py:14
-      <module>
       "on_created" names a symbol defined at handlers.py:9
   (3)
 ```
 
-The last one is the shape that makes dead-code detection dangerous:
+That last group is the one that makes dead-code detection dangerous:
 `handlers.on_created` is called at runtime through a string in a dispatch
-table. No reference in the source names it. spanda will not tell you it is
-dead, and it will not tell you it is alive either — it tells you where to look.
+table. Nothing in the source names it. spanda will not call it dead, and will
+not call it alive — it tells you where to look.
 
-## What it refuses to guess
+Add `--unreferenced` to also list symbols nothing references, split by whether
+the silence is explained.
 
-The distinction the whole tool is built around is between *nothing references
-this* and *I cannot see who references this*. They look identical in the output
-of most tools, and only one of them means a symbol is safe to delete.
+### 3. Ask about a specific symbol
 
-Four shapes make a caller invisible to any reader of the source, and each is
-reported as such rather than as an absence:
-
-- **Framework dispatch.** A decorator hands the symbol to something that will
-  call it later — an HTTP route, an ORM event hook, a signal receiver, a
-  scheduled job. `spanda/dynamic_dispatch.txt` lists the decorators that mean
-  this, one glob per line. It is configuration, not code: `spanda parse` ends
-  with a census of every decorator your codebase actually uses, and that census
-  is what you grow the file from.
-- **Name assembly at runtime.** `getattr(module, name)`, a handler looked up in
-  a dict of strings, `importlib.import_module`. Identifier-shaped string
-  literals are reported as hints and never become edges.
-- **Inheritance from a base the codebase does not contain.** An override of a
-  method defined in an installed library is *maybe inherited*, not absent.
-- **Attribute access on a value of unknown type.** Where an annotation exists it
-  is used; where it does not, the reference is recorded unresolved, with the
-  reason attached.
-
-A heuristic stays labelled as a heuristic and is never promoted to an edge in
-the graph. If you find a symbol reported with no callers that something really
-does call, that is a bug worth filing — it is the exact failure this project
-exists to eliminate.
-
-## Commands
-
-| command | what it answers |
-|---|---|
-| `spanda index <path>` | parse the codebase and store it; safe to re-run |
-| `spanda gaps <path>` | what static analysis cannot see here, with reasons |
-| `spanda gaps <path> --unreferenced` | ...plus symbols nothing references, split by whether the silence is explained |
-| `spanda callers <path> <name>` | what calls this symbol, and what might but cannot be proven to |
-| `spanda find <path> "Order*"` | look up symbols by name |
-| `spanda parse <path>` | definitions and references per file, without storing anything |
-| `spanda parse <path> --out out/` | the same, as one inspectable JSON record per source file |
-| `spanda resolve <path> --reasons 3` | link every reference to a definition, listing the failures |
-| `spanda imports <path>` | which file each import points at, and what imports circularly |
-| `spanda imports <path> --order` | the order files must be processed in |
-| `spanda profile <path>` | what the code keeps doing: re-implemented names, annotation rates, churn |
-| `spanda loops <path>` | where the loops are, including nesting that spans a function call |
-| `spanda drift <path>` | what changed between two scans |
-| `spanda backfill <path> --last 10` | replay past commits, so drift has real history to read today |
-| `spanda scans <path>` | every run, with its timestamp, commit and fingerprint |
-| `spanda vet <path>` | record human decisions in the index, and check them against the newest scan |
-| `spanda guide <path> --write` | a note on reading this index, with that index's own numbers in it |
-
-`spanda loops` reads nesting off the call graph, not just out of one file:
-
-```console
-$ spanda loops .
-LOOPS NESTED IN ONE BODY — for/while/comprehensions, counted syntactically
-  2 deep   batch.py:20  pair_up
-
-LOOPS NESTED ACROSS CALLS — a loop calling a function that loops
-  3 deep (own 1)   batch.py:30  pair_all_groups   via pair_up
-
-DATABASE CALLS INSIDE LOOPS — matched by name against database_calls.txt
-  1 deep   batch.py:44  in load_each:  session.get
-
-NOT SEEN INTO — 5 calls inside loops the resolver could not follow:
-       4  attribute_on_unknown_type
-       1  builtin
-  Whatever those do per iteration is outside this report.
+```sh
+spanda callers . create_invoice
 ```
 
-Every one of those is a place to look, never a score. spanda does not compute
-a complexity number, because a number invites a threshold and a threshold
-invites gaming.
+Gives you the callers it can prove, plus anything that might call it but cannot
+be proven to — with the reason attached, as in the example at the top.
 
-## Recording what a person decides
+### 4. Record what a person decides
 
-Static analysis eventually runs out. When it does, a human looks at the symbol
-and decides — and that decision belongs in the index, not in someone's memory:
+Static analysis eventually runs out. When it does, someone looks at the symbol
+and decides — and that decision belongs in the index, not in memory:
 
 ```sh
 spanda vet . --alive "tasks.py::nightly_cleanup" --note "APScheduler, see config/jobs.py"
@@ -225,54 +142,85 @@ spanda vet .
 ```
 
 Re-running `spanda vet` checks every recorded decision against the newest scan:
-which verdicts the code now contradicts, which patterns the alive ones imply
-(a decorator vetted alive three times is a line that belongs in
-`dynamic_dispatch.txt`), and which symbols are next to look at. `--export` and
-`--from` move verdicts between indexes.
+which verdicts the code now contradicts, which patterns the alive ones imply (a
+decorator vetted alive three times belongs in `dynamic_dispatch.txt`), and what
+to look at next. `--export` and `--from` move verdicts between indexes.
 
-## The index
+## What it refuses to guess
 
-The index lives at `<path>/.spanda/index.db`, inside the codebase it describes
-— one authoritative index per codebase. `.spanda/` ignores itself with a
-`.gitignore` of `*`: an index is derived data and never belongs in a commit.
+Four shapes make a caller invisible to any reader of the source. Each is
+reported as such, never as an absence:
 
-- **Re-running is safe.** Symbols keep their identity across scans, matched on
-  a deterministic key, so a second scan does not read as everything being
-  deleted and re-added.
-- **History lives in the index, not in filenames.** `spanda scans` lists every
-  run with its timestamp, commit and content fingerprint.
-- **Re-indexing is incremental** in a git repository: only what changed is
-  re-read, which is the difference between 52 seconds and 12 minutes over 425
-  commits.
-- **Memory depends on the largest file, not the codebase.** Indexing streams
-  one file at a time — 680 files index in 52 MB and about 3 seconds.
-- **A syntax error is recorded, not fatal.** The file is marked unparseable
-  with the interpreter's message, and the run completes.
+| shape | example | what spanda says |
+|---|---|---|
+| **Framework dispatch** | `@app.post(...)`, `@event.listens_for(...)` | dispatched at runtime; callers not in the source |
+| **Runtime name assembly** | `getattr(mod, name)`, a dict of handler strings | the call site is certain, the target is not |
+| **Inheritance from an absent base** | overriding a method from an installed library | maybe inherited, not absent |
+| **Attribute on an unknown type** | `x.method()` where `x` has no annotation | unresolved, with the reason attached |
 
-Nothing here is async, deliberately: parsing is CPU-bound and never waits, so
-async would add machinery and no speed.
+A heuristic stays labelled a heuristic and never becomes an edge in the graph.
+Framework knowledge lives in `dynamic_dispatch.txt` as configuration, one glob
+per line — and `spanda parse` ends with a census of every decorator your
+codebase actually uses, so you grow that file from evidence rather than memory.
+
+**If you find a symbol reported with no callers that something really does
+call, please [file it](https://github.com/pr0digy91/spanda/issues/new/choose).**
+That is the exact failure this project exists to eliminate.
+
+## Other questions it answers
+
+| command | what it answers |
+|---|---|
+| `spanda loops .` | where the loops are — including nesting that spans a function call, and database calls inside them |
+| `spanda profile .` | what the code keeps doing: re-implemented names, annotation rates, churn |
+| `spanda drift .` | what changed between two scans |
+| `spanda backfill . --last 10` | replay past commits, so drift has real history to read today |
+| `spanda imports .` | which file each import points at, and what imports circularly |
+| `spanda find . "Order*"` | look up symbols by name |
+| `spanda scans .` | every run, with its timestamp, commit and fingerprint |
+| `spanda guide . --write` | a note on reading this index, with that index's own numbers in it |
+| `spanda parse . --out out/` | one inspectable JSON record per source file, storing nothing |
+| `spanda resolve . --reasons 3` | link every reference to a definition, listing the failures |
+
+`spanda loops` reads nesting off the call graph, not just out of one file — a
+one-loop function called from another loop is three deep, and no single file
+shows that. Every line is a place to look, never a score: spanda computes no
+complexity number, because a number invites a threshold and a threshold invites
+gaming.
 
 ## What it does not do
 
 - **No LLM calls, no network, no telemetry.** This is the deterministic layer.
-  A description or summarisation layer would consume its output; it does not
-  live inside it.
-- **Python only**, and no framework-specific parsing — no route extraction, no
-  URL maps. Framework knowledge enters as configuration in
-  `dynamic_dispatch.txt`, never as code.
-- **No type inference.** Annotations are used where the code provides them.
-  Where it does not, the reference is reported unresolved rather than guessed.
-- **No refactoring, no rewriting.** spanda reads; it never edits your code.
-- **No complexity score, no quality grade, no threshold to pass.**
+  A description layer would consume its output, not live inside it.
+- **Python only**, and no framework-specific parsing. Framework knowledge
+  enters as configuration, never as code.
+- **No type inference.** Annotations are used where the code provides them;
+  where it does not, the reference is reported unresolved rather than guessed.
+- **No refactoring.** spanda reads; it never edits your code.
+- **No quality score or grade.**
+
+<details>
+<summary>Notes on the index</summary>
+
+- Lives at `<path>/.spanda/index.db`, inside the codebase it describes — one
+  authoritative index per codebase. `.spanda/` ignores itself with a
+  `.gitignore` of `*`: an index is derived data and never belongs in a commit.
+- **Re-indexing is incremental** in a git repository — only what changed is
+  re-read, which is the difference between 52 seconds and 12 minutes over 425
+  commits.
+- **Memory depends on the largest file, not the codebase.** Indexing streams
+  one file at a time: 680 files index in 52 MB and about 3 seconds.
+- **A syntax error is recorded, not fatal.** The file is marked unparseable
+  with the interpreter's message, and the run completes.
+- History lives in the index, not in filenames. `spanda scans` lists every run
+  with its timestamp, commit and content fingerprint.
+- Nothing is async, deliberately: parsing is CPU-bound and never waits, so
+  async would add machinery and no speed.
+</details>
 
 ## Contributing
 
-Bug reports and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md)
-for the development setup, the rule that the fixture answer key changes before
-the tests do, and what the project deliberately will not do.
-
-The single most valuable report is a symbol spanda claims has no callers that
-something actually calls.
+Bug reports and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
