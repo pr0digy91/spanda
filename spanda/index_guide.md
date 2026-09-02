@@ -99,6 +99,27 @@ Tests are left out.
 {{candidates_block}}
 ```
 
+**Before recording `dead`, check the four places a caller hides.** Every
+miss so far was one of these:
+
+1. **A framework calls it through a base class or a runtime value.** A class
+   whose base is `Base = declarative_base()` is a table SQLAlchemy registers;
+   a method named `dispatch` on a middleware subclass is called by Starlette.
+   The tool marks bases it knows are external; a base that is a *variable*
+   in this codebase it cannot see through yet.
+2. **A framework calls it through a decorator not on the list.** `spanda
+   gaps` lists decorators the tool does not recognise. If the symbol carries
+   one, it is not on this list — but a decorator alias (`pytestmark_db =
+   pytest.mark.usefixtures(...)`) can hide the real one.
+3. **It is named by a string.** `relationship("Outlet")`, a handler registry
+   keyed by name, `response_model=` on a route, `importlib.import_module`.
+   `spanda gaps` reports string literals that spell a symbol's name.
+4. **The caller is outside Python or outside the repository.** A `uvicorn
+   app:app` in a Dockerfile, a cron entry, another service, a migration.
+
+If any of these applies, record `--alive` and write *which one* in the
+note. That note is what turns into a pattern line for the next codebase.
+
 ---
 
 ## The tables
