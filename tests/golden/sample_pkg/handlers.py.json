@@ -40,7 +40,8 @@
       "canonical_signature": "(positional:payload)->",
       "signature_hash": "sha256:033cf8593b5c954a789ea791f460bdbc",
       "content_hash": "sha256:308d0fcbebd690ec53a0d6301ee5f808",
-      "body_hash": "sha256:3dd8b3f59916dcb361ca9d3055f5ad63"
+      "body_hash": "sha256:3dd8b3f59916dcb361ca9d3055f5ad63",
+      "loop_depth": 0
     },
     {
       "local_id": "d2",
@@ -74,7 +75,8 @@
       "canonical_signature": "(positional:payload)->",
       "signature_hash": "sha256:033cf8593b5c954a789ea791f460bdbc",
       "content_hash": "sha256:961dbe66afc5f5ff13cbc20287555430",
-      "body_hash": "sha256:3dd8b3f59916dcb361ca9d3055f5ad63"
+      "body_hash": "sha256:3dd8b3f59916dcb361ca9d3055f5ad63",
+      "loop_depth": 0
     }
   ],
   "references": [
@@ -87,7 +89,8 @@
       "context": "name",
       "line": 11,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "payload",
@@ -98,7 +101,8 @@
       "context": "name",
       "line": 16,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     }
   ],
   "dynamic_hints": [

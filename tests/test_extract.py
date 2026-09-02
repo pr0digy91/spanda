@@ -22,6 +22,7 @@ EXPECTED_COUNTS = {
     "sample_pkg/__init__.py":  (2, 0, 0, 0, 2),
     "sample_pkg/consumer.py":  (2, 1, 0, 0, 1),
     "sample_pkg/lazy.py":      (1, 1, 0, 0, 0),
+    "sample_pkg/batch.py":     (5, 4, 0, 0, 1),
     "sample_pkg/registry/__init__.py": (1, 0, 0, 0, 1),
     "sample_pkg/registry/impl.py":     (1, 1, 0, 0, 0),
     "sample_pkg/a.py":         (3, 2, 0, 0, 1),
@@ -71,10 +72,10 @@ def test_definition_counts_match_answer_key(records, path, expected):
 
 
 def test_totals(records):
-    assert len(records) == 18
-    assert sum(len(r["definitions"]) for r in records.values()) == 59
+    assert len(records) == 19
+    assert sum(len(r["definitions"]) for r in records.values()) == 64
     parsed = [r for r in records.values() if r["parse_status"] == "ok"]
-    assert len(parsed) == 17
+    assert len(parsed) == 18
 
 
 # -- the hard edges --------------------------------------------------------
@@ -373,3 +374,36 @@ def test_the_name_is_not_part_of_the_body():
 def test_a_lambda_body_does_not_break_the_hash():
     """A lambda's body is one expression, not a list — regression."""
     assert _hashes("f = lambda x: x + 1\n")["body"].startswith("sha256:")
+
+
+
+# -- loops -------------------------------------------------------------------
+
+def test_loop_depth_is_counted_per_body(records):
+    batch = _by_qualname(records["sample_pkg/batch.py"])
+    assert batch["normalise_all"]["loop_depth"] == 1
+    assert batch["pair_up"]["loop_depth"] == 2
+    assert batch["pair_all_groups"]["loop_depth"] == 1, "the callee's loops are not its own"
+    assert batch["SQUARES"]["loop_depth"] == 0, "assigned outside any loop"
+
+
+def test_a_reference_knows_how_many_loops_it_sits_inside(records):
+    refs = {(r["raw"], r["loop_depth"]) for r in records["sample_pkg/batch.py"]["references"]}
+    assert ("slugify", 1) in refs
+    assert ("pair_up", 1) in refs
+    assert ("session.get", 1) in refs
+    assert ("range", 0) in refs, "a comprehension's first iterable runs once, outside"
+    assert ("n", 1) in refs, "the element expression runs per iteration"
+
+
+def test_a_nested_function_starts_its_own_loop_count(tmp_path):
+    from spanda.extract import extract_file
+    path = tmp_path / "m.py"
+    path.write_text("def outer(xs):\n    for x in xs:\n        def inner():\n"
+                    "            return helper()\n        inner()\n")
+    record = extract_file(path, tmp_path)
+    by = _by_qualname(record)
+    assert by["outer"]["loop_depth"] == 1
+    assert by["outer.inner"]["loop_depth"] == 0
+    depths = {r["raw"]: r["loop_depth"] for r in record["references"]}
+    assert depths["helper"] == 0 and depths["inner"] == 1

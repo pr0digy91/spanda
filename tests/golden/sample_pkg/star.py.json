@@ -61,7 +61,8 @@
       "canonical_signature": "(positional:item_name:str,positional:price)->str",
       "signature_hash": "sha256:335d27a764afe846179cca0d500ada6a",
       "content_hash": "sha256:3bda062fbfe8cce377009c8dc61a5b25",
-      "body_hash": "sha256:637a66e988cbd73c8ca1a99297a9522e"
+      "body_hash": "sha256:637a66e988cbd73c8ca1a99297a9522e",
+      "loop_depth": 0
     }
   ],
   "references": [
@@ -74,7 +75,8 @@
       "context": "annotation",
       "line": 10,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "str",
@@ -85,7 +87,8 @@
       "context": "annotation",
       "line": 10,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "slugify",
@@ -96,7 +99,8 @@
       "context": "call",
       "line": 12,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "item_name",
@@ -107,7 +111,8 @@
       "context": "name",
       "line": 12,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "format_currency",
@@ -118,7 +123,8 @@
       "context": "call",
       "line": 12,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "price",
@@ -129,7 +135,8 @@
       "context": "name",
       "line": 12,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     }
   ],
   "dynamic_hints": []

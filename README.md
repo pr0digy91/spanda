@@ -20,8 +20,8 @@ M5/M6 complete: reference resolution, edges, and `spanda callers`.
 M7 complete: incremental re-index — 425 commits in 52 seconds, not 12 minutes.
 M8 complete: drift over reference edges and circular-import groups.
 
-All eight planned milestones built, plus `gaps` and `profile`, which were not
-in the original plan.
+All eight planned milestones built, plus `gaps`, `profile` and `loops`, which
+were not in the original plan.
 
 Each module does one thing, and says which in its first line:
 
@@ -35,6 +35,7 @@ Each module does one thing, and says which in its first line:
 | `drift.py` | two scans compared |
 | `gaps.py` | what the extractor cannot see, made explicit |
 | `profile.py` | what the corpus keeps doing |
+| `loops.py` | where the loops are, and what runs inside them |
 | `guide.py` | the index described from the index |
 | `cli.py` | arguments in, one command run, text out; reads no source itself |
 
@@ -76,6 +77,10 @@ python3.14 -m venv .venv && .venv/bin/pip install -q pytest
 # they are verbatim copies), parameter naming and annotation rates, docstrings,
 # decorators, and which symbols never settle
 .venv/bin/python -m spanda.cli profile <path>
+
+# Where the loops are: nested in one body, nested across calls, recursive,
+# and database calls inside them. Places to look, never a complexity.
+.venv/bin/python -m spanda.cli loops <path>
 
 # A note on reading the index, with that index's own numbers in it
 .venv/bin/python -m spanda.cli guide <path> --write

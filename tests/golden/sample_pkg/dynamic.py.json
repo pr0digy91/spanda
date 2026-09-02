@@ -87,7 +87,8 @@
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
       "content_hash": "sha256:6ec2b6f86275adf11d8797d31216196a",
-      "body_hash": "sha256:c53f5de2224e1e0d69dff6595cb49126"
+      "body_hash": "sha256:c53f5de2224e1e0d69dff6595cb49126",
+      "loop_depth": 0
     },
     {
       "local_id": "d2",
@@ -127,7 +128,8 @@
       "canonical_signature": "(positional:event_name:str,positional:payload)->",
       "signature_hash": "sha256:cd5e2c64ece98839abc6b1206c2542b7",
       "content_hash": "sha256:3783ef1caee799207061d528b21649cd",
-      "body_hash": "sha256:b49d05fff3196b83305aeb0069342a90"
+      "body_hash": "sha256:b49d05fff3196b83305aeb0069342a90",
+      "loop_depth": 0
     },
     {
       "local_id": "d3",
@@ -167,7 +169,8 @@
       "canonical_signature": "(positional:target,positional:method_name:str='on_paid')->",
       "signature_hash": "sha256:d51a731dee1a22590c42627838935e6a",
       "content_hash": "sha256:0a6842b0c18300c74d96b05b2a1c6f99",
-      "body_hash": "sha256:5d25418bc3e8aa904909b68cbf8ddc99"
+      "body_hash": "sha256:5d25418bc3e8aa904909b68cbf8ddc99",
+      "loop_depth": 0
     },
     {
       "local_id": "d4",
@@ -201,7 +204,8 @@
       "canonical_signature": "(positional:payload)->str",
       "signature_hash": "sha256:3aff5f971370b6d8475d37a83e3c4cee",
       "content_hash": "sha256:ce9c337dede3868fb9a8c8955bc424d8",
-      "body_hash": "sha256:1443d79cf8f1da92dc2133a9ae5be86f"
+      "body_hash": "sha256:1443d79cf8f1da92dc2133a9ae5be86f",
+      "loop_depth": 0
     },
     {
       "local_id": "d5",
@@ -235,7 +239,8 @@
       "canonical_signature": "(positional:name:str)->",
       "signature_hash": "sha256:3a67b0f78da23c942ce68a99a337d838",
       "content_hash": "sha256:c59f1d6e452598515a2d877526b57a4f",
-      "body_hash": "sha256:825ab006c68a007af5f2f468a103aa80"
+      "body_hash": "sha256:825ab006c68a007af5f2f468a103aa80",
+      "loop_depth": 0
     }
   ],
   "references": [
@@ -248,7 +253,8 @@
       "context": "name",
       "line": 11,
       "enclosing": null,
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "str",
@@ -259,7 +265,8 @@
       "context": "annotation",
       "line": 17,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "getattr",
@@ -270,7 +277,8 @@
       "context": "call",
       "line": 19,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "handlers",
@@ -281,7 +289,8 @@
       "context": "name",
       "line": 19,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "event_name",
@@ -292,7 +301,8 @@
       "context": "name",
       "line": 19,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "fn",
@@ -303,7 +313,8 @@
       "context": "name",
       "line": 20,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "fn",
@@ -314,7 +325,8 @@
       "context": "call",
       "line": 22,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "payload",
@@ -325,7 +337,8 @@
       "context": "name",
       "line": 22,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "str",
@@ -336,7 +349,8 @@
       "context": "annotation",
       "line": 25,
       "enclosing": "d3",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "hasattr",
@@ -347,7 +361,8 @@
       "context": "call",
       "line": 27,
       "enclosing": "d3",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "target",
@@ -358,7 +373,8 @@
       "context": "name",
       "line": 27,
       "enclosing": "d3",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "method_name",
@@ -369,7 +385,8 @@
       "context": "name",
       "line": 27,
       "enclosing": "d3",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "getattr",
@@ -380,7 +397,8 @@
       "context": "call",
       "line": 28,
       "enclosing": "d3",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "target",
@@ -391,7 +409,8 @@
       "context": "call",
       "line": 28,
       "enclosing": "d3",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "method_name",
@@ -402,7 +421,8 @@
       "context": "call",
       "line": 28,
       "enclosing": "d3",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "str",
@@ -413,7 +433,8 @@
       "context": "annotation",
       "line": 32,
       "enclosing": "d4",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "json.dumps",
@@ -425,7 +446,8 @@
       "context": "call",
       "line": 34,
       "enclosing": "d4",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "payload",
@@ -436,7 +458,8 @@
       "context": "name",
       "line": 34,
       "enclosing": "d4",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "str",
@@ -447,7 +470,8 @@
       "context": "annotation",
       "line": 37,
       "enclosing": "d5",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "importlib.import_module",
@@ -459,7 +483,8 @@
       "context": "call",
       "line": 41,
       "enclosing": "d5",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "name",
@@ -470,7 +495,8 @@
       "context": "name",
       "line": 41,
       "enclosing": "d5",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     }
   ],
   "dynamic_hints": [

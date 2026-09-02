@@ -1,0 +1,33 @@
+# Call chains that reach a database, matched by name against the raw dotted
+# chain of a call the resolver could not follow. Name-based on purpose: the
+# session is an external type (SQLAlchemy, asyncpg, a driver) and never
+# resolves, so its name is the only evidence there is. A match is a place to
+# look, never a measurement.
+#
+# Globs, fnmatch style, against the chain as written: `session.execute`,
+# `self.db.scalars`, `conn.fetchall`.
+
+# a session or connection object, whatever it is asked to do
+session.*
+db.*
+conn.*
+connection.*
+*.session.*
+*.db.*
+*.conn.*
+
+# the verbs, on anything
+*.execute
+*.executemany
+*.scalars
+*.scalar
+*.scalar_one
+*.scalar_one_or_none
+*.fetchall
+*.fetchone
+*.fetchrow
+*.fetchval
+*.commit
+*.flush
+*.refresh
+*.query

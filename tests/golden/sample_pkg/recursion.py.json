@@ -40,7 +40,8 @@
       "canonical_signature": "(positional:n:int)->int",
       "signature_hash": "sha256:93bfd2c7af437abd15b0bfec4afea38c",
       "content_hash": "sha256:e7960fb005356cd915fe529396dac003",
-      "body_hash": "sha256:6683cb6c21617af52adbe9657e73e350"
+      "body_hash": "sha256:6683cb6c21617af52adbe9657e73e350",
+      "loop_depth": 0
     },
     {
       "local_id": "d2",
@@ -74,7 +75,8 @@
       "canonical_signature": "(positional:n:int)->bool",
       "signature_hash": "sha256:3146fa6c05ae9db2b456cca3ad51c21b",
       "content_hash": "sha256:c8367c87fa1d0d0c76dab76811a9768c",
-      "body_hash": "sha256:bc9a72a841c1fb2e97799703c0a9373e"
+      "body_hash": "sha256:bc9a72a841c1fb2e97799703c0a9373e",
+      "loop_depth": 0
     },
     {
       "local_id": "d3",
@@ -108,7 +110,8 @@
       "canonical_signature": "(positional:n:int)->bool",
       "signature_hash": "sha256:3146fa6c05ae9db2b456cca3ad51c21b",
       "content_hash": "sha256:f5f744e188abc77e39a39dcdfeb4d86d",
-      "body_hash": "sha256:1b613a6c04200a0135f4ff3490a794ee"
+      "body_hash": "sha256:1b613a6c04200a0135f4ff3490a794ee",
+      "loop_depth": 0
     }
   ],
   "references": [
@@ -121,7 +124,8 @@
       "context": "annotation",
       "line": 8,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "int",
@@ -132,7 +136,8 @@
       "context": "annotation",
       "line": 8,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "n",
@@ -143,7 +148,8 @@
       "context": "name",
       "line": 10,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "countdown",
@@ -154,7 +160,8 @@
       "context": "call",
       "line": 12,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "n",
@@ -165,7 +172,8 @@
       "context": "name",
       "line": 12,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "int",
@@ -176,7 +184,8 @@
       "context": "annotation",
       "line": 15,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "bool",
@@ -187,7 +196,8 @@
       "context": "annotation",
       "line": 15,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "n",
@@ -198,7 +208,8 @@
       "context": "name",
       "line": 17,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "is_odd",
@@ -209,7 +220,8 @@
       "context": "call",
       "line": 19,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "n",
@@ -220,7 +232,8 @@
       "context": "name",
       "line": 19,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "int",
@@ -231,7 +244,8 @@
       "context": "annotation",
       "line": 22,
       "enclosing": "d3",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "bool",
@@ -242,7 +256,8 @@
       "context": "annotation",
       "line": 22,
       "enclosing": "d3",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "n",
@@ -253,7 +268,8 @@
       "context": "name",
       "line": 24,
       "enclosing": "d3",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "is_even",
@@ -264,7 +280,8 @@
       "context": "call",
       "line": 26,
       "enclosing": "d3",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "n",
@@ -275,7 +292,8 @@
       "context": "name",
       "line": 26,
       "enclosing": "d3",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     }
   ],
   "dynamic_hints": []

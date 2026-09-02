@@ -55,7 +55,8 @@
       "canonical_signature": "(positional:table_id:str)->bool",
       "signature_hash": "sha256:91a3994d9d8dab7d51dbcd71891efe0a",
       "content_hash": "sha256:d47a9abcf2367048582387aae4e0fe93",
-      "body_hash": "sha256:d7f17cb1f9198618b1c7c28ab42a662f"
+      "body_hash": "sha256:d7f17cb1f9198618b1c7c28ab42a662f",
+      "loop_depth": 0
     }
   ],
   "references": [
@@ -68,7 +69,8 @@
       "context": "annotation",
       "line": 6,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "bool",
@@ -79,7 +81,8 @@
       "context": "annotation",
       "line": 6,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "table_id.startswith",
@@ -91,7 +94,8 @@
       "context": "call",
       "line": 8,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "TABLE_PREFIX",
@@ -102,7 +106,8 @@
       "context": "name",
       "line": 8,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     }
   ],
   "dynamic_hints": []

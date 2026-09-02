@@ -55,7 +55,8 @@
       "canonical_signature": "(positional:text:str)->str",
       "signature_hash": "sha256:58a1c6d4511b7d2e974d7e36463adb43",
       "content_hash": "sha256:e5886aa088df38c95d34e478f5a8ef89",
-      "body_hash": "sha256:4a62a2648890ddd5a1df51d1ab2d1900"
+      "body_hash": "sha256:4a62a2648890ddd5a1df51d1ab2d1900",
+      "loop_depth": 0
     }
   ],
   "references": [
@@ -68,7 +69,8 @@
       "context": "annotation",
       "line": 10,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "str",
@@ -79,7 +81,8 @@
       "context": "annotation",
       "line": 10,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "slugify",
@@ -90,7 +93,8 @@
       "context": "call",
       "line": 13,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "text",
@@ -101,7 +105,8 @@
       "context": "name",
       "line": 13,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     }
   ],
   "dynamic_hints": []

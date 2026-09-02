@@ -18,6 +18,7 @@ from spanda.drift import compare
 from spanda.extract import extract_codebase
 from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
 from spanda.guide import render as render_guide
+from spanda.loops import build as build_loops, render as render_loops
 from spanda.modules import (EXTERNAL, build_import_graph, cycle_groups,
                             processing_order)
 from spanda.profile import build as build_profile, render as render_profile
@@ -776,6 +777,19 @@ def cmd_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_loops(args: argparse.Namespace) -> int:
+    root = Path(args.path).resolve()
+    target = resolve_db(args)
+    if target is None:
+        print(f"no index yet at {db_path(root)} — run `spanda index` first",
+              file=sys.stderr)
+        return 1
+    with Index(target) as index:
+        report = build_loops(index, include_tests=args.include_tests)
+    print(render_loops(report, root.name, limit=args.limit))
+    return 0
+
+
 def cmd_guide(args: argparse.Namespace) -> int:
     root = Path(args.path).resolve()
     target = resolve_db(args)
@@ -861,6 +875,17 @@ def main(argv: list[str] | None = None) -> int:
                              help="report a name as reused when defined in N+ files (default 3)")
     profile_cmd.add_argument("--db", default=None, help="pin a specific index file")
     profile_cmd.set_defaults(func=cmd_profile)
+
+    loops_cmd = subparsers.add_parser(
+        "loops", help="where the loops are: nested in a body, nested across "
+                      "calls, recursive, and database calls inside them")
+    loops_cmd.add_argument("path", help="root of the indexed codebase")
+    loops_cmd.add_argument("--include-tests", action="store_true",
+                           help="count symbols under tests/ too")
+    loops_cmd.add_argument("--limit", type=int, default=15, metavar="N",
+                           help="rows per section (default 15)")
+    loops_cmd.add_argument("--db", default=None, help="pin a specific index file")
+    loops_cmd.set_defaults(func=cmd_loops)
 
     guide_cmd = subparsers.add_parser(
         "guide", help="a note on reading this index, with its own numbers filled in")

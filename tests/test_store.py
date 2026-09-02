@@ -15,7 +15,7 @@ import pytest
 
 from spanda.extract import plan_scan, stream_records
 from spanda.gaps import load_patterns
-from spanda.store import (Index, IndexError_, db_path, ensure_index_dir,
+from spanda.store import (SCHEMA_VERSION, Index, IndexError_, db_path, ensure_index_dir,
                           merge_duplicate_definitions, path_module,
                           prepare_db_path, symbol_key)
 
@@ -79,7 +79,7 @@ def test_duplicate_definitions_merge_rather_than_collide():
         return {"qualname": "find_library", "kind": "function",
                 "lines": [line, line + 2], "content_hash": f"sha256:c{line}",
                 "signature_hash": sig_hash, "docstring": None,
-                "body_hash": f"sha256:b{line}"}
+                "body_hash": f"sha256:b{line}", "loop_depth": 0}
 
     merged = merge_duplicate_definitions(
         [definition(10, "sha256:s1"), definition(20, "sha256:s1"),
@@ -107,10 +107,10 @@ def test_indexing_unchanged_code_twice_produces_zero_drift(workspace):
         versions = index.connection.execute(
             "SELECT COUNT(*) c FROM symbol_versions WHERE scan_id = 2").fetchone()
 
-    assert rows["total"] == 59
+    assert rows["total"] == 64
     assert rows["added"] == 0, "a re-index of unchanged code invented new symbols"
     assert rows["removed"] == 0, "a re-index of unchanged code lost symbols"
-    assert rows["uuids"] == rows["keys"] == 59
+    assert rows["uuids"] == rows["keys"] == 64
     assert versions["c"] == 0, "unchanged symbols must not write version rows"
 
 
@@ -243,8 +243,8 @@ def test_unchanged_files_do_not_write_a_row_every_scan(tmp_path):
         later = index.connection.execute(
             "SELECT COUNT(*) c FROM file_versions WHERE scan_id > 1").fetchone()["c"]
 
-    assert files == 18, "one row per file, not per file per scan"
-    assert versions == 18, "every file recorded once, at the scan that found it"
+    assert files == 19, "one row per file, not per file per scan"
+    assert versions == 19, "every file recorded once, at the scan that found it"
     assert later == 0, "three scans of unchanged code add nothing"
 
 
@@ -448,12 +448,13 @@ def test_an_older_index_is_brought_forward_not_refused(workspace):
 
     with Index(target, codebase_root=workspace) as index:
         assert index.migrated_from == 10
-        assert index.meta("schema_version") == "11"
+        assert index.meta("schema_version") == str(SCHEMA_VERSION)
         # The index remembers it was brought forward; a later reader of a
         # NULL column can find out why without the terminal that saw it.
-        (record,) = index.migrations()
-        assert record["from"] == 10 and record["to"] == 11
-        assert record["when"].startswith("20")
+        steps = index.migrations()
+        assert [(m["from"], m["to"]) for m in steps] == [
+            (v - 1, v) for v in range(11, SCHEMA_VERSION + 1)]
+        assert all(m["when"].startswith("20") for m in steps)
         empty = index.connection.execute(
             "SELECT COUNT(*) FROM symbols WHERE body_hash IS NULL").fetchone()[0]
         assert empty > 0
@@ -479,7 +480,7 @@ def test_a_newer_index_is_still_refused(workspace):
 
 
 def test_a_gap_no_migration_covers_is_refused(workspace):
-    """Version 3 to 11 has no recorded steps: say so, do not guess."""
+    """Version 3 onward has no recorded steps: say so, do not guess."""
     workspace, _ = workspace
     from spanda.cli import main
     assert main(["index", str(workspace)]) == 0

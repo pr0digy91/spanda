@@ -21,7 +21,7 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 INDEX_DIRNAME = ".spanda"
 
 SCHEMA = """
@@ -166,6 +166,9 @@ CREATE TABLE IF NOT EXISTS symbols (
     -- symbol does rather than what it says. NULL only for a symbol recorded
     -- before schema 11 and not re-read since.
     body_hash            TEXT,
+    -- Loops nested in the symbol's own body (for a variable: where the
+    -- assignment sits). Syntactic. Says where loops are, not how they scale.
+    loop_depth           INTEGER NOT NULL DEFAULT 0,
     first_seen_scan_id   INTEGER NOT NULL,
     last_seen_scan_id    INTEGER NOT NULL
 );
@@ -193,6 +196,8 @@ CREATE TABLE IF NOT EXISTS edges (
     source_file        TEXT    NOT NULL,
     target_symbol_uuid TEXT    NOT NULL,
     edge_type          TEXT    NOT NULL, -- calls | inherits | uses
+    -- Deepest loop any site of this edge sits inside, as of its last sighting.
+    loop_depth         INTEGER NOT NULL DEFAULT 0,
     first_seen_scan_id INTEGER NOT NULL,
     last_seen_scan_id  INTEGER NOT NULL
 );
@@ -211,6 +216,19 @@ CREATE TABLE IF NOT EXISTS unresolved_refs (
     raw                TEXT,
     attr_name          TEXT,
     line               INTEGER,
+    reason             TEXT    NOT NULL
+);
+
+-- Calls inside loops that the resolver could not follow — a database session
+-- is an external type, so `session.execute` in a loop never becomes an edge,
+-- and without this row the loop body would read as empty. Current scan only.
+CREATE TABLE IF NOT EXISTS loop_calls (
+    scan_id            INTEGER NOT NULL,
+    source_file        TEXT    NOT NULL,
+    source_symbol_uuid TEXT,
+    raw                TEXT    NOT NULL,
+    line               INTEGER,
+    loop_depth         INTEGER NOT NULL,
     reason             TEXT    NOT NULL
 );
 
@@ -244,7 +262,7 @@ SYMBOL_FIELDS = [
     "name", "qualname", "kind", "module", "file_path", "line_start",
     "line_end", "signature", "canonical_signature", "docstring", "decorators",
     "has_dynamic_dispatch", "definition_count", "signature_varies",
-    "content_hash", "signature_hash", "body_hash",
+    "content_hash", "signature_hash", "body_hash", "loop_depth",
 ]
 
 #: Additive changes an older index can be brought forward by, keyed by the
@@ -254,6 +272,8 @@ MIGRATIONS: dict[int, list[tuple[str, str, str]]] = {
     # (table, column, declaration) — applied only if the column is missing.
     11: [("symbols", "body_hash", "TEXT"),
          ("symbol_versions", "body_hash", "TEXT")],
+    12: [("symbols", "loop_depth", "INTEGER NOT NULL DEFAULT 0"),
+         ("edges", "loop_depth", "INTEGER NOT NULL DEFAULT 0")],
 }
 
 
@@ -368,6 +388,7 @@ def merge_duplicate_definitions(definitions: list[dict]) -> list[dict]:
                 bodies.encode()).hexdigest()[:32]
             first["definition_count"] = len(group)
             first["signature_varies"] = len({d["signature_hash"] for d in group}) > 1
+            first["loop_depth"] = max(d["loop_depth"] for d in group)
             first["docstring"] = next((d["docstring"] for d in group if d["docstring"]), None)
         else:
             first["definition_count"] = 1
@@ -699,6 +720,7 @@ class Index:
                 "content_hash": definition["content_hash"],
                 "signature_hash": definition["signature_hash"],
                 "body_hash": definition["body_hash"],
+                "loop_depth": definition["loop_depth"],
             }
             assert set(by_field) == set(SYMBOL_FIELDS), "symbols columns drifted"
             values = tuple(by_field[f] for f in SYMBOL_FIELDS)
@@ -832,6 +854,12 @@ class Index:
         counts = {"edges": 0, "unresolved": 0}
         self.connection.execute(
             "DELETE FROM unresolved_refs WHERE scan_id != ?", (scan_id,))
+        self.connection.execute(
+            "DELETE FROM loop_calls WHERE scan_id != ?", (scan_id,))
+        # One edge can have several sites; it carries the deepest of them,
+        # and the value is *this* scan's, so a call moved out of a loop
+        # reads as out of it — not as the deepest it has ever been.
+        depth_this_scan: dict[str, int] = {}
 
         for reference in references:
             source_uuid = (keys_to_uuid.get(reference.source_symbol)
@@ -843,23 +871,34 @@ class Index:
                     continue
                 key = (f"{reference.source_symbol or reference.source_file}"
                        f"->{reference.target_symbol}|{reference.edge_type}")
+                depth = max(depth_this_scan.get(key, 0), reference.loop_depth)
+                depth_this_scan[key] = depth
                 existing = self.connection.execute(
                     "SELECT uuid FROM edges WHERE edge_key = ?", (key,)).fetchone()
                 if existing:
                     self.connection.execute(
-                        "UPDATE edges SET last_seen_scan_id = ? WHERE uuid = ?",
-                        (scan_id, existing["uuid"]))
+                        "UPDATE edges SET last_seen_scan_id = ?, loop_depth = ?"
+                        " WHERE uuid = ?", (scan_id, depth, existing["uuid"]))
                 else:
                     self.connection.execute(
                         "INSERT INTO edges (uuid, edge_key, source_symbol_uuid,"
                         " source_file, target_symbol_uuid, edge_type,"
-                        " first_seen_scan_id, last_seen_scan_id)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        " first_seen_scan_id, last_seen_scan_id, loop_depth)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (uuid_module.uuid4().hex, key, source_uuid,
                          reference.source_file, target_uuid,
-                         reference.edge_type, scan_id, scan_id))
+                         reference.edge_type, scan_id, scan_id, depth))
                 counts["edges"] += 1
-            elif reference.reason in KEEPABLE_REASONS:
+                continue
+
+            if reference.loop_depth > 0 and reference.edge_type == "calls" \
+                    and reference.reason != "assignment_target":
+                self.connection.execute(
+                    "INSERT INTO loop_calls (scan_id, source_file, source_symbol_uuid,"
+                    " raw, line, loop_depth, reason) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (scan_id, reference.source_file, source_uuid, reference.raw,
+                     reference.line, reference.loop_depth, reference.reason))
+            if reference.reason in KEEPABLE_REASONS:
                 self.connection.execute(
                     "INSERT INTO unresolved_refs (scan_id, source_file,"
                     " source_symbol_uuid, raw, attr_name, line, reason)"

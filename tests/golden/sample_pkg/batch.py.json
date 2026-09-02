@@ -1,0 +1,721 @@
+{
+  "file": "sample_pkg/batch.py",
+  "module": "sample_pkg.batch",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:97259ce1c023f08a9847dd505697e8ae",
+  "module_docstring": "Loops: nested in one body, nested across a call, and a database call\ninside one.\n\nThe index records where loops are and what runs inside them. It never says\nhow anything scales \u2014 `pair_all_groups` is three loops deep across a call,\nwhich is a place to look, not a complexity.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "from .helpers import slugify",
+      "module": ".helpers",
+      "names": [
+        {
+          "name": "slugify",
+          "alias": null
+        }
+      ],
+      "level": 1,
+      "is_star": false,
+      "line": 9,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "function",
+      "name": "normalise_all",
+      "qualname": "normalise_all",
+      "parent": null,
+      "lines": [
+        12,
+        17
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "rows",
+            "kind": "positional",
+            "annotation": "list[str]",
+            "default": null
+          }
+        ],
+        "returns": "list[str]"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "One loop, calling a function that has none.",
+      "canonical_signature": "(positional:rows:list[str])->list[str]",
+      "signature_hash": "sha256:9e61023d0b7e5dadc40bb248fa9c169e",
+      "content_hash": "sha256:53933d3b6c9aaeff6fe1efcea93e803a",
+      "body_hash": "sha256:b28a9bbf6fdb55f5f62f157a402694e6",
+      "loop_depth": 1
+    },
+    {
+      "local_id": "d2",
+      "kind": "function",
+      "name": "pair_up",
+      "qualname": "pair_up",
+      "parent": null,
+      "lines": [
+        20,
+        27
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "rows",
+            "kind": "positional",
+            "annotation": "list[str]",
+            "default": null
+          }
+        ],
+        "returns": "list[tuple[str, str]]"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "Two loops in one body.",
+      "canonical_signature": "(positional:rows:list[str])->list[tuple[str, str]]",
+      "signature_hash": "sha256:6d32f2919a26503fd89957a9eafbfec0",
+      "content_hash": "sha256:3b2725d0877e23993f68947eda276458",
+      "body_hash": "sha256:f88fce067af35ba8ba4400ff3fe33ea6",
+      "loop_depth": 2
+    },
+    {
+      "local_id": "d3",
+      "kind": "function",
+      "name": "pair_all_groups",
+      "qualname": "pair_all_groups",
+      "parent": null,
+      "lines": [
+        30,
+        35
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "groups",
+            "kind": "positional",
+            "annotation": "list[list[str]]",
+            "default": null
+          }
+        ],
+        "returns": "int"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "One loop that calls a two-loop function: three deep across the call.",
+      "canonical_signature": "(positional:groups:list[list[str]])->int",
+      "signature_hash": "sha256:35bd15492ce0874fe41d61686aade4c6",
+      "content_hash": "sha256:f08c24b15919d4c8a13268fdaa994704",
+      "body_hash": "sha256:56fdf76fc71a71383df7ffa1e06726b6",
+      "loop_depth": 1
+    },
+    {
+      "local_id": "d4",
+      "kind": "function",
+      "name": "load_each",
+      "qualname": "load_each",
+      "parent": null,
+      "lines": [
+        38,
+        45
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "session",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "ids",
+            "kind": "positional",
+            "annotation": "list[int]",
+            "default": null
+          }
+        ],
+        "returns": "list"
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": "A database call inside a loop \u2014 the shape that makes one request\ninto a thousand queries. The session never resolves; its name is all\nthe index has.",
+      "canonical_signature": "(positional:session,positional:ids:list[int])->list",
+      "signature_hash": "sha256:2f258b8a47d3fe7274d76dd4fc91efc8",
+      "content_hash": "sha256:57c397686ba5faac3ded8a21a9d6f65d",
+      "body_hash": "sha256:d1224b9f34b1e547ae700446b5e36c98",
+      "loop_depth": 1
+    },
+    {
+      "local_id": "d5",
+      "kind": "variable",
+      "name": "SQUARES",
+      "qualname": "SQUARES",
+      "parent": null,
+      "lines": [
+        48,
+        48
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": ":",
+      "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
+      "content_hash": "sha256:5d0985e8f2487512f1e49bfea3f907cc",
+      "body_hash": "sha256:75374c022319bd668014f088e5efe754",
+      "loop_depth": 0
+    }
+  ],
+  "references": [
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "annotation",
+      "line": 12,
+      "enclosing": "d1",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 12,
+      "enclosing": "d1",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "annotation",
+      "line": 12,
+      "enclosing": "d1",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 12,
+      "enclosing": "d1",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "rows",
+      "root": "rows",
+      "chain": [
+        "rows"
+      ],
+      "context": "name",
+      "line": 15,
+      "enclosing": "d1",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "out.append",
+      "root": "out",
+      "chain": [
+        "out",
+        "append"
+      ],
+      "context": "call",
+      "line": 16,
+      "enclosing": "d1",
+      "local": true,
+      "loop_depth": 1
+    },
+    {
+      "raw": "slugify",
+      "root": "slugify",
+      "chain": [
+        "slugify"
+      ],
+      "context": "call",
+      "line": 16,
+      "enclosing": "d1",
+      "local": false,
+      "loop_depth": 1
+    },
+    {
+      "raw": "row",
+      "root": "row",
+      "chain": [
+        "row"
+      ],
+      "context": "name",
+      "line": 16,
+      "enclosing": "d1",
+      "local": true,
+      "loop_depth": 1
+    },
+    {
+      "raw": "out",
+      "root": "out",
+      "chain": [
+        "out"
+      ],
+      "context": "name",
+      "line": 17,
+      "enclosing": "d1",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "annotation",
+      "line": 20,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 20,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "annotation",
+      "line": 20,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "tuple",
+      "root": "tuple",
+      "chain": [
+        "tuple"
+      ],
+      "context": "annotation",
+      "line": 20,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 20,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 20,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "rows",
+      "root": "rows",
+      "chain": [
+        "rows"
+      ],
+      "context": "name",
+      "line": 23,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "rows",
+      "root": "rows",
+      "chain": [
+        "rows"
+      ],
+      "context": "name",
+      "line": 24,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 1
+    },
+    {
+      "raw": "left",
+      "root": "left",
+      "chain": [
+        "left"
+      ],
+      "context": "name",
+      "line": 25,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 2
+    },
+    {
+      "raw": "right",
+      "root": "right",
+      "chain": [
+        "right"
+      ],
+      "context": "name",
+      "line": 25,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 2
+    },
+    {
+      "raw": "pairs.append",
+      "root": "pairs",
+      "chain": [
+        "pairs",
+        "append"
+      ],
+      "context": "call",
+      "line": 26,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 2
+    },
+    {
+      "raw": "left",
+      "root": "left",
+      "chain": [
+        "left"
+      ],
+      "context": "name",
+      "line": 26,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 2
+    },
+    {
+      "raw": "right",
+      "root": "right",
+      "chain": [
+        "right"
+      ],
+      "context": "name",
+      "line": 26,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 2
+    },
+    {
+      "raw": "pairs",
+      "root": "pairs",
+      "chain": [
+        "pairs"
+      ],
+      "context": "name",
+      "line": 27,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "annotation",
+      "line": 30,
+      "enclosing": "d3",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "annotation",
+      "line": 30,
+      "enclosing": "d3",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "str",
+      "root": "str",
+      "chain": [
+        "str"
+      ],
+      "context": "annotation",
+      "line": 30,
+      "enclosing": "d3",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 30,
+      "enclosing": "d3",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "groups",
+      "root": "groups",
+      "chain": [
+        "groups"
+      ],
+      "context": "name",
+      "line": 33,
+      "enclosing": "d3",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "len",
+      "root": "len",
+      "chain": [
+        "len"
+      ],
+      "context": "call",
+      "line": 34,
+      "enclosing": "d3",
+      "local": false,
+      "loop_depth": 1
+    },
+    {
+      "raw": "pair_up",
+      "root": "pair_up",
+      "chain": [
+        "pair_up"
+      ],
+      "context": "call",
+      "line": 34,
+      "enclosing": "d3",
+      "local": false,
+      "loop_depth": 1
+    },
+    {
+      "raw": "group",
+      "root": "group",
+      "chain": [
+        "group"
+      ],
+      "context": "name",
+      "line": 34,
+      "enclosing": "d3",
+      "local": true,
+      "loop_depth": 1
+    },
+    {
+      "raw": "total",
+      "root": "total",
+      "chain": [
+        "total"
+      ],
+      "context": "name",
+      "line": 35,
+      "enclosing": "d3",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "annotation",
+      "line": 38,
+      "enclosing": "d4",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "int",
+      "root": "int",
+      "chain": [
+        "int"
+      ],
+      "context": "annotation",
+      "line": 38,
+      "enclosing": "d4",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "list",
+      "root": "list",
+      "chain": [
+        "list"
+      ],
+      "context": "annotation",
+      "line": 38,
+      "enclosing": "d4",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "ids",
+      "root": "ids",
+      "chain": [
+        "ids"
+      ],
+      "context": "name",
+      "line": 43,
+      "enclosing": "d4",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "found.append",
+      "root": "found",
+      "chain": [
+        "found",
+        "append"
+      ],
+      "context": "call",
+      "line": 44,
+      "enclosing": "d4",
+      "local": true,
+      "loop_depth": 1
+    },
+    {
+      "raw": "session.get",
+      "root": "session",
+      "chain": [
+        "session",
+        "get"
+      ],
+      "context": "call",
+      "line": 44,
+      "enclosing": "d4",
+      "local": true,
+      "loop_depth": 1
+    },
+    {
+      "raw": "identifier",
+      "root": "identifier",
+      "chain": [
+        "identifier"
+      ],
+      "context": "name",
+      "line": 44,
+      "enclosing": "d4",
+      "local": true,
+      "loop_depth": 1
+    },
+    {
+      "raw": "found",
+      "root": "found",
+      "chain": [
+        "found"
+      ],
+      "context": "name",
+      "line": 45,
+      "enclosing": "d4",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "range",
+      "root": "range",
+      "chain": [
+        "range"
+      ],
+      "context": "call",
+      "line": 48,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "n",
+      "root": "n",
+      "chain": [
+        "n"
+      ],
+      "context": "name",
+      "line": 48,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 1
+    },
+    {
+      "raw": "n",
+      "root": "n",
+      "chain": [
+        "n"
+      ],
+      "context": "name",
+      "line": 48,
+      "enclosing": null,
+      "local": false,
+      "loop_depth": 1
+    }
+  ],
+  "dynamic_hints": []
+}

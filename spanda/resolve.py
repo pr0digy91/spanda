@@ -360,6 +360,8 @@ class Reference:
     raw: str
     line: int
     reason: str | None = None
+    #: How many loops the reference sits inside, within its own function.
+    loop_depth: int = 0
 
 
 def _edge_type(context: str) -> str:
@@ -427,7 +429,8 @@ def resolve_record(record: dict, table: SymbolTable,
             out.append(Reference(
                 source_file=record["file"], source_symbol=source,
                 target_symbol=target, edge_type=edge_type,
-                raw=reference["raw"], line=reference["line"], reason=reason))
+                raw=reference["raw"], line=reference["line"], reason=reason,
+                loop_depth=reference.get("loop_depth", 0)))
 
         root = chain[0]
 

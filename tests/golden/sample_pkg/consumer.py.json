@@ -53,7 +53,8 @@
       "canonical_signature": ":",
       "signature_hash": "sha256:e7ac0786668e0ff0f02b62bd04f45ff6",
       "content_hash": "sha256:a7d399f29bfc13731227ead54be87438",
-      "body_hash": "sha256:089e438bf3d5c4d40db1194b1eef1c34"
+      "body_hash": "sha256:089e438bf3d5c4d40db1194b1eef1c34",
+      "loop_depth": 0
     },
     {
       "local_id": "d2",
@@ -87,7 +88,8 @@
       "canonical_signature": "(positional:order_id:str)->str",
       "signature_hash": "sha256:1c71e8766901814c4ca50bcf51fc32fe",
       "content_hash": "sha256:20c83dada926c7be3eb557a371f12f54",
-      "body_hash": "sha256:cbc4872c3c343f703fb26a318bb29280"
+      "body_hash": "sha256:cbc4872c3c343f703fb26a318bb29280",
+      "loop_depth": 0
     }
   ],
   "references": [
@@ -100,7 +102,8 @@
       "context": "call",
       "line": 11,
       "enclosing": null,
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "str",
@@ -111,7 +114,8 @@
       "context": "annotation",
       "line": 14,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "str",
@@ -122,7 +126,8 @@
       "context": "annotation",
       "line": 14,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "format_currency",
@@ -133,7 +138,8 @@
       "context": "call",
       "line": 16,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "Order.empty(order_id).total",
@@ -142,7 +148,8 @@
       "context": "call",
       "line": 16,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "Order.empty",
@@ -154,7 +161,8 @@
       "context": "call",
       "line": 16,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "order_id",
@@ -165,7 +173,8 @@
       "context": "call",
       "line": 16,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     }
   ],
   "dynamic_hints": [

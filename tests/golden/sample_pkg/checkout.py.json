@@ -75,7 +75,8 @@
       "canonical_signature": "(positional:method:PaymentMethod,positional:amount)->bool",
       "signature_hash": "sha256:a6cd820b907afe5e1cc59f081399cd97",
       "content_hash": "sha256:298518d7df9ee32f5b6b4c8c12c77f40",
-      "body_hash": "sha256:aa6d16f07fc5b459ca61455617ef54ae"
+      "body_hash": "sha256:aa6d16f07fc5b459ca61455617ef54ae",
+      "loop_depth": 0
     },
     {
       "local_id": "d2",
@@ -115,7 +116,8 @@
       "canonical_signature": "(positional:method:Optional[PaymentMethod],positional:amount)->bool",
       "signature_hash": "sha256:4b942af3a9b6ac70777d0799fd6c2712",
       "content_hash": "sha256:51a4fb94165342c74f30a2da868d74b6",
-      "body_hash": "sha256:25ac279fb399551ec9d9d58b252e2823"
+      "body_hash": "sha256:25ac279fb399551ec9d9d58b252e2823",
+      "loop_depth": 0
     },
     {
       "local_id": "d3",
@@ -149,7 +151,8 @@
       "canonical_signature": "(positional:method:'PaymentMethod')->str",
       "signature_hash": "sha256:7bf3a761f24d94d722e463516f44cd90",
       "content_hash": "sha256:7005ddbc108c70bb2e596f07cad9ddcb",
-      "body_hash": "sha256:933d9a1e404d8841db4adaeb45669eb1"
+      "body_hash": "sha256:933d9a1e404d8841db4adaeb45669eb1",
+      "loop_depth": 0
     },
     {
       "local_id": "d4",
@@ -189,7 +192,8 @@
       "canonical_signature": "(positional:method,positional:amount)->bool",
       "signature_hash": "sha256:02add74c8d2bc3704481621ece170c21",
       "content_hash": "sha256:073c8929baadf159817a7a0c9ce823d1",
-      "body_hash": "sha256:72807b647a5f736406c4693dc1c26e74"
+      "body_hash": "sha256:72807b647a5f736406c4693dc1c26e74",
+      "loop_depth": 0
     }
   ],
   "references": [
@@ -202,7 +206,8 @@
       "context": "annotation",
       "line": 14,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "bool",
@@ -213,7 +218,8 @@
       "context": "annotation",
       "line": 14,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "method.charge",
@@ -225,7 +231,8 @@
       "context": "call",
       "line": 16,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "amount",
@@ -236,7 +243,8 @@
       "context": "name",
       "line": 16,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "Optional",
@@ -247,7 +255,8 @@
       "context": "annotation",
       "line": 19,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "PaymentMethod",
@@ -258,7 +267,8 @@
       "context": "annotation",
       "line": 19,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "bool",
@@ -269,7 +279,8 @@
       "context": "annotation",
       "line": 19,
       "enclosing": "d2",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "method",
@@ -280,7 +291,8 @@
       "context": "name",
       "line": 21,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "method.refund",
@@ -292,7 +304,8 @@
       "context": "call",
       "line": 21,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "amount",
@@ -303,7 +316,8 @@
       "context": "name",
       "line": 21,
       "enclosing": "d2",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "str",
@@ -314,7 +328,8 @@
       "context": "annotation",
       "line": 24,
       "enclosing": "d3",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "method.provider_name",
@@ -326,7 +341,8 @@
       "context": "name",
       "line": 26,
       "enclosing": "d3",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "bool",
@@ -337,7 +353,8 @@
       "context": "annotation",
       "line": 29,
       "enclosing": "d4",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "method.charge",
@@ -349,7 +366,8 @@
       "context": "call",
       "line": 31,
       "enclosing": "d4",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "amount",
@@ -360,7 +378,8 @@
       "context": "name",
       "line": 31,
       "enclosing": "d4",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     }
   ],
   "dynamic_hints": [

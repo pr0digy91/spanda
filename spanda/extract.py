@@ -249,6 +249,11 @@ class _Scope:
     is_class: bool
     is_function: bool
     bindings: set[str] = field(default_factory=set)
+    #: How many loops the walk is currently inside, within this scope only.
+    #: A nested function starts at zero: its body runs when it is called,
+    #: not once per iteration of the loop it was defined in.
+    loop_depth: int = 0
+    max_loop: int = 0
 
 
 @dataclass
@@ -377,6 +382,7 @@ class _Walker(ast.NodeVisitor):
             # Resolved here, within the file's own scope. Everything else is
             # handed to Stage 2 still unresolved.
             "local": self._is_local(root),
+            "loop_depth": self.scope.loop_depth,
         })
 
     #: Contexts that describe *where* a reference sits structurally. A call
@@ -432,8 +438,62 @@ class _Walker(ast.NodeVisitor):
             "signature_hash": _sha256(canonical),
             "content_hash": _sha256(self._source_of(start, end)),
             "body_hash": _body_hash(node),
+            # For a def or class, replaced by the deepest loop in its own
+            # body once that body has been walked. For a variable, where
+            # the assignment sits — 1 for one assigned inside a loop.
+            "loop_depth": self.scope.loop_depth,
         })
         return local_id
+
+    # -- loops ------------------------------------------------------------
+    # Counted syntactically, per scope: for, async for, while, and each
+    # generator of a comprehension. What runs before the loop begins — the
+    # iterable of a `for`, the first iterable of a comprehension, an `else`
+    # clause — is visited at the outer depth, because it runs once.
+    def _in_loop(self, visit) -> None:
+        scope = self.scope
+        scope.loop_depth += 1
+        scope.max_loop = max(scope.max_loop, scope.loop_depth)
+        try:
+            visit()
+        finally:
+            scope.loop_depth -= 1
+
+    def visit_For(self, node) -> None:
+        self.visit(node.iter)
+        self.visit(node.target)
+        self._in_loop(lambda: [self.visit(s) for s in node.body])
+        for statement in node.orelse:
+            self.visit(statement)
+
+    visit_AsyncFor = visit_For
+
+    def visit_While(self, node: ast.While) -> None:
+        self._in_loop(lambda: [self.visit(node.test)]
+                      + [self.visit(s) for s in node.body])
+        for statement in node.orelse:
+            self.visit(statement)
+
+    def _visit_comprehension(self, node) -> None:
+        generators = node.generators
+
+        def inside(i: int) -> None:
+            if i == len(generators):
+                for part in ("key", "value", "elt"):
+                    if hasattr(node, part):
+                        self.visit(getattr(node, part))
+                return
+            generator = generators[i]
+            if i > 0:
+                self.visit(generator.iter)  # runs inside the previous loop
+            self.visit(generator.target)
+            self._in_loop(lambda: [self.visit(c) for c in generator.ifs] + [inside(i + 1)])
+
+        self.visit(generators[0].iter)
+        inside(0)
+
+    visit_ListComp = visit_SetComp = visit_DictComp = visit_GeneratorExp = \
+        _visit_comprehension
 
     def _decorators(self, node) -> list[dict]:
         rendered = []
@@ -467,7 +527,9 @@ class _Walker(ast.NodeVisitor):
         self._in_context("annotation", lambda: self._visit_signature(node))
         for statement in node.body:
             self.visit(statement)
-        self.scopes.pop()
+        definition = next(
+            d for d in reversed(self.out.definitions) if d["local_id"] == local_id)
+        definition["loop_depth"] = self.scopes.pop().max_loop
 
     def _visit_signature(self, node) -> None:
         args = node.args
@@ -502,7 +564,9 @@ class _Walker(ast.NodeVisitor):
         self._in_context("base_class", lambda: [self.visit(b) for b in node.bases])
         for statement in node.body:
             self.visit(statement)
-        self.scopes.pop()
+        definition = next(
+            d for d in reversed(self.out.definitions) if d["local_id"] == local_id)
+        definition["loop_depth"] = self.scopes.pop().max_loop
 
     # -- assignments ------------------------------------------------------
     def _assignment_names(self, target) -> list[ast.Name]:

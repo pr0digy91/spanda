@@ -46,7 +46,8 @@
       "canonical_signature": "(positional:name:str,positional:handler)->dict",
       "signature_hash": "sha256:fa81884771f47394cc8c5eec82ca95fe",
       "content_hash": "sha256:7b9379fc2461dcbdd454f23206934197",
-      "body_hash": "sha256:cda6303eafc1646aab1ab91280e97e7c"
+      "body_hash": "sha256:cda6303eafc1646aab1ab91280e97e7c",
+      "loop_depth": 0
     }
   ],
   "references": [
@@ -59,7 +60,8 @@
       "context": "annotation",
       "line": 4,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "dict",
@@ -70,7 +72,8 @@
       "context": "annotation",
       "line": 4,
       "enclosing": "d1",
-      "local": false
+      "local": false,
+      "loop_depth": 0
     },
     {
       "raw": "name",
@@ -81,7 +84,8 @@
       "context": "name",
       "line": 6,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     },
     {
       "raw": "handler",
@@ -92,7 +96,8 @@
       "context": "name",
       "line": 6,
       "enclosing": "d1",
-      "local": true
+      "local": true,
+      "loop_depth": 0
     }
   ],
   "dynamic_hints": [

@@ -66,6 +66,7 @@ you and is the safer route.
 | `scans` | index run | commit, timestamp, counts, fingerprint |
 | `scan_problems` | file a scan could not parse | rare; syntax errors at that commit |
 | `scan_unread` | what a scan chose not to read | explains `skipped_files`: excluded directories with counts, and `.py` files git ignores |
+| `loop_calls` | a call inside a loop the resolver could not follow | newest scan only; `session.execute` in a loop lives here, since the session type never resolves |
 | `meta` | key | schema version, which codebase this index describes, when it was brought forward |
 
 ### `symbols` — the columns that matter
@@ -88,6 +89,10 @@ you and is the safer route.
   recorded before this column existed and not re-read since.
 - `has_dynamic_dispatch` — 1 means something calls it that the source does not
   show.
+- `loop_depth` — loops nested in the symbol's own body, counted syntactically
+  (for, while, each generator of a comprehension). Says where loops are, not
+  how they scale. Loops in functions it *calls* are not included; `spanda
+  loops` adds those up across the call graph.
 - `definition_count` — >1 means the same name is defined several times in one
   file, usually one branch per platform. Which one runs is not knowable.
 - `first_seen_scan_id` / `last_seen_scan_id` — see Rule 1.
@@ -96,7 +101,8 @@ you and is the safer route.
 
 `source_symbol_uuid` is NULL when the reference is in module-level code rather
 than inside a function; `source_file` is always set. `edge_type` is `calls`,
-`inherits` or `uses`.
+`inherits` or `uses`. `loop_depth` is the deepest loop any site of the edge
+sits inside, as of the newest scan that saw it.
 
 ### `unresolved_refs`
 
@@ -210,6 +216,16 @@ one body under different wording, or genuinely different code — that is
 `body_hash`, above), how parameters are named and annotated, docstring
 coverage, decorators, and which symbols' shapes never settle. Descriptive
 only — it says what the corpus does, not whether that is good.
+
+## Where the loops are
+
+`spanda loops {{repo}}` reads `loop_depth` on symbols and edges, plus
+`loop_calls`: functions with loops nested in one body, functions whose depth
+comes from what they call (a one-loop function calling a two-loop function
+is three deep, and no single file shows it), recursive groups, and calls
+inside loops whose name says "database". Every line is a place to look. It
+never states a complexity, because what a loop walks and how large that is
+are not in the source.
 
 ## What it will not tell you
 
