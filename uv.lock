@@ -147,7 +147,6 @@ wheels = [
 
 [[package]]
 name = "spanda-graph"
-version = "0.1.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
