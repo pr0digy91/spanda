@@ -69,11 +69,11 @@ candidates. A person looks, decides, and records it in the index — the one
 authoritative store — with a date and a reason:
 
 ```sh
-spanda vet {{repo}} --alive server.py::RequestLoggingMiddleware.dispatch --note "Starlette calls dispatch by name"
-spanda vet {{repo}} --dead  services/legacy.py::old_helper --note "removed in PR 412"
+spanda vet --alive server.py::RequestLoggingMiddleware.dispatch --note "Starlette calls dispatch by name"
+spanda vet --dead  services/legacy.py::old_helper --note "removed in PR 412"
 ```
 
-That writes the `verdicts` table. `spanda vet {{repo}}` on its own reads
+That writes the `verdicts` table. `spanda vet` on its own reads
 the table against the newest scan: it turns every *alive* verdict on an
 unrecognised shape into the pattern line that would have recognised it,
 reports verdicts the code has since contradicted, flags an alive verdict
@@ -89,10 +89,10 @@ for moving them or surviving a rebuild. As of this scan:
 
 Each line below is a candidate. The `?` is the tool's whole opinion: it
 found no static caller and nothing that explains the silence, and it does
-not know which. A person who looks records `spanda vet {{repo}} --dead
+not know which. A person who looks records `spanda vet --dead
 <target>` or `--alive <target> --note "what calls it"`, or saves these
 lines to a file, replaces each `?` with `alive` or `dead`, adds the date
-and a note, and runs `spanda vet {{repo}} --from <file>`. A line still
+and a note, and runs `spanda vet --from <file>`. A line still
 marked `?` is skipped: no decision, no record. Tests are left out.
 
 ```
@@ -195,18 +195,22 @@ be calling this" answerable when the object's type is unknown.
 
 ## The commands, and when to reach for each
 
+Every command takes the repo path first and defaults to the current
+directory, so these are written as run from the repo root. From anywhere
+else, put the path first: `spanda callers ~/src/{{repo}} <name>`.
+
 | Run | To learn |
 |---|---|
-| `spanda index {{repo}}` | refresh the index: a full re-read, a few seconds on a thousand files |
+| `spanda index` | refresh the index: a full re-read, a few seconds on a thousand files |
 | `spanda callers <name>` | who calls a symbol, and every reason the answer might be incomplete |
-| `spanda drift {{repo}} A B` | what changed between two scans: shape, body, references, cycles, loop depth, decorators seen for the first time |
-| `spanda vet {{repo}}` | the verdicts loop: pattern lines to add, contradicted verdicts, the next candidates |
-| `spanda gaps {{repo}}` | everything the extractor cannot see, from the source alone, no index needed |
-| `spanda profile {{repo}}` | what the corpus keeps doing: names re-implemented across files, annotation and docstring rates, decorators, churn |
-| `spanda loops {{repo}}` | where the loops are: nested in one body, nested across calls, recursive, database calls inside them |
-| `spanda scans {{repo}}` | every scan, its commit, and the schema this index is at |
-| `spanda backfill {{repo}} --last N` | replay history into an empty index, one scan per commit |
-| `spanda guide {{repo}}` | this document, regenerated |
+| `spanda drift A B` | what changed between two scans: shape, body, references, cycles, loop depth, decorators seen for the first time |
+| `spanda vet` | the verdicts loop: pattern lines to add, contradicted verdicts, the next candidates |
+| `spanda gaps` | everything the extractor cannot see, from the source alone, no index needed |
+| `spanda profile` | what the corpus keeps doing: names re-implemented across files, annotation and docstring rates, decorators, churn |
+| `spanda loops` | where the loops are: nested in one body, nested across calls, recursive, database calls inside them |
+| `spanda scans` | every scan, its commit, and the schema this index is at |
+| `spanda backfill --last N` | replay history into an empty index, one scan per commit |
+| `spanda guide` | this document, regenerated into `.spanda/README.md` |
 
 Every report ends by saying what it does not say. `profile` and `loops` are
 descriptive: they say what the code does, never whether that is good or how
@@ -348,7 +352,7 @@ run and nothing since. Check before trusting it:
 SELECT timestamp, git_commit_hash FROM scans ORDER BY scan_id DESC LIMIT 1;
 ```
 
-Refresh with `spanda index {{repo}}`. It re-reads every file — a full pass,
+Refresh with `spanda index`. It re-reads every file — a full pass,
 not an incremental one; only `backfill` re-reads just what git says changed.
 A full pass is a few seconds on a thousand files, quick enough to run before
 asking the index anything.

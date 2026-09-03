@@ -247,9 +247,9 @@ def render(report: VetReport, repo: str) -> str:
     p(f"TO VET — {report.candidates_total} symbol(s) with no caller, no hint, no verdict"
       + (f"; first {len(report.candidates)}"
          if report.candidates_total > len(report.candidates) else ""))
-    p(f"  Record a decision with  spanda vet {repo} --dead <target>  or  --alive <target>")
+    p("  From the repo root, record a decision with  spanda vet --dead <target>  or")
     p("  --note \"what calls it\";  or save these lines to a file, replace each ? with")
-    p(f"  alive or dead, add the date and a note, and run  spanda vet {repo} --from <file>.")
+    p("  alive or dead, add the date and a note, and run  spanda vet --from <file>.")
     p("  A line still marked ? is skipped: no decision, no record.")
     for file_path, qualname, _line in report.candidates:
         p(f"    ?      {file_path}::{qualname}")

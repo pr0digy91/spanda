@@ -157,7 +157,7 @@ def render(index, root: Path) -> str:
         if vetting.candidates_total > len(vetting.candidates):
             candidate_lines.append(
                 f"# ... and {vetting.candidates_total - len(vetting.candidates)} more: "
-                f"`spanda vet {root.name} --limit {vetting.candidates_total}`")
+                f"`spanda vet --limit {vetting.candidates_total}`")
     else:
         candidate_lines = ["# nothing left to vet outside tests"]
 

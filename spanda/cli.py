@@ -392,6 +392,12 @@ def _bullet(change) -> str:
 
 
 def cmd_drift(args: argparse.Namespace) -> int:
+    # `spanda drift 450 452` from inside the repo: the first number lands in
+    # `path` because the path is optional. A path that is only digits and is
+    # not a directory here is a scan number.
+    if (args.path.isdigit() and args.scan_b is None
+            and not Path(args.path).is_dir()):
+        args.path, args.scan_a, args.scan_b = ".", int(args.path), args.scan_a
     target = resolve_db(args)
     if target is None:
         print(f"no index yet at {db_path(Path(args.path).resolve())} — "
@@ -897,7 +903,7 @@ def cmd_vet(args: argparse.Namespace) -> int:
         new = [s for s in report.suggestions if s.line not in existing.splitlines()]
         if new:
             with destination.open("a") as handle:
-                handle.write(f"\n# From `spanda vet {root.name}` on "
+                handle.write(f"\n# From `spanda vet` on "
                              f"{verdicts_module.today()}:\n")
                 for s in new:
                     handle.write(f"# {s.because}\n{s.line}\n")
@@ -943,12 +949,12 @@ def cmd_guide(args: argparse.Namespace) -> int:
     with Index(target) as index:
         text = render_guide(index, root)
 
-    if args.write:
+    if args.to_stdout:
+        print(text)
+    else:
         destination = target.parent / "README.md"
         destination.write_text(text)
         print(f"wrote {destination}")
-    else:
-        print(text)
     return 0
 
 
@@ -966,14 +972,16 @@ def main(argv: list[str] | None = None) -> int:
 
     parse = subparsers.add_parser(
         "parse", help="Stage 1: extract definitions and references, one file at a time")
-    parse.add_argument("path", help="root of the codebase to parse")
+    parse.add_argument("path", nargs="?", default=".",
+        help="root of the codebase to parse (default: the current directory)")
     parse.add_argument("--out", help="directory to write one JSON record per source file")
     parse.add_argument("--quiet", action="store_true", help="suppress the summary")
     parse.set_defaults(func=cmd_parse)
 
     gaps = subparsers.add_parser(
         "gaps", help="what static analysis cannot see in this codebase")
-    gaps.add_argument("path", help="root of the codebase to inspect")
+    gaps.add_argument("path", nargs="?", default=".",
+        help="root of the codebase to inspect (default: the current directory)")
     gaps.add_argument("--patterns", help="override the dynamic-dispatch pattern file")
     gaps.add_argument("--unreferenced", action="store_true",
                       help="also list symbols whose name appears in no reference")
@@ -981,7 +989,8 @@ def main(argv: list[str] | None = None) -> int:
 
     index_cmd = subparsers.add_parser(
         "index", help="Stage 4: parse a codebase and store it in SQLite")
-    index_cmd.add_argument("path", help="root of the codebase to index")
+    index_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the codebase to index (default: the current directory)")
     index_cmd.add_argument("--db", default=None,
                            help="override the index location "
                                 "(default: <codebase>/.spanda/index.db)")
@@ -989,26 +998,30 @@ def main(argv: list[str] | None = None) -> int:
     index_cmd.set_defaults(func=cmd_index)
 
     scans_cmd = subparsers.add_parser("scans", help="list the scans in an index")
-    scans_cmd.add_argument("path", help="root of the indexed codebase")
+    scans_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the indexed codebase (default: the current directory)")
     scans_cmd.add_argument("--db", default=None, help="pin a specific index file")
     scans_cmd.set_defaults(func=cmd_scans)
 
     find_cmd = subparsers.add_parser("find", help="look up symbols by name")
-    find_cmd.add_argument("path", help="root of the indexed codebase")
+    find_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the indexed codebase (default: the current directory)")
     find_cmd.add_argument("pattern", help="name or qualname, * allowed as a wildcard")
     find_cmd.add_argument("--db", default=None, help="pin a specific index file")
     find_cmd.set_defaults(func=cmd_find)
 
     imports_cmd = subparsers.add_parser(
         "imports", help="Stage 0: resolve imports, find circular import groups")
-    imports_cmd.add_argument("path", help="root of the codebase")
+    imports_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the codebase (default: the current directory)")
     imports_cmd.add_argument("--order", action="store_true",
                              help="also print the full processing order")
     imports_cmd.set_defaults(func=cmd_imports)
 
     resolve_cmd = subparsers.add_parser(
         "resolve", help="Stage 2: link references to the definitions they name")
-    resolve_cmd.add_argument("path", help="root of the codebase")
+    resolve_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the codebase (default: the current directory)")
     resolve_cmd.add_argument("--patterns", help="override the dynamic-dispatch pattern file")
     resolve_cmd.add_argument("--reasons", type=int, default=0, metavar="N",
                              help="show N examples of each unresolved reason")
@@ -1016,7 +1029,8 @@ def main(argv: list[str] | None = None) -> int:
 
     profile_cmd = subparsers.add_parser(
         "profile", help="what the code keeps doing: reuse, naming, annotations, churn")
-    profile_cmd.add_argument("path", help="root of the indexed codebase")
+    profile_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the indexed codebase (default: the current directory)")
     profile_cmd.add_argument("--include-tests", action="store_true",
                              help="count symbols under tests/ as well")
     profile_cmd.add_argument("--min-files", type=int, default=3, metavar="N",
@@ -1027,7 +1041,8 @@ def main(argv: list[str] | None = None) -> int:
     loops_cmd = subparsers.add_parser(
         "loops", help="where the loops are: nested in a body, nested across "
                       "calls, recursive, and database calls inside them")
-    loops_cmd.add_argument("path", help="root of the indexed codebase")
+    loops_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the indexed codebase (default: the current directory)")
     loops_cmd.add_argument("--include-tests", action="store_true",
                            help="count symbols under tests/ too")
     loops_cmd.add_argument("--limit", type=int, default=15, metavar="N",
@@ -1039,7 +1054,8 @@ def main(argv: list[str] | None = None) -> int:
         "vet", help="the verdicts loop: record a person's decision in the index, "
                     "check recorded decisions against the newest scan, print the "
                     "pattern lines they imply and the next candidates")
-    vet_cmd.add_argument("path", help="root of the indexed codebase")
+    vet_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the indexed codebase (default: the current directory)")
     vet_cmd.add_argument("--alive", action="append", metavar="FILE::QUALNAME",
                          help="record that this symbol is alive (repeatable)")
     vet_cmd.add_argument("--dead", action="append", metavar="FILE::QUALNAME",
@@ -1062,15 +1078,17 @@ def main(argv: list[str] | None = None) -> int:
 
     guide_cmd = subparsers.add_parser(
         "guide", help="a note on reading this index, with its own numbers filled in")
-    guide_cmd.add_argument("path", help="root of the indexed codebase")
-    guide_cmd.add_argument("--write", action="store_true",
-                           help="write it to .spanda/README.md beside the index")
+    guide_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the indexed codebase (default: the current directory)")
+    guide_cmd.add_argument("--print", dest="to_stdout", action="store_true",
+                           help="print it instead of writing .spanda/README.md")
     guide_cmd.add_argument("--db", default=None, help="pin a specific index file")
     guide_cmd.set_defaults(func=cmd_guide)
 
     callers_cmd = subparsers.add_parser(
         "callers", help="what calls a symbol, and what might but cannot be proven to")
-    callers_cmd.add_argument("path", help="root of the indexed codebase")
+    callers_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the indexed codebase (default: the current directory)")
     callers_cmd.add_argument("name", help="symbol name, * allowed as a wildcard")
     callers_cmd.add_argument("--limit", type=int, default=10,
                              help="how many unprovable call sites to list")
@@ -1079,7 +1097,8 @@ def main(argv: list[str] | None = None) -> int:
 
     drift_cmd = subparsers.add_parser(
         "drift", help="what changed between two scans")
-    drift_cmd.add_argument("path", help="root of the indexed codebase")
+    drift_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the indexed codebase (default: the current directory)")
     drift_cmd.add_argument("scan_a", nargs="?", type=int, default=None,
                            help="older scan (default: second-newest)")
     drift_cmd.add_argument("scan_b", nargs="?", type=int, default=None,
@@ -1091,7 +1110,8 @@ def main(argv: list[str] | None = None) -> int:
 
     backfill_cmd = subparsers.add_parser(
         "backfill", help="index past git commits into a fresh index")
-    backfill_cmd.add_argument("path", help="root of the codebase (a git repository)")
+    backfill_cmd.add_argument("path", nargs="?", default=".",
+        help="root of the codebase (a git repository) (default: the current directory)")
     backfill_cmd.add_argument("--last", type=int, default=10,
                               help="how many commits back to index (default: 10)")
     backfill_cmd.add_argument("--patterns", help="override the dynamic-dispatch pattern file")

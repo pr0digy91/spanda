@@ -298,7 +298,7 @@ That is the exact failure this project exists to eliminate.
 | `spanda imports .` | which file each import points at, and what imports circularly |
 | `spanda find . "Order*"` | look up symbols by name |
 | `spanda scans .` | every run, with its timestamp, commit and fingerprint |
-| `spanda guide . --write` | a note on reading this index, with that index's own numbers in it |
+| `spanda guide .` | a note on reading this index, with its own numbers in it, written to `.spanda/README.md` |
 | `spanda parse . --out out/` | one inspectable JSON record per source file, storing nothing |
 | `spanda resolve . --reasons 3` | link every reference to a definition, listing the failures |
 
