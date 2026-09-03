@@ -188,10 +188,14 @@ uv sync --all-extras && uv run spanda --help
 
 ## Using it, in order
 
+Every command takes a path, and **every command defaults to the current
+directory** — so from inside the repository you are asking about, the path can
+be left off entirely. The examples below do exactly that.
+
 ### 1. Index the codebase
 
 ```sh
-spanda index .
+spanda index
 ```
 
 Parses everything, stores it at `.spanda/index.db` inside the codebase itself,
@@ -202,7 +206,7 @@ Safe to re-run — symbols keep their identity across scans.
 ### 2. Find out what it cannot see
 
 ```sh
-spanda gaps .
+spanda gaps
 ```
 
 **Read this before you trust anything else.** It is the map of the blind spot,
@@ -240,12 +244,13 @@ table. Nothing in the source names it. spanda will not call it dead, and will
 not call it alive — it tells you where to look.
 
 Add `--unreferenced` to also list symbols nothing references, split by whether
-the silence is explained.
+the silence is explained. Pass a path (`spanda gaps ../other-repo`) to ask about
+somewhere else.
 
 ### 3. Ask about a specific symbol
 
 ```sh
-spanda callers . create_invoice
+spanda callers create_invoice
 ```
 
 Gives you the callers it can prove, plus anything that might call it but cannot
@@ -257,8 +262,8 @@ Static analysis eventually runs out. When it does, someone looks at the symbol
 and decides — and that decision belongs in the index, not in memory:
 
 ```sh
-spanda vet . --alive "tasks.py::nightly_cleanup" --note "APScheduler, see config/jobs.py"
-spanda vet .
+spanda vet --alive "tasks.py::nightly_cleanup" --note "APScheduler, see config/jobs.py"
+spanda vet
 ```
 
 Re-running `spanda vet` checks every recorded decision against the newest scan:
@@ -291,16 +296,16 @@ That is the exact failure this project exists to eliminate.
 
 | command | what it answers |
 |---|---|
-| `spanda loops .` | where the loops are — including nesting that spans a function call, and database calls inside them |
-| `spanda profile .` | what the code keeps doing: re-implemented names, annotation rates, churn |
-| `spanda drift .` | what changed between two scans |
-| `spanda backfill . --last 10` | replay past commits, so drift has real history to read today |
-| `spanda imports .` | which file each import points at, and what imports circularly |
-| `spanda find . "Order*"` | look up symbols by name |
-| `spanda scans .` | every run, with its timestamp, commit and fingerprint |
-| `spanda guide .` | a note on reading this index, with its own numbers in it, written to `.spanda/README.md` |
-| `spanda parse . --out out/` | one inspectable JSON record per source file, storing nothing |
-| `spanda resolve . --reasons 3` | link every reference to a definition, listing the failures |
+| `spanda loops` | where the loops are — including nesting that spans a function call, and database calls inside them |
+| `spanda profile` | what the code keeps doing: re-implemented names, annotation rates, churn |
+| `spanda drift` | what changed between two scans |
+| `spanda backfill --last 10` | replay past commits, so drift has real history to read today |
+| `spanda imports` | which file each import points at, and what imports circularly |
+| `spanda find "Order*"` | look up symbols by name |
+| `spanda scans` | every run, with its timestamp, commit and fingerprint |
+| `spanda guide` | a note on reading this index, with its own numbers in it, written to `.spanda/README.md` |
+| `spanda parse --out out/` | one inspectable JSON record per source file, storing nothing |
+| `spanda resolve --reasons 3` | link every reference to a definition, listing the failures |
 
 `spanda loops` reads nesting off the call graph, not just out of one file — a
 one-loop function called from another loop is three deep, and no single file
