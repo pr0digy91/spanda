@@ -223,7 +223,7 @@ Decorated with something that dispatches at runtime — the framework calls thes
 
 Decorated with something on neither list, and nothing names them. Not a claim
   that a framework calls these — a statement that spanda does not know. Vet, then
-  add a line to dynamic_dispatch.txt either way:
+  add a line to .spanda/dynamic_dispatch.txt either way (the format is inside it):
 
   middleware.py:45
       nightly_cleanup
@@ -268,8 +268,9 @@ spanda vet
 
 Re-running `spanda vet` checks every recorded decision against the newest scan:
 which verdicts the code now contradicts, which patterns the alive ones imply (a
-decorator vetted alive three times belongs in `dynamic_dispatch.txt`), and what
-to look at next. `--export` and `--from` move verdicts between indexes.
+decorator vetted alive three times belongs in `.spanda/dynamic_dispatch.txt`,
+and `--append-to` writes it there), and what to look at next. `--export` and
+`--from` move verdicts between indexes.
 
 ## What it refuses to guess
 
@@ -284,9 +285,14 @@ reported as such, never as an absence:
 | **Attribute on an unknown type** | `x.method()` where `x` has no annotation | unresolved, with the reason attached |
 
 A heuristic stays labelled a heuristic and never becomes an edge in the graph.
-Framework knowledge lives in `dynamic_dispatch.txt` as configuration, one glob
-per line — and `spanda parse` ends with a census of every decorator your
-codebase actually uses, so you grow that file from evidence rather than memory.
+Framework knowledge is configuration, one glob per line: a decorator, a base
+class, a method a framework calls by name on a subclass, or a file and function
+name it finds by convention. Web routes, task queues, ORM hooks, and Alembic's
+`upgrade` and `downgrade` ship built in; anything else goes in the codebase's
+own `.spanda/dynamic_dispatch.txt`, which `spanda index` creates with the format
+documented inside and every run reads. `spanda parse` ends with a census of
+every decorator your codebase actually uses, so you grow that file from
+evidence rather than memory.
 
 **If you find a symbol reported with no callers that something really does
 call, please [file it](https://github.com/pr0digy91/spanda/issues/new/choose).**

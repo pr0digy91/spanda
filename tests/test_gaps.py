@@ -154,3 +154,86 @@ def test_a_dynamic_import_is_a_visible_gap(gaps):
     assert len(dynamic) == 1
     assert dynamic[0].file == "sample_pkg/dynamic.py"
     assert "import_module" in dynamic[0].detail
+
+
+def _alembic_tree(tmp_path):
+    versions = tmp_path / "alembic" / "versions"
+    versions.mkdir(parents=True)
+    (tmp_path / "alembic" / "env.py").write_text(
+        "from alembic import context\n\n\ndef run():\n    context.run_migrations()\n")
+    (versions / "0001_first.py").write_text(
+        "from alembic import op\n\n\ndef upgrade():\n    op.add_column('t', None)\n\n\n"
+        "def downgrade():\n    op.drop_column('t', 'c')\n\n\ndef helper():\n    pass\n")
+    (versions / "0002_multidb.py").write_text(
+        "def upgrade_engine1():\n    pass\n\n\ndef downgrade_engine1():\n    pass\n")
+    (tmp_path / "seeds.py").write_text("def upgrade():\n    pass\n")
+
+
+def test_alembic_migrations_are_framework_called_by_file_and_name(tmp_path):
+    """Alembic runs upgrade() and downgrade() in every file under versions/
+    itself. Nothing at the definition says so, and nothing in the codebase
+    names them, so on a migrations repository 844 of 845 candidates were
+    these — a list long enough that a reader stops reading. The `file:`
+    pattern kind exists for this shape."""
+    from spanda.gaps import framework_convention
+    _alembic_tree(tmp_path)
+    scan = extract_codebase(tmp_path)
+    patterns = load_patterns()
+    by_symbol = {(g.file, g.symbol): g for g in find_gaps(scan, patterns)
+                 if g.kind == "framework_convention"}
+    assert set(by_symbol) == {
+        ("alembic/versions/0001_first.py", "upgrade"),
+        ("alembic/versions/0001_first.py", "downgrade"),
+        ("alembic/versions/0002_multidb.py", "upgrade_engine1"),
+        ("alembic/versions/0002_multidb.py", "downgrade_engine1"),
+    }, "helper() in a migration and upgrade() outside versions/ are ordinary functions"
+    assert by_symbol[("alembic/versions/0001_first.py", "upgrade")].detail \
+        == "matches *versions/*.py::upgrade*"
+    # The match is on the written path and on module level, never on a method.
+    definition = {"kind": "method", "parent": 1, "name": "upgrade"}
+    assert framework_convention("alembic/versions/x.py", definition, patterns) is None
+    assert framework_convention(None, {"kind": "function", "parent": None,
+                                       "name": "upgrade"}, patterns) is None
+
+
+def test_a_file_pattern_without_a_separator_matches_nothing():
+    """A malformed line must not become a wildcard that flags every function."""
+    from spanda.gaps import framework_convention
+    definition = {"kind": "function", "parent": None, "name": "upgrade"}
+    assert framework_convention("alembic/versions/x.py", definition,
+                                ["file:*versions/*.py"]) is None
+
+
+def test_task_queue_decorators_are_dispatch():
+    """`@app.task` is Celery and procrastinate; the worker calls what it
+    decorates. Two export tasks reported as a decorator spanda did not know."""
+    patterns = load_patterns()
+    for base in ("app.task", "celery.shared_task", "shared_task",
+                 "app.periodic", "dramatiq.actor"):
+        assert is_dynamic_dispatch(base, patterns), base
+    assert not is_dynamic_dispatch("scheduler.scheduled_job", patterns), \
+        "still unknown, still reported as such"
+
+
+def test_a_codebase_extends_the_built_in_patterns_from_its_own_file(tmp_path):
+    """`.spanda/dynamic_dispatch.txt` is read after the built-in list on
+    every run, so a framework the tool has never heard of is a one-line fix
+    in the repository rather than an edit inside an installed package.
+    `--patterns` still replaces the list outright."""
+    from spanda.gaps import local_patterns_path
+    from spanda.store import ensure_index_dir
+    ensure_index_dir(tmp_path)
+    local = local_patterns_path(tmp_path)
+    assert local.exists(), "spanda index writes the file so a message can name it"
+    assert load_patterns(root=tmp_path) == load_patterns(), \
+        "the stub is comments only: it documents the format and adds nothing"
+    local.write_text(local.read_text() + "*.every\n")
+    with_local = load_patterns(root=tmp_path)
+    assert is_dynamic_dispatch("scheduler.every", with_local)
+    assert with_local[:-1] == load_patterns()
+    override = tmp_path / "only.txt"
+    override.write_text("*.only\n")
+    assert load_patterns(override, root=tmp_path) == ["*.only"]
+    # Written once; a person's edits are theirs.
+    ensure_index_dir(tmp_path)
+    assert local.read_text().endswith("*.every\n")

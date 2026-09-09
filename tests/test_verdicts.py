@@ -145,6 +145,26 @@ def test_append_to_writes_the_lines_once(indexed, tmp_path):
     assert lines[0] == "*.get"
 
 
+def test_append_to_defaults_to_the_codebases_own_pattern_file(indexed):
+    """The message that names the decorator names the file; the flag with no
+    argument writes to that file, and the next index reads it."""
+    from spanda.gaps import load_patterns, local_patterns_path
+    with Index(prepare_db_path(indexed)) as index:
+        index.record_verdict("sample_pkg/middleware.py", "nightly_cleanup", "alive", "apscheduler")
+    assert main(["vet", str(indexed), "--append-to"]) == 0
+    local = local_patterns_path(indexed)
+    assert "scheduler.scheduled_job" in local.read_text().splitlines()
+    assert "scheduler.scheduled_job" in load_patterns(root=indexed)
+    assert main(["index", str(indexed)]) == 0
+    with Index(prepare_db_path(indexed)) as index:
+        row = index.connection.execute(
+            "SELECT has_dynamic_dispatch, dispatch_hint FROM symbols"
+            " WHERE qualname = 'nightly_cleanup' ORDER BY last_seen_scan_id DESC"
+        ).fetchone()
+    assert (row["has_dynamic_dispatch"], row["dispatch_hint"]) \
+        == (1, "dispatch:scheduler.scheduled_job")
+
+
 def test_the_whole_index_directory_is_ignored_again(tmp_path):
     repo = tmp_path / "r"
     repo.mkdir()

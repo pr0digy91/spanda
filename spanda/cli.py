@@ -16,7 +16,8 @@ from pathlib import Path
 
 from spanda.drift import compare
 from spanda.extract import extract_codebase
-from spanda.gaps import find_gaps, load_patterns, unreferenced_symbols
+from spanda.gaps import (find_gaps, load_patterns, local_patterns_path,
+                         unreferenced_symbols)
 from spanda.guide import render as render_guide
 from spanda.loops import build as build_loops, render as render_loops
 from spanda.modules import (EXTERNAL, build_import_graph, cycle_groups,
@@ -160,10 +161,15 @@ GAP_HEADINGS = {
     "framework_owned_class":
         "Classes a framework owns by inheritance — a mapped table, a model the "
         "framework\n  registers. Alive whether or not Python names them:",
+    "framework_convention":
+        "Module-level functions a framework finds by file and name — Alembic's "
+        "upgrade\n  and downgrade. Nothing at the definition says so; the pattern "
+        "file does:",
     "unknown_decorator":
         "Decorated with something on neither list, and nothing names them. Not "
         "a claim\n  that a framework calls these — a statement that spanda does "
-        "not know. Vet, then\n  add a line to dynamic_dispatch.txt either way:",
+        "not know. Vet, then\n  add a line to .spanda/dynamic_dispatch.txt either way "
+        "(the format is inside it):",
     "override_on_external_base":
         "Public methods nothing names, on classes whose base is outside this "
         "codebase.\n  Whatever the base's framework is, this is the shape it "
@@ -187,7 +193,7 @@ def cmd_gaps(args: argparse.Namespace) -> int:
         return 2
 
     scan = extract_codebase(root, plan_for(root))
-    patterns = load_patterns(Path(args.patterns) if args.patterns else None)
+    patterns = load_patterns(Path(args.patterns) if args.patterns else None, root=root)
     gaps = find_gaps(scan, patterns)
 
     total_symbols = sum(len(r["definitions"]) for r in scan.records)
@@ -282,7 +288,7 @@ def cmd_index(args: argparse.Namespace) -> int:
         return 2
 
     plan = plan_for(root)
-    patterns = load_patterns(Path(args.patterns) if args.patterns else None)
+    patterns = load_patterns(Path(args.patterns) if args.patterns else None, root=root)
 
     target = Path(args.db) if args.db else prepare_db_path(root)
     print(f"index: {target}")
@@ -580,7 +586,7 @@ def cmd_backfill(args: argparse.Namespace) -> int:
         print("no commits found", file=sys.stderr)
         return 2
 
-    patterns = load_patterns(Path(args.patterns) if args.patterns else None)
+    patterns = load_patterns(Path(args.patterns) if args.patterns else None, root=root)
     print(f"backfilling {len(commits)} commits into {target}\n")
 
     # One worktree for the whole run, checked out from commit to commit.
@@ -684,7 +690,7 @@ def cmd_resolve(args: argparse.Namespace) -> int:
         print(f"not a directory: {root}", file=sys.stderr)
         return 2
 
-    patterns = load_patterns(Path(args.patterns) if args.patterns else None)
+    patterns = load_patterns(Path(args.patterns) if args.patterns else None, root=root)
     plan, table, _scopes, references, lost, _hints = resolve_codebase(root, patterns)
 
     resolved = [r for r in references if r.target_symbol]
@@ -812,10 +818,13 @@ def cmd_callers(args: argparse.Namespace) -> int:
                       "above is not the whole story.")
             elif symbol["dispatch_hint"] \
                     and symbol["dispatch_hint"].startswith("unknown_decorator:"):
-                print(f"\n  ...but it is decorated with @{symbol['dispatch_hint'][18:]}, "
+                base = symbol['dispatch_hint'][18:]
+                print(f"\n  ...but it is decorated with @{base}, "
                       f"which spanda does not know.\n     A framework may call it. "
-                      f"Vet it, then add the decorator to dynamic_dispatch.txt\n"
-                      f"     as dispatching or as harmless, so the next reader is told.")
+                      f"Vet it, then tell the next reader with one line in\n"
+                      f"     .spanda/dynamic_dispatch.txt: `{base}` if a framework "
+                      f"calls it, `harmless:{base}`\n     if not. "
+                      f"`spanda vet --alive` then `spanda vet --append-to` writes it.")
             elif symbol["dispatch_hint"] and symbol["dispatch_hint"].startswith("external_base:"):
                 print(f"\n  ...but it is a public method on a subclass of "
                       f"{symbol['dispatch_hint'][14:]}, which is outside this\n"
@@ -897,8 +906,9 @@ def cmd_vet(args: argparse.Namespace) -> int:
         report = verdicts_module.vet(index, include_tests=args.include_tests,
                                      limit=args.limit)
     print(verdicts_module.render(report, root.name))
-    if args.append_to and report.suggestions:
-        destination = Path(args.append_to)
+    if args.append_to is not None and report.suggestions:
+        destination = (Path(args.append_to) if args.append_to
+                       else local_patterns_path(root))
         existing = destination.read_text() if destination.exists() else ""
         new = [s for s in report.suggestions if s.line not in existing.splitlines()]
         if new:
@@ -1071,7 +1081,7 @@ def main(argv: list[str] | None = None) -> int:
                          help="list candidates under tests/ too")
     vet_cmd.add_argument("--limit", type=int, default=30, metavar="N",
                          help="candidates to print (default 30)")
-    vet_cmd.add_argument("--append-to", metavar="FILE",
+    vet_cmd.add_argument("--append-to", metavar="FILE", nargs="?", const="",
                          help="append the suggested pattern lines to this pattern file")
     vet_cmd.add_argument("--db", default=None, help="pin a specific index file")
     vet_cmd.set_defaults(func=cmd_vet)

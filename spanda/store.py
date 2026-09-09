@@ -396,6 +396,13 @@ def ensure_index_dir(root: Path) -> Path:
     # anything a person edited is theirs and is left alone.
     if not gitignore.exists() or gitignore.read_text() in _SUPERSEDED_GITIGNORE_BODIES:
         gitignore.write_text(GITIGNORE_BODY)
+    # The codebase's own pattern file, written once as comments: the format
+    # is documented where the person who needs it is looking, and a
+    # "decorator spanda does not know" message can name a file that exists.
+    from spanda.gaps import LOCAL_PATTERNS_NAME, LOCAL_PATTERNS_STUB
+    patterns = directory / LOCAL_PATTERNS_NAME
+    if not patterns.exists():
+        patterns.write_text(LOCAL_PATTERNS_STUB)
     return directory
 
 
@@ -853,8 +860,10 @@ class Index:
         bases_by_local = class_bases_by_local(definitions)
         for definition in definitions:
             key = symbol_key(record["file"], definition["qualname"], definition["kind"])
-            dynamic = is_framework_called(definition, bases_by_local, patterns)
-            hint = dispatch_hint(definition, bases_by_local, patterns)
+            dynamic = is_framework_called(definition, bases_by_local, patterns,
+                                          file_path=record["file"])
+            hint = dispatch_hint(definition, bases_by_local, patterns,
+                                 file_path=record["file"])
             # Built by column name and then ordered by SYMBOL_FIELDS, so a
             # column added to one and not the other fails here, loudly, not
             # by writing every value one slot to the left.

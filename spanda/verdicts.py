@@ -224,8 +224,8 @@ def render(report: VetReport, repo: str) -> str:
 
     if report.suggestions:
         p("PATTERN LINES TO ADD — each alive verdict on an unrecognised shape, as a rule")
-        p("  Append to spanda/dynamic_dispatch.txt (or the file passed with --patterns),")
-        p("  or run `spanda vet --append-to <file>`:")
+        p("  `spanda vet --append-to` writes them to .spanda/dynamic_dispatch.txt, which")
+        p("  every run reads after the built-in list; or paste them there by hand:")
         for s in report.suggestions:
             p(f"    {s.line:<44} # {s.because}")
         p("")

@@ -118,7 +118,8 @@ class SymbolTable:
             by_local[definition["local_id"]] = key
             self.symbols[key] = (definition["kind"], file_path, definition["qualname"])
 
-            if is_framework_called(definition, bases_by_local, patterns):
+            if is_framework_called(definition, bases_by_local, patterns,
+                                   file_path=file_path):
                 self.dynamic.add(key)
             if definition["kind"] == "class" and definition.get("instance_attributes"):
                 self.instance_attrs[key] = set(definition["instance_attributes"])

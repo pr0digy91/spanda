@@ -9,6 +9,12 @@
 # Every entry below was added from the decorator census printed by
 # `spanda parse`, which lists what a codebase actually uses. Grow this file
 # from that census rather than guessing.
+#
+# Four further shapes, each with its own prefix, are described where they
+# appear below: `class:` for bases a framework owns, `method:` for methods
+# it calls by name on a subclass, `file:` for module-level functions it
+# finds by file and name, and `harmless:` for decorators known to hide
+# nothing.
 
 # HTTP route handlers. The web framework calls these when a request arrives;
 # nothing in the codebase calls them by name. In a web application these are
@@ -30,6 +36,19 @@
 # Dependency injection: the container decides the caller at runtime.
 Depends
 *.Depends
+
+# Task queues: a worker runs the decorated function when a job for it is
+# dequeued. `@app.task` is Celery and procrastinate, `@shared_task` Celery,
+# `@app.periodic` procrastinate's scheduler, `@dramatiq.actor` dramatiq.
+# Two export tasks on a job-queue codebase read as "decorator spanda does
+# not know" before these lines existed.
+*.task
+task
+shared_task
+*.shared_task
+*.periodic
+*.actor
+actor
 
 # Dispatch registries: the concrete implementation is chosen at runtime.
 *.register
@@ -109,6 +128,17 @@ method:Thread.run
 method:Process.run
 method:TestCase.setUp
 method:TestCase.tearDown
+
+# Module-level functions a framework finds by file and name. Nothing is
+# written at the definition: Alembic imports every file under `versions/`
+# and runs its `upgrade()` and `downgrade()` itself. On a migrations
+# repository those were 844 of 845 "waiting for a verdict" entries — a list
+# long enough that a reader stops reading, which is the mistake the list
+# exists to prevent. Syntax: `file:<path glob>::<name glob>`, the path
+# relative to the scan root; only functions at module level match. The
+# multi-database template names them `upgrade_<engine>`, hence the star.
+file:*versions/*.py::upgrade*
+file:*versions/*.py::downgrade*
 
 # Decorators known NOT to hide a caller. Listed so that they can be told
 # apart from decorators this file has never heard of: a symbol with no

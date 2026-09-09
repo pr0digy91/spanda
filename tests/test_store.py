@@ -565,3 +565,25 @@ def test_an_external_base_hint_goes_away_when_a_call_appears(workspace):
             "SELECT dispatch_hint FROM symbols WHERE qualname = 'Auditor.on_validate'"
         ).fetchone()[0]
     assert hint is None
+
+
+def test_alembic_migrations_are_not_waiting_for_a_verdict(tmp_path):
+    """Through the index: the flag and the hint reach the symbols table, and
+    `spanda vet` no longer lists upgrade/downgrade as candidates."""
+    from spanda.cli import main
+    from spanda.verdicts import vet
+    versions = tmp_path / "alembic" / "versions"
+    versions.mkdir(parents=True)
+    (versions / "0001_first.py").write_text(
+        "def upgrade():\n    pass\n\n\ndef downgrade():\n    pass\n")
+    (tmp_path / "seeds.py").write_text("def clear():\n    pass\n")
+    assert main(["index", str(tmp_path)]) == 0
+    with Index(db_path(tmp_path)) as index:
+        rows = {r["qualname"]: (r["has_dynamic_dispatch"], r["dispatch_hint"])
+                for r in index.connection.execute(
+                    "SELECT qualname, has_dynamic_dispatch, dispatch_hint FROM symbols")}
+        candidates = {qualname for _file, qualname, _line in vet(index).candidates}
+    assert rows["upgrade"] == (1, "convention:*versions/*.py::upgrade*")
+    assert rows["downgrade"] == (1, "convention:*versions/*.py::downgrade*")
+    assert rows["clear"] == (0, None)
+    assert candidates == {"clear"}

@@ -41,10 +41,12 @@ Four things are missing from it, by design rather than by oversight:
 
 - **Runtime dispatch.** A FastAPI route handler is called by the framework.
   Nothing in the codebase names it. `has_dynamic_dispatch = 1` marks these —
-  {{dynamic}} of them here. The mark comes from a decorator on the pattern
-  list, or from a method override the framework calls by name on a subclass
-  of its own base (`dispatch` on a `BaseHTTPMiddleware`), which no decorator
-  shows.
+  {{dynamic}} of them here. The mark comes from a pattern line — spanda's
+  built-in list plus this codebase's own `.spanda/dynamic_dispatch.txt`, whose
+  format is documented inside it — matching a decorator, a method override
+  the framework calls by name on a subclass of its own base (`dispatch` on a
+  `BaseHTTPMiddleware`), a base class it owns, or a file and function name it
+  finds by convention (Alembic's `upgrade`).
 - **What the tool does not recognise.** A decorator on neither the dispatch
   list nor the harmless list ({{hint_unknown}} live symbols here), or a public
   method nothing names on a class whose base is outside this codebase
@@ -106,7 +108,7 @@ miss so far was one of these:
    `Base = declarative_base()` is a table SQLAlchemy and Alembic own, alive
    whether or not Python names it; a method named `dispatch` on a middleware
    subclass is called by Starlette. `class:<base>` and `method:<base>.<name>`
-   lines in the pattern file mark these (`inherits:<base>` and
+   lines in `.spanda/dynamic_dispatch.txt` mark these (`inherits:<base>` and
    `override:<base>.<name>` in `dispatch_hint`). A base the file does not
    list is a pattern line waiting to be added.
 2. **A framework calls it through a decorator not on the list.** `spanda

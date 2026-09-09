@@ -15,9 +15,56 @@ from pathlib import Path
 
 DEFAULT_PATTERNS = Path(__file__).with_name("dynamic_dispatch.txt")
 
+#: A codebase's own pattern lines, inside its `.spanda/`. Read after the
+#: built-in file on every run, so a framework the tool has never heard of
+#: is a one-line fix in the repository rather than an edit inside an
+#: installed package. `spanda index` writes it, as comments only, so the
+#: format is documented where the person editing it is looking.
+LOCAL_PATTERNS_NAME = "dynamic_dispatch.txt"
 
-def load_patterns(path: Path | None = None) -> list[str]:
-    source = path or DEFAULT_PATTERNS
+LOCAL_PATTERNS_STUB = """# Dynamic-dispatch patterns for this codebase.
+#
+# spanda reads this file after its built-in list on every run. Lines here
+# add to that list; they cannot remove from it. One pattern per line,
+# shell-style globs, `#` comments. The shapes:
+#
+#   app.task                a decorator (its dotted base, not the call):
+#   *.task                    the framework calls what it decorates
+#   harmless:my.wrapper     a decorator known to hide nothing, so that it is
+#                             no longer reported as one the tool does not know
+#   class:Base              a base class a framework owns by inheritance
+#   method:Worker.run       a method a framework calls by name on a subclass
+#   file:*versions/*.py::upgrade*
+#                           a module-level function a framework finds by file
+#                             and name
+#
+# `spanda gaps` lists the decorators it does not recognise; `spanda vet
+# --append-to` writes the line each alive verdict implies to this file.
+#
+# Ignored by git along with the rest of .spanda/. To share it with the
+# team, add `!dynamic_dispatch.txt` to .spanda/.gitignore.
+"""
+
+
+def local_patterns_path(root: Path) -> Path:
+    from spanda.store import INDEX_DIRNAME
+    return Path(root) / INDEX_DIRNAME / LOCAL_PATTERNS_NAME
+
+
+def load_patterns(path: Path | None = None, root: Path | None = None) -> list[str]:
+    """The built-in patterns plus the codebase's own, or `path` alone when
+    one is given: `--patterns` replaces the list, the local file extends it."""
+    if path is not None:
+        return _read_patterns(path)
+    patterns = _read_patterns(DEFAULT_PATTERNS)
+    if root is not None:
+        local = local_patterns_path(root)
+        if local.exists():
+            patterns.extend(_read_patterns(local))
+    return patterns
+
+
+def _read_patterns(source: Path) -> list[str]:
     return [
         line.strip() for line in source.read_text().splitlines()
         if line.strip() and not line.startswith("#")
@@ -26,8 +73,9 @@ def load_patterns(path: Path | None = None) -> list[str]:
 
 METHOD_PREFIX = "method:"
 CLASS_PREFIX = "class:"
+FILE_PREFIX = "file:"
 HARMLESS_PREFIX = "harmless:"
-PREFIXES = (METHOD_PREFIX, CLASS_PREFIX, HARMLESS_PREFIX)
+PREFIXES = (METHOD_PREFIX, CLASS_PREFIX, FILE_PREFIX, HARMLESS_PREFIX)
 
 
 def is_dynamic_dispatch(decorator_base: str | None, patterns: list[str]) -> bool:
@@ -54,12 +102,14 @@ def classify_decorator(decorator_base: str | None, patterns: list[str]) -> str:
     return "unknown"
 
 
-def dispatch_hint(definition: dict, bases_by_local: dict, patterns: list[str]) -> str | None:
+def dispatch_hint(definition: dict, bases_by_local: dict, patterns: list[str],
+                  file_path: str | None = None) -> str | None:
     """Why this symbol's callers may be hidden, from the definition alone.
 
-    `dispatch:<decorator>` or `override:<base>.<method>` when a pattern
-    matched; `unknown_decorator:<decorator>` when a decorator is on neither
-    list; None when nothing at the definition suggests a hidden caller. The
+    `dispatch:<decorator>`, `override:<base>.<method>`, `inherits:<base>`
+    or `convention:<file glob>::<name glob>` when a pattern matched;
+    `unknown_decorator:<decorator>` when a decorator is on neither list;
+    None when nothing at the definition suggests a hidden caller. The
     external-base case needs the whole scan and is added after resolution.
     """
     for decorator in definition["decorators"]:
@@ -73,6 +123,9 @@ def dispatch_hint(definition: dict, bases_by_local: dict, patterns: list[str]) -
         owned_by = framework_class_base(definition["bases"], patterns)
         if owned_by:
             return f"inherits:{owned_by}"
+    convention = framework_convention(file_path, definition, patterns)
+    if convention:
+        return f"convention:{convention}"
     for decorator in definition["decorators"]:
         if classify_decorator(decorator["base"], patterns) == "unknown":
             return f"unknown_decorator:{decorator['base'] or decorator['raw']}"
@@ -127,9 +180,37 @@ def framework_class_base(bases: list[str] | None, patterns: list[str]) -> str | 
     return None
 
 
-def is_framework_called(definition: dict, bases_by_local: dict, patterns: list[str]) -> bool:
+def framework_convention(file_path: str | None, definition: dict,
+                         patterns: list[str]) -> str | None:
+    """The `file:` pattern that names this module-level function, if any.
+
+    Some frameworks find their entry points by *where* a function is and
+    what it is called, with nothing written at the definition at all:
+    Alembic runs `upgrade()` and `downgrade()` in every file under
+    `versions/`. On a migrations repository that is every function there
+    is, and without this every one of them sat on the candidate list —
+    844 of 845 entries, a list nobody would read to the end. Syntax:
+    `file:<path glob>::<name glob>`, the path matched relative to the
+    scan root, the name only for functions at module level.
+    """
+    if not file_path or definition["kind"] != "function" or definition["parent"] is not None:
+        return None
+    for pattern in patterns:
+        if not pattern.startswith(FILE_PREFIX):
+            continue
+        path_glob, sep, name_glob = pattern[len(FILE_PREFIX):].partition("::")
+        if not sep:
+            continue  # malformed: a `file:` line without `::` names nothing
+        if fnmatch(definition["name"], name_glob) and fnmatch(file_path, path_glob):
+            return pattern[len(FILE_PREFIX):]
+    return None
+
+
+def is_framework_called(definition: dict, bases_by_local: dict, patterns: list[str],
+                        file_path: str | None = None) -> bool:
     """Any of the ways a framework can own a symbol: a decorator, an
-    override it calls by name, or a base class it registers."""
+    override it calls by name, a base class it registers, or a file and
+    name it looks for by convention."""
     if any(is_dynamic_dispatch(d["base"], patterns) for d in definition["decorators"]):
         return True
     if definition["kind"] == "method":
@@ -137,7 +218,7 @@ def is_framework_called(definition: dict, bases_by_local: dict, patterns: list[s
             bases_by_local.get(definition["parent"]), definition["name"], patterns)
     if definition["kind"] == "class":
         return framework_class_base(definition["bases"], patterns) is not None
-    return False
+    return framework_convention(file_path, definition, patterns) is not None
 
 
 def class_bases_by_local(definitions: list[dict]) -> dict:
@@ -267,6 +348,18 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
                     "framework_owned_class", record["file"],
                     definition["lines"][0], definition["qualname"],
                     f"inherits from {owned_by}"))
+
+    # 1a''. A module-level function a framework finds by file and name:
+    #       Alembic's upgrade/downgrade. Nothing at the definition says so;
+    #       the pattern file does.
+    for record in scan.records:
+        for definition in record["definitions"]:
+            matched = framework_convention(record["file"], definition, patterns)
+            if matched:
+                gaps.append(Gap(
+                    "framework_convention", record["file"],
+                    definition["lines"][0], definition["qualname"],
+                    f"matches {matched}"))
 
     # 1c. A decorator on neither list, on a symbol nothing names. Not a
     #     claim that a framework calls it — a statement that the tool does
