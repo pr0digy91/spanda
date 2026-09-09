@@ -36,6 +36,12 @@ class ImportEdge:
     conditional: bool = False
     #: Names the statement brings in, as (name, alias).
     names: list[tuple[str, str | None]] = field(default_factory=list)
+    #: True when `names` denote modules rather than symbols in one: every
+    #: `import a.b`, and `from pkg import sub` where `pkg/sub.py` exists.
+    #: Recorded here because it cannot be recovered later by comparing
+    #: strings: `from pkg.thing import thing` and `from pkg import thing`
+    #: both end in "thing", and only one of them names a module.
+    names_are_modules: bool = False
 
 
 @dataclass
@@ -110,7 +116,7 @@ def resolve_imports(record: dict, index: ModuleIndex) -> list[ImportEdge]:
             # `import a.b.c` / `import a.b as x` — the module is in `names`.
             for name, alias in [(n["name"], n["alias"]) for n in statement["names"]]:
                 edges.append(_edge(record, statement, name, index,
-                                   names=[(name, alias)]))
+                                   names=[(name, alias)], are_modules=True))
             continue
 
         target = absolute_module(importing, is_package, cleaned, level)
@@ -135,18 +141,20 @@ def resolve_imports(record: dict, index: ModuleIndex) -> list[ImportEdge]:
         for name, alias in submodules:
             edges.append(_edge(record, statement,
                                f"{target}.{name}" if target else name, index,
-                               names=[(name, alias)]))
+                               names=[(name, alias)], are_modules=True))
         if plain or not submodules:
             edges.append(_edge(record, statement, target, index, names=plain))
     return edges
 
 
 def _edge(record: dict, statement: dict, target: str, index: ModuleIndex,
-          names: list[tuple[str, str | None]]) -> ImportEdge:
+          names: list[tuple[str, str | None]], are_modules: bool = False
+          ) -> ImportEdge:
     edge = ImportEdge(
         source_file=record["file"], raw=statement["raw"], line=statement["line"],
         target_module=target, is_star=statement["is_star"],
-        conditional=statement["conditional"], names=names)
+        conditional=statement["conditional"], names=names,
+        names_are_modules=are_modules)
 
     resolved = index.file_for(target)
     if resolved is None and names and not statement["is_star"]:
@@ -157,6 +165,7 @@ def _edge(record: dict, statement: dict, target: str, index: ModuleIndex,
             if candidate is not None:
                 resolved = candidate
                 edge.target_module = joined
+                edge.names_are_modules = True
                 break
 
     if resolved is not None:

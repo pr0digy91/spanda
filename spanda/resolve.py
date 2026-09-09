@@ -254,14 +254,30 @@ def build_scope(record: dict, table: SymbolTable, index: ModuleIndex
                 continue
             if target_module is None:
                 continue
-            # `from . import handlers`, where the edge already points at the
-            # submodule the name denotes. Distinguished from a re-export by
-            # the module's own name: `flow_nodes.ai.ai_agent` is not what
-            # `handle_ai_agent` denotes, so that one is a re-export to chase.
-            # Conflating the two makes every symbol behind a package root
-            # look uncalled.
-            if target_module == name or target_module.endswith("." + name):
+            if edge.names_are_modules:
+                if name == target_module:
+                    # `import a.b` binds `a`, and `a.b` is reached through
+                    # it; `import a.b as x` binds `x` to `a.b` directly.
+                    scope[local] = Target(
+                        "module", module=target_module if alias else local)
+                    continue
+                # `from . import handlers`: the edge already points at the
+                # submodule the name denotes. Usually that is the answer —
+                # but not when the package's own __init__ binds the same
+                # name to something else. `from services.inventory import
+                # stock_status` where inventory/__init__.py does `from
+                # .stock_status import stock_status` gives Python the
+                # *function*: the from-import rebinds the attribute after
+                # the submodule import set it. Read as the module, all 13
+                # of that function's callers reported as one.
+                package = target_module.rpartition(".")[0]
+                own = table.module_names.get(package, {}).get(name)
+                if own is not None:
+                    scope[local] = Target("symbol", symbol=own)
+                    continue
                 scope[local] = Target("module", module=target_module)
+                if package in table.module_files:
+                    pending.append(("shadow", local, package, name, edge))
                 continue
             key = table.module_names.get(target_module, {}).get(name)
             if key is not None:
@@ -325,7 +341,12 @@ def build_scopes(collected, table: SymbolTable, index: ModuleIndex
                 # A re-export of something in this codebase is followed to
                 # it; a re-export of an external name is external here too.
                 # Both are answers. Only "still a module" is unfinished.
-                if found is not None and found.kind in ("symbol", "external"):
+                # For a "shadow" item the module *is* an answer, already in
+                # the scope; the package's own binding replaces it only if
+                # one turns up — and it may turn up in a later pass, when
+                # that package's own re-exports have been chased.
+                if found is not None and found.kind in ("symbol", "external") \
+                        and scopes[file_path].get(local) != found:
                     scopes[file_path][local] = found
                     progressed = True
                 else:
@@ -358,12 +379,9 @@ def audit_lost_trails(collected, scopes: dict[str, dict[str, Target]],
             target_module = index.by_file.get(edge.target_file)
             if target_module is None:
                 continue
+            if edge.names_are_modules:
+                continue  # `from . import db` names a module: its answer
             for name, alias in edge.names:
-                # `from . import db` names a module, and that is its answer.
-                joined = f"{target_module}.{name}" if target_module else name
-                if index.file_for(joined) is not None or target_module == name \
-                        or target_module.endswith("." + name):
-                    continue
                 local = alias or name
                 final = scope.get(local)
                 if final is None or final.kind == "module":
@@ -567,6 +585,12 @@ def resolve_record(record: dict, table: SymbolTable,
             # of `pkg.sub`, not a missing member of `pkg`.
             module, depth = target.module, 1
             while depth < len(chain) and f"{module}.{chain[depth]}" in table.module_files:
+                # Unless the package binds that name to a symbol itself, in
+                # which case the attribute is the symbol, not the submodule
+                # of the same name (see build_scope).
+                bound = scopes.get(table.module_files.get(module, ""), {}).get(chain[depth])
+                if bound is not None and bound.kind == "symbol":
+                    break
                 module, depth = f"{module}.{chain[depth]}", depth + 1
             if depth == len(chain):
                 emit(None, R_MODULE)
@@ -603,5 +627,12 @@ def resolve_record(record: dict, table: SymbolTable,
             found = table.member(target.symbol, chain[1], scopes=scopes)
             emit(found, None if found else missing_member(target.symbol, chain[1]), depth=1)
         else:
-            emit(None, R_UNKNOWN_TYPE)
+            # `deliver_export.configure(lock=...).defer_async(...)`: an
+            # attribute reached through a function or variable this codebase
+            # defines. What the attribute is cannot be known here — but what
+            # it is reached *through* is, and that symbol is used by this
+            # line. Recorded as "attribute on an unknown type" instead, the
+            # reference produced no edge at all, and every job a queue
+            # hands off by object looked uncalled.
+            emit(target.symbol, R_STAR if target.via_star else None, depth=0)
     return out

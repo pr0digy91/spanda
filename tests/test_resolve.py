@@ -527,3 +527,101 @@ def test_dunder_attributes_every_class_and_module_has_are_builtins(resolved):
     reasons = {r.raw: r.reason for r in _scoping(resolved)
                if r.raw in ("Order.__name__", "h.__file__")}
     assert reasons == {"Order.__name__": "builtin", "h.__file__": "builtin"}
+
+
+def _resolve_tree(tmp_path):
+    from spanda.extract import plan_scan, stream_records
+    from spanda.modules import ModuleIndex
+    plan, patterns = plan_scan(tmp_path), load_patterns()
+    index, table, records = ModuleIndex(), SymbolTable(), []
+    for record in stream_records(plan):
+        index.add(record["file"], record["module"])
+        table.add_record(record, patterns)
+        records.append(record)
+    scopes, lost = build_scopes(records, table, index)
+    references = [ref for r in records for ref in resolve_record(r, table, scopes)]
+    return references, lost
+
+
+def _write_inventory(tmp_path, init_body):
+    (tmp_path / "services" / "inventory").mkdir(parents=True)
+    (tmp_path / "services" / "__init__.py").write_text("")
+    (tmp_path / "services" / "inventory" / "__init__.py").write_text(init_body)
+    (tmp_path / "services" / "inventory" / "stock_status.py").write_text(
+        "def stock_status(sku):\n    return sku\n")
+
+
+def test_a_symbol_re_exported_under_its_modules_name_shadows_the_module(tmp_path):
+    """stock_status.py defines stock_status, and inventory/__init__.py does
+    `from .stock_status import stock_status`. To Python, `from
+    services.inventory import stock_status` is the *function*: the
+    from-import in __init__ rebinds the attribute after the submodule
+    import set it. Read as the submodule instead, a function with thirteen
+    callers reported one — and nothing flagged it, because "it's a module"
+    is a legitimate answer that the lost-trail audit rightly ignores.
+    """
+    _write_inventory(tmp_path, "from .stock_status import stock_status\n")
+    (tmp_path / "app.py").write_text(
+        "from services.inventory import stock_status\n\n\n"
+        "def check(sku):\n    return stock_status(sku)\n")
+    (tmp_path / "attr.py").write_text(
+        "import services.inventory\n\n\n"
+        "def check(sku):\n    return services.inventory.stock_status(sku)\n")
+    references, lost = _resolve_tree(tmp_path)
+    assert lost == []
+    calls = {(r.source_file, r.target_symbol) for r in references
+             if r.edge_type == "calls" and r.target_symbol}
+    target = "services.inventory.stock_status.stock_status|function"
+    assert ("app.py", target) in calls
+    assert ("attr.py", target) in calls, "the dotted path is rebound too"
+
+
+def test_a_submodule_the_package_does_not_rebind_stays_a_module(tmp_path):
+    """The other half. With no re-export in __init__.py the same import
+    really does name the module, and the call goes through it."""
+    _write_inventory(tmp_path, "")
+    (tmp_path / "app.py").write_text(
+        "from services.inventory import stock_status\n\n\n"
+        "def check(sku):\n    return stock_status.stock_status(sku)\n")
+    references, lost = _resolve_tree(tmp_path)
+    assert lost == []
+    by_raw = {r.raw: (r.target_symbol, r.reason) for r in references
+              if r.source_file == "app.py"}
+    assert by_raw["stock_status.stock_status"] == (
+        "services.inventory.stock_status.stock_status|function", None)
+
+
+def test_a_dotted_import_binds_its_first_segment(tmp_path):
+    """`import a.b` binds `a`; `a.b.thing` walks down from there. It was
+    bound to `a.b`, so the walk looked for `a.b.b` and reported `b` as an
+    attribute `a.b` did not have."""
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    (tmp_path / "a" / "__init__.py").write_text("")
+    (tmp_path / "a" / "b" / "__init__.py").write_text("def thing():\n    return 1\n")
+    (tmp_path / "user.py").write_text(
+        "import a.b\nimport a.b as ab\n\n\ndef go():\n"
+        "    return a.b.thing() + ab.thing()\n")
+    references, _lost = _resolve_tree(tmp_path)
+    targets = [r.target_symbol for r in references if r.source_file == "user.py"]
+    assert targets == ["a.b.thing|function", "a.b.thing|function"]
+
+
+def test_a_chain_through_a_known_function_is_a_use_of_that_function(tmp_path):
+    """`deliver_export.configure(lock=...).defer_async(...)` is how every
+    procrastinate hand-off looks, and Celery's `.apply_async` is the same
+    shape. The attribute is unknowable; the function it is reached through
+    is not. Reported as "attribute on an unknown type" this produced no
+    edge at all, and a job-queue codebase read as all-dead."""
+    (tmp_path / "tasks.py").write_text(
+        "async def deliver_export(export_id):\n    return export_id\n\n\n"
+        "async def build_export(export_id):\n"
+        "    await deliver_export.configure(lock='x').defer_async(export_id=export_id)\n\n\n"
+        "LIMITS = {}\n\n\ndef limit(name):\n    return LIMITS.get(name)\n")
+    references, _lost = _resolve_tree(tmp_path)
+    found = {(r.source_symbol, r.target_symbol, r.edge_type, r.reason)
+             for r in references if r.target_symbol}
+    assert ("tasks.build_export|function", "tasks.deliver_export|function",
+            "uses", None) in found, "a use of the function, not a call on it"
+    assert ("tasks.limit|function", "tasks.LIMITS|variable", "uses", None) in found
+    assert not [r for r in references if r.raw.startswith("deliver_export.")
+                and r.target_symbol is None]
