@@ -82,6 +82,9 @@ tool_decorator
 #
 # ASGI middleware registered on the app; the framework calls it per request.
 *.middleware
+# PyObjC: an action method Interface Builder wires to a control.
+IBAction
+*.IBAction
 *.exception_handler
 # MCP server handlers: the client's requests are routed to these by the SDK.
 *.list_tools
@@ -128,6 +131,16 @@ method:Thread.run
 method:Process.run
 method:TestCase.setUp
 method:TestCase.tearDown
+
+# Cocoa, through PyObjC. Objective-C calls a method by selector, and a
+# selector is a string: the menu item wired to "quit:" makes Cocoa send
+# `quit_` — each colon becomes an underscore in the Python name. So on a
+# subclass of any NS* class, a public method whose name ends in `_` is a
+# selector the framework may send, and no Python names it. `awakeFromNib`
+# takes no argument and so has no underscore. The first PyObjC app spanda
+# read had about fifty of these on its "no explanation" list.
+method:NS*.*_
+method:NS*.awakeFromNib
 
 # Module-level functions a framework finds by file and name. Nothing is
 # written at the definition: Alembic imports every file under `versions/`
@@ -181,3 +194,6 @@ harmless:typing.overload
 harmless:final
 harmless:override
 harmless:typing.*
+# PyObjC: explicitly *not* a selector; Cocoa cannot reach it.
+harmless:python_method
+harmless:objc.python_method

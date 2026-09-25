@@ -27,6 +27,7 @@ Both are deliberate.
 | `lazy.py` | 1 | 1 | 0 | 0 | 0 |
 | `batch.py` | 5 | 4 | 0 | 0 | 1 |
 | `middleware.py` | 15 | 3 | 3 | 4 | 5 |
+| `cocoa.py` | 6 | 0 | 1 | 5 | 0 |
 | `scoping.py` | 19 | 6 | 2 | 2 | 9 |
 | `a.py` | 3 | 2 | 0 | 0 | 1 |
 | `b.py` | 1 | 1 | 0 | 0 | 0 |
@@ -43,9 +44,9 @@ Both are deliberate.
 | `registry/impl.py` | 1 | 1 | 0 | 0 | 0 |
 | `star.py` | 1 | 1 | 0 | 0 | 0 |
 | `broken.py` | — | unparseable; the reported line and wording vary by interpreter |
-| **Total** | **98** | 42 | 11 | 16 | 29 |
+| **Total** | **104** | 42 | 12 | 21 | 29 |
 
-21 files: 20 parse, 1 does not.
+22 files: 21 parse, 1 does not.
 
 ## What each file proves
 
@@ -67,11 +68,12 @@ Both are deliberate.
 | `scoping.py` | Labels: a member inherited from an external base is *maybe inherited*, not absent; lambda, comprehension and class-body names are bound; a module alias reaches re-exports and submodules; a member read inside a call is a use, not a call; a call further along the chain is not a call on the member; module-level loop targets are module names; an attribute set on self is an instance attribute, not absent. |
 | `middleware.py` | Framework-called with no caller in the code: `@app.middleware`, `@server.list_tools()`, a `dispatch` override on an external base that no decorator marks, a decorator on neither list (`@scheduler.scheduled_job`), a public method on a Pydantic model that nothing names, and a SQLAlchemy model owned by its `Base`. |
 | `nested.py` | Nested function, nested class, async, and every parameter kind. |
+| `cocoa.py` | PyObjC: a method ending in `_` on an `NS*` subclass is a selector Cocoa sends by name; the string `"quit:"` is that name, and is reported as spelling `quit_`; `@objc.python_method` says the opposite and is harmless. |
 | `broken.py` | A syntax error must be recorded, not fatal. |
 
 ## Specific assertions the extractor must satisfy
 
-**Decorators — exactly 10 decorated definitions, recorded verbatim:**
+**Decorators — exactly 12 decorated definitions, recorded verbatim:**
 
 | Symbol | Decorator |
 |---|---|
@@ -81,6 +83,8 @@ Both are deliberate.
 | `models.Order.empty` | `classmethod` |
 | `models._apply_rls_context` | `event.listens_for(Session, 'before_flush')` |
 | `nested.expensive_lookup` | `functools.lru_cache(maxsize=128)` |
+| `cocoa.AppDelegate.refresh_` | `objc.IBAction` |
+| `cocoa.AppDelegate.helper` | `objc.python_method` |
 
 Of these, **exactly one** is dynamic dispatch: `event.listens_for`. Flagging
 `lru_cache` or `property` too would make the flag meaningless — precision here

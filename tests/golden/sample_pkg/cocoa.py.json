@@ -1,0 +1,449 @@
+{
+  "file": "sample_pkg/cocoa.py",
+  "module": "sample_pkg.cocoa",
+  "parse_status": "ok",
+  "parse_error": null,
+  "file_hash": "sha256:269938b7504836a43e05c2e16794ce7a",
+  "module_docstring": "A PyObjC app delegate: Cocoa calls methods by selector, and a selector is\na string.\n\n`quit_` is the Python spelling of the Objective-C selector `quit:` \u2014 each\ncolon becomes an underscore. Nothing in Python calls `quit_`; the menu item\nis wired to the string \"quit:\" and Cocoa sends it. On the first PyObjC app\nspanda read, about fifty such methods sat on the \"no explanation\" list.",
+  "dunder_all": [],
+  "imports": [
+    {
+      "raw": "import objc",
+      "module": null,
+      "names": [
+        {
+          "name": "objc",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 10,
+      "conditional": false
+    },
+    {
+      "raw": "from AppKit import NSMenuItem, NSObject, NSStatusBar",
+      "module": "AppKit",
+      "names": [
+        {
+          "name": "NSMenuItem",
+          "alias": null
+        },
+        {
+          "name": "NSObject",
+          "alias": null
+        },
+        {
+          "name": "NSStatusBar",
+          "alias": null
+        }
+      ],
+      "level": 0,
+      "is_star": false,
+      "line": 11,
+      "conditional": false
+    }
+  ],
+  "definitions": [
+    {
+      "local_id": "d1",
+      "kind": "class",
+      "name": "AppDelegate",
+      "qualname": "AppDelegate",
+      "parent": null,
+      "lines": [
+        14,
+        34
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": null,
+      "bases": [
+        "NSObject"
+      ],
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "bases(NSObject)",
+      "signature_hash": "sha256:5f7af0a0f204269ae28e1dfb424d60d4",
+      "content_hash": "sha256:77f79f8bef0d1cac393dc95d01759bcb",
+      "body_hash": "sha256:18a770acceedc8cba8f200d87be321a3",
+      "loop_depth": 0,
+      "instance_attributes": [
+        "status"
+      ]
+    },
+    {
+      "local_id": "d2",
+      "kind": "method",
+      "name": "applicationDidFinishLaunching_",
+      "qualname": "AppDelegate.applicationDidFinishLaunching_",
+      "parent": "d1",
+      "lines": [
+        15,
+        19
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "notification",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:self,positional:notification)->",
+      "signature_hash": "sha256:363ba2fdf981675de7aef0ba6e4bef35",
+      "content_hash": "sha256:0053d46dfda1aff6eff2c7605c4b51de",
+      "body_hash": "sha256:5cd6a12037f4547a1b17448c181c6edb",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d3",
+      "kind": "method",
+      "name": "awakeFromNib",
+      "qualname": "AppDelegate.awakeFromNib",
+      "parent": "d1",
+      "lines": [
+        21,
+        22
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:self)->",
+      "signature_hash": "sha256:88be7475fea74f50a94024d09e5db4d4",
+      "content_hash": "sha256:caac74d272cd9b40ef5e4d292e6e0d97",
+      "body_hash": "sha256:d5f6f580e0d9fd5fb266fe0d308a301b",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d4",
+      "kind": "method",
+      "name": "quit_",
+      "qualname": "AppDelegate.quit_",
+      "parent": "d1",
+      "lines": [
+        24,
+        25
+      ],
+      "decorator_lines": null,
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "sender",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [],
+      "docstring": null,
+      "canonical_signature": "(positional:self,positional:sender)->",
+      "signature_hash": "sha256:8fc3abd7c6fca05c70097e9742b51643",
+      "content_hash": "sha256:d29ed8aa93a1f040de22010d16e0c9cf",
+      "body_hash": "sha256:600e71928cf579674eaa6dead214d80e",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d5",
+      "kind": "method",
+      "name": "refresh_",
+      "qualname": "AppDelegate.refresh_",
+      "parent": "d1",
+      "lines": [
+        27,
+        29
+      ],
+      "decorator_lines": [
+        27,
+        27
+      ],
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          },
+          {
+            "name": "sender",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "objc.IBAction",
+          "base": "objc.IBAction"
+        }
+      ],
+      "docstring": null,
+      "canonical_signature": "(positional:self,positional:sender)->",
+      "signature_hash": "sha256:8fc3abd7c6fca05c70097e9742b51643",
+      "content_hash": "sha256:4a09db6c4739ea5dba494c3f99bae78e",
+      "body_hash": "sha256:82d1c05d9e4673b0d4d6fb649ea94249",
+      "loop_depth": 0,
+      "instance_attributes": []
+    },
+    {
+      "local_id": "d6",
+      "kind": "method",
+      "name": "helper",
+      "qualname": "AppDelegate.helper",
+      "parent": "d1",
+      "lines": [
+        31,
+        34
+      ],
+      "decorator_lines": [
+        31,
+        31
+      ],
+      "is_async": false,
+      "is_private": false,
+      "in_dunder_all": false,
+      "signature": {
+        "params": [
+          {
+            "name": "self",
+            "kind": "positional",
+            "annotation": null,
+            "default": null
+          }
+        ],
+        "returns": null
+      },
+      "bases": null,
+      "annotation": null,
+      "decorators": [
+        {
+          "raw": "objc.python_method",
+          "base": "objc.python_method"
+        }
+      ],
+      "docstring": "Marked as not a selector: an ordinary method Cocoa cannot reach.",
+      "canonical_signature": "(positional:self)->",
+      "signature_hash": "sha256:88be7475fea74f50a94024d09e5db4d4",
+      "content_hash": "sha256:ac6cc6a9f4f2743f4a81d6f12d02ec2c",
+      "body_hash": "sha256:607ae22474fece261c314897273bd602",
+      "loop_depth": 0,
+      "instance_attributes": []
+    }
+  ],
+  "references": [
+    {
+      "raw": "NSObject",
+      "root": "NSObject",
+      "chain": [
+        "NSObject"
+      ],
+      "context": "base_class",
+      "line": 14,
+      "enclosing": "d1",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "NSMenuItem.alloc().initWithTitle_action_keyEquivalent_",
+      "root": null,
+      "chain": null,
+      "context": "call",
+      "line": 16,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "NSMenuItem.alloc",
+      "root": "NSMenuItem",
+      "chain": [
+        "NSMenuItem",
+        "alloc"
+      ],
+      "context": "call",
+      "line": 16,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "self.status",
+      "root": "self",
+      "chain": [
+        "self",
+        "status"
+      ],
+      "context": "assign_target",
+      "line": 18,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "NSStatusBar.systemStatusBar().statusItemWithLength_",
+      "root": null,
+      "chain": null,
+      "context": "call",
+      "line": 18,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "NSStatusBar.systemStatusBar",
+      "root": "NSStatusBar",
+      "chain": [
+        "NSStatusBar",
+        "systemStatusBar"
+      ],
+      "context": "call",
+      "line": 18,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "self.status.menu().addItem_",
+      "root": null,
+      "chain": null,
+      "context": "call",
+      "line": 19,
+      "enclosing": "d2",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "self.status.menu",
+      "root": "self",
+      "chain": [
+        "self",
+        "status",
+        "menu"
+      ],
+      "context": "call",
+      "line": 19,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "item",
+      "root": "item",
+      "chain": [
+        "item"
+      ],
+      "context": "name",
+      "line": 19,
+      "enclosing": "d2",
+      "local": true,
+      "loop_depth": 0
+    },
+    {
+      "raw": "objc.IBAction",
+      "root": "objc",
+      "chain": [
+        "objc",
+        "IBAction"
+      ],
+      "context": "decorator",
+      "line": 27,
+      "enclosing": "d5",
+      "local": false,
+      "loop_depth": 0
+    },
+    {
+      "raw": "objc.python_method",
+      "root": "objc",
+      "chain": [
+        "objc",
+        "python_method"
+      ],
+      "context": "decorator",
+      "line": 31,
+      "enclosing": "d6",
+      "local": false,
+      "loop_depth": 0
+    }
+  ],
+  "dynamic_hints": [
+    {
+      "kind": "identifier_string",
+      "value": "Quit",
+      "line": 17,
+      "enclosing": "d2"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "quit_",
+      "selector": "quit:",
+      "line": 17,
+      "enclosing": "d2"
+    },
+    {
+      "kind": "identifier_string",
+      "value": "q",
+      "line": 17,
+      "enclosing": "d2"
+    }
+  ]
+}

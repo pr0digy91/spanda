@@ -24,6 +24,7 @@ EXPECTED_COUNTS = {
     "sample_pkg/lazy.py":      (1, 1, 0, 0, 0),
     "sample_pkg/batch.py":     (5, 4, 0, 0, 1),
     "sample_pkg/middleware.py": (15, 3, 3, 4, 5),
+    "sample_pkg/cocoa.py":      (6, 0, 1, 5, 0),
     "sample_pkg/scoping.py":    (19, 6, 2, 2, 9),
     "sample_pkg/registry/__init__.py": (1, 0, 0, 0, 1),
     "sample_pkg/registry/impl.py":     (1, 1, 0, 0, 0),
@@ -53,6 +54,8 @@ EXPECTED_DECORATORS = {
     ("sample_pkg/middleware.py", "list_tools"): "server.list_tools",
     ("sample_pkg/middleware.py", "nightly_cleanup"): "scheduler.scheduled_job",
     ("sample_pkg/middleware.py", "Auditor.name_present"): "field_validator",
+    ("sample_pkg/cocoa.py", "AppDelegate.refresh_"): "objc.IBAction",
+    ("sample_pkg/cocoa.py", "AppDelegate.helper"): "objc.python_method",
 }
 
 
@@ -78,10 +81,10 @@ def test_definition_counts_match_answer_key(records, path, expected):
 
 
 def test_totals(records):
-    assert len(records) == 21
-    assert sum(len(r["definitions"]) for r in records.values()) == 98
+    assert len(records) == 22
+    assert sum(len(r["definitions"]) for r in records.values()) == 104
     parsed = [r for r in records.values() if r["parse_status"] == "ok"]
-    assert len(parsed) == 20
+    assert len(parsed) == 21
 
 
 # -- the hard edges --------------------------------------------------------
@@ -453,3 +456,15 @@ def test_attributes_assigned_on_self_are_recorded_on_the_class(records):
     names = _by_qualname(records["sample_pkg/scoping.py"])
     assert names["Window"]["instance_attributes"] == ["seconds"]
     assert names["Ledger"]["instance_attributes"] == []
+
+
+def test_a_selector_string_is_recorded_as_the_python_name_it_spells(records):
+    """"quit:" is how Cocoa names `quit_`. The hint carries the Python
+    spelling, so the string-literal gap can match it, and keeps the selector
+    so the report can say what was actually written."""
+    hints = [h for h in records["sample_pkg/cocoa.py"]["dynamic_hints"]
+             if h["kind"] == "identifier_string"]
+    by_value = {h["value"]: h for h in hints}
+    assert by_value["quit_"]["selector"] == "quit:"
+    assert "selector" not in by_value["Quit"], "a plain identifier string is unchanged"
+    assert "q" in by_value

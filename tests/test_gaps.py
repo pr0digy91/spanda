@@ -35,14 +35,21 @@ def gaps(scan):
 def test_the_decorated_hook_is_flagged(gaps):
     flagged = {g.symbol for g in gaps if g.kind == "dynamic_dispatch_decorator"}
     assert flagged == {"_apply_rls_context", "security_headers", "list_tools",
-                       "Auditor.name_present"}
+                       "Auditor.name_present", "AppDelegate.refresh_"}
 
 
 def test_an_override_the_framework_calls_by_name_is_flagged(gaps):
     """No decorator, no caller: `dispatch` on a BaseHTTPMiddleware subclass.
     A human vetting found this one alive on the dead list."""
     flagged = {g.symbol: g.detail for g in gaps if g.kind == "framework_method_override"}
-    assert flagged == {"RequestLogger.dispatch": "overrides dispatch on BaseHTTPMiddleware"}
+    assert flagged == {
+        "RequestLogger.dispatch": "overrides dispatch on BaseHTTPMiddleware",
+        # Cocoa selectors: the trailing underscore is the colon
+        "AppDelegate.applicationDidFinishLaunching_":
+            "overrides applicationDidFinishLaunching_ on NSObject",
+        "AppDelegate.awakeFromNib": "overrides awakeFromNib on NSObject",
+        "AppDelegate.quit_": "overrides quit_ on NSObject",
+    }
 
 
 def test_a_decorator_on_neither_list_is_reported_as_unknown(gaps):
@@ -63,8 +70,12 @@ def test_harmless_decorators_are_neither_dispatch_nor_unknown():
 
 def test_a_public_method_on_an_external_base_is_a_candidate(gaps):
     found = {g.symbol: g.detail for g in gaps if g.kind == "override_on_external_base"}
-    assert set(found) == {"Auditor.on_validate"}, \
+    assert set(found) == {"Auditor.on_validate", "AppDelegate.helper"}, \
         "name_present is a validator, explained by its decorator, and not listed twice"
+    # helper carries @objc.python_method, which says Cocoa cannot reach it.
+    # The tool does not read that meaning; it reports a public method on an
+    # external base that nothing names, and a person decides. Honest, not
+    # clever.
     assert "BaseModel" in found["Auditor.on_validate"]
     # dispatch is explained by its pattern line and not listed twice;
     # _helper is private; methods on internal bases (derived.py) resolve.
@@ -96,6 +107,30 @@ def test_framework_method_matching_is_by_written_base_name():
     assert not is_framework_method(None, "dispatch", patterns)
 
 
+def test_cocoa_selectors_are_framework_methods():
+    """PyObjC: a method ending in `_` on an NS* subclass is a selector Cocoa
+    sends by name. `awakeFromNib` is the argument-less one. A method with a
+    plain name on the same class is the class's own."""
+    from spanda.gaps import is_framework_method
+    patterns = load_patterns()
+    assert is_framework_method(["NSObject"], "quit_", patterns)
+    assert is_framework_method(["AppKit.NSWindowController"], "windowWillClose_", patterns)
+    assert is_framework_method(["NSObject"], "awakeFromNib", patterns)
+    assert not is_framework_method(["NSObject"], "helper", patterns)
+    assert not is_framework_method(["Namespace"], "quit_", patterns), \
+        "NS* means the Cocoa prefix, not any name starting with those letters"
+    assert not is_framework_method(["Ledger"], "quit_", patterns)
+
+
+def test_a_selector_string_reports_the_method_it_names(gaps):
+    """The menu item wired to "quit:" is the only evidence that `quit_` is
+    called. The report says the string, and what it spells."""
+    [gap] = [g for g in gaps if g.kind == "name_in_string_literal"
+             and g.file == "sample_pkg/cocoa.py"]
+    assert '"quit:" is the selector for quit_' in gap.detail
+    assert "cocoa.py" in gap.detail
+
+
 def test_ordinary_decorators_are_not_flagged():
     """Precision: flagging every decorated symbol is the same as flagging none."""
     patterns = load_patterns()
@@ -116,7 +151,7 @@ def test_runtime_attribute_access_sites_are_found(gaps):
 def test_handlers_reached_only_by_string_are_found(gaps):
     named = {g.detail.split('"')[1] for g in gaps
              if g.kind == "name_in_string_literal"}
-    assert named == {"on_created", "on_paid"}
+    assert named == {"on_created", "on_paid", "quit:"}
 
 
 def test_dunder_all_entries_are_not_reported_as_gaps(gaps):

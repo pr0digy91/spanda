@@ -30,6 +30,10 @@ SKIP_DIRS = {
 }
 
 IDENTIFIER_RE = re.compile(r"[A-Za-z_]\w*\Z")
+#: An Objective-C selector with arguments — `quit:`, `setValue:forKey:`.
+#: PyObjC spells it with each colon as an underscore, so the string names
+#: a Python method the same way an identifier string does.
+SELECTOR_RE = re.compile(r"[A-Za-z_]\w*:(\w*:)*\Z")
 
 #: Call names whose targets cannot be known statically. Recorded as hints so
 #: the gap is visible rather than absent.
@@ -772,11 +776,20 @@ class _Walker(ast.NodeVisitor):
             self._record_reference(node, node.id, [node.id])
 
     def visit_Constant(self, node: ast.Constant) -> None:
-        if (isinstance(node.value, str) and id(node) not in self.docstrings
-                and IDENTIFIER_RE.match(node.value)):
+        if not isinstance(node.value, str) or id(node) in self.docstrings:
+            return
+        if IDENTIFIER_RE.match(node.value):
             self.out.dynamic_hints.append({
                 "kind": "identifier_string",
                 "value": node.value,
+                "line": node.lineno,
+                "enclosing": self.scope.local_id,
+            })
+        elif SELECTOR_RE.match(node.value):
+            self.out.dynamic_hints.append({
+                "kind": "identifier_string",
+                "value": node.value.replace(":", "_"),
+                "selector": node.value,
                 "line": node.lineno,
                 "enclosing": self.scope.local_id,
             })

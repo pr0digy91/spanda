@@ -313,10 +313,12 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
 
     # 1. Decorated with something that dispatches at runtime. High confidence:
     #    the decorator is written in the source, we are only reading it.
+    by_decorator: set[tuple[str, str]] = set()
     for record in scan.records:
         for definition in record["definitions"]:
             for decorator in definition["decorators"]:
                 if is_dynamic_dispatch(decorator["base"], patterns):
+                    by_decorator.add((record["file"], definition["qualname"]))
                     gaps.append(Gap(
                         "dynamic_dispatch_decorator", record["file"],
                         definition["lines"][0], definition["qualname"],
@@ -324,10 +326,14 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
 
     # 1b. An override the framework calls by name. Same confidence as a
     #     decorator — the base and the method name are both written — and
-    #     the one shape a decorator list could never express.
+    #     the one shape a decorator list could never express. One
+    #     explanation per symbol, as `dispatch_hint` gives it: a selector
+    #     that also carries @objc.IBAction is listed under the decorator.
     for record in scan.records:
         bases = class_bases_by_local(record["definitions"])
         for definition in record["definitions"]:
+            if (record["file"], definition["qualname"]) in by_decorator:
+                continue
             if definition["kind"] == "method" and is_framework_method(
                     bases.get(definition["parent"]), definition["name"], patterns):
                 gaps.append(Gap(
@@ -440,12 +446,16 @@ def find_gaps(scan, patterns: list[str]) -> list[Gap]:
             value = hint["value"]
             if value in exported or value in referenced:
                 continue
-            if value in defined and value not in own:
+            # A file mentioning its own names in strings is noise — except
+            # a selector: "quit:" beside `def quit_` is the wiring itself.
+            if value in defined and (value not in own or "selector" in hint):
                 where = ", ".join(defined[value][:3])
+                spelled = (f'"{hint["selector"]}" is the selector for {value}, which'
+                           if "selector" in hint else f'"{value}"')
                 gaps.append(Gap(
                     "name_in_string_literal", record["file"], hint["line"],
                     by_id.get(hint["enclosing"], "<module>"),
-                    f'"{value}" names a symbol defined at {where}'))
+                    f'{spelled} names a symbol defined at {where}'))
 
     return sorted(gaps, key=lambda g: (g.kind, g.file, g.line))
 

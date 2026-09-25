@@ -108,7 +108,11 @@ def test_annotation_and_docstring_arithmetic(indexed):
     assert 0.0 < profile.return_annotation_rate < 1.0
     have, total = profile.docstrings["function"]
     assert 0 < have <= total
-    assert profile.naming["snake_case functions"][0] == profile.naming["snake_case functions"][1]
+    snake, total = profile.naming["snake_case functions"]
+    # cocoa.py: two Cocoa selectors are camelCase by Objective-C convention
+    # (applicationDidFinishLaunching_, awakeFromNib); every other function
+    # and method in the fixtures is snake_case
+    assert total - snake == 2
 
 
 def test_tests_are_excluded_by_default_and_counted(tmp_path):
